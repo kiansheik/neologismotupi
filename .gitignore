@@ -1,0 +1,38 @@
+# macOS
+.DS_Store
+
+# Node
+node_modules/
+.pnpm-store/
+apps/web/node_modules/
+apps/web/dist/
+apps/web/.vite/
+apps/web/playwright-report/
+apps/web/test-results/
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+.venv/
+apps/api/.venv/
+
+# Env files
+.env
+.env.local
+apps/api/.env
+apps/web/.env
+
+# Alembic artifacts
+alembic.log
+
+# IDE
+.vscode/
+.idea/

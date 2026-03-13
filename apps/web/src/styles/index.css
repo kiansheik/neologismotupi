@@ -1,0 +1,24 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --surface: #f7f7f2;
+  --surface-alt: #eef2e8;
+  --text: #1f2a1f;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  font-family: "Source Sans 3", "IBM Plex Sans", sans-serif;
+  color: var(--text);
+  background:
+    radial-gradient(circle at top right, #dbe6ce 0%, transparent 45%),
+    radial-gradient(circle at 20% 80%, #d8e6df 0%, transparent 35%),
+    var(--surface);
+}
+
+* {
+  box-sizing: border-box;
+}
