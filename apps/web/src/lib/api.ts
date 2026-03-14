@@ -19,6 +19,39 @@ type RequestInitWithBody = Omit<RequestInit, "body"> & {
   body?: unknown;
 };
 
+function pathRequiresTurnstile(path: string, method: string): boolean {
+  if (method !== "POST") {
+    return false;
+  }
+
+  const normalizedPath = path.startsWith("http://") || path.startsWith("https://")
+    ? new URL(path).pathname.replace(/^\/api/, "")
+    : path;
+
+  if (
+    normalizedPath === "/auth/register" ||
+    normalizedPath === "/auth/login" ||
+    normalizedPath === "/auth/request-password-reset" ||
+    normalizedPath === "/entries"
+  ) {
+    return true;
+  }
+
+  if (/^\/entries\/[^/]+\/examples$/.test(normalizedPath)) {
+    return true;
+  }
+
+  if (/^\/entries\/[^/]+\/reports$/.test(normalizedPath)) {
+    return true;
+  }
+
+  if (/^\/examples\/[^/]+\/reports$/.test(normalizedPath)) {
+    return true;
+  }
+
+  return false;
+}
+
 function buildUrl(path: string): string {
   if (path.startsWith("http://") || path.startsWith("https://")) {
     return path;
@@ -37,7 +70,8 @@ export async function apiFetch<T>(path: string, options: RequestInitWithBody = {
     method !== "HEAD" &&
     typeof body === "object" &&
     body !== null &&
-    !Array.isArray(body)
+    !Array.isArray(body) &&
+    pathRequiresTurnstile(path, method)
   ) {
     const bodyWithToken = body as Record<string, unknown>;
     if (bodyWithToken.turnstile_token === undefined && isTurnstileConfigured()) {

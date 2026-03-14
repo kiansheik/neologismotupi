@@ -1,15 +1,24 @@
 import { Link, Outlet } from "react-router-dom";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useEffect } from "react";
 
 import { useCurrentUser } from "@/features/auth/hooks";
 import { logout } from "@/features/auth/api";
 import { Button } from "@/components/ui/button";
 import { type Locale, useI18n } from "@/i18n";
+import { isTurnstileConfigured, preloadTurnstile } from "@/lib/turnstile";
 
 export function AppShell() {
   const queryClient = useQueryClient();
   const { data: user } = useCurrentUser();
   const { locale, setLocale, t } = useI18n();
+
+  useEffect(() => {
+    if (!isTurnstileConfigured()) {
+      return;
+    }
+    void preloadTurnstile();
+  }, []);
 
   const logoutMutation = useMutation({
     mutationFn: logout,

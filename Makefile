@@ -17,7 +17,7 @@ API_DIR := apps/api
 WEB_DIR := apps/web
 API_ENV_FILE ?= .env
 
-.PHONY: help bootstrap-macos bootstrap-linux install dev dev-web dev-api web-build prod-check prod-migrate db-create db-migrate db-reset db-rebuild seed test-email db-backup db-dump-docker db-restore-dump deploy-full deploy-daily deploy-reset deploy-smoke deploy-ssh-all deploy-email-test deploy-smtp-logs bootstrap-admin change-user-password test test-web test-api test-e2e lint format
+.PHONY: help bootstrap-macos bootstrap-linux install dev dev-web dev-api web-build prod-check prod-migrate db-create db-migrate db-reset db-rebuild seed test-email db-backup db-dump-docker db-restore-dump deploy-full deploy-daily deploy-reset deploy-smoke deploy-ssh-all deploy-email-test deploy-smtp-logs deploy-api-logs deploy-api-logs-follow bootstrap-admin change-user-password test test-web test-api test-e2e lint format
 
 help:
 	@echo "Available targets:"
@@ -45,6 +45,8 @@ help:
 	@echo "  make deploy-smoke     # Run smoke checks against DEPLOY_API_URL (+ CORS preflight from DEPLOY_SMOKE_ORIGIN)"
 	@echo "  make deploy-email-test TO=<recipient@email> [DEPLOY_HOST=...] [DEPLOY_USER=...] [DEPLOY_PATH=...] [SSH_IDENTITY=...]"
 	@echo "  make deploy-smtp-logs [DEPLOY_HOST=...] [DEPLOY_USER=...] [DEPLOY_PATH=...] [SSH_IDENTITY=...]"
+	@echo "  make deploy-api-logs [DEPLOY_HOST=...] [DEPLOY_USER=...] [DEPLOY_PATH=...] [SSH_IDENTITY=...]"
+	@echo "  make deploy-api-logs-follow [DEPLOY_HOST=...] [DEPLOY_USER=...] [DEPLOY_PATH=...] [SSH_IDENTITY=...]"
 	@echo "  make deploy-ssh-all DEPLOY_HOST=<host> [DEPLOY_USER=root] [DEPLOY_PATH=/srv/nheenga-neologismos] [DEPLOY_DB_DUMP=/path/file.sql.gz] [DEPLOY_SEED_CSV=/path/neologisms.csv] [DEPLOY_MODE=full|daily] [DEPLOY_API_URL=https://api.example.com] [DEPLOY_SMOKE_ORIGIN=https://neo.example.com] [SSH_IDENTITY=~/.ssh/id_ed25519] [DEPLOY_RESET_STACK=1] [DEPLOY_RESET_VOLUMES=1]"
 	@echo "  make bootstrap-admin EMAIL=<email> PASSWORD=<password> [DISPLAY_NAME=<name>]  # Create/update first admin"
 	@echo "  make change-user-password <email> <new_password>  # Update a user's password"
@@ -189,6 +191,14 @@ deploy-email-test:
 deploy-smtp-logs:
 	@ssh -i "$(SSH_IDENTITY)" "$(DEPLOY_USER)@$(DEPLOY_HOST)" \
 		"cd '$(DEPLOY_PATH)' && docker compose -f deploy/docker-compose.remote.yml --env-file deploy/env/stack.env logs --tail=120 smtp-relay"
+
+deploy-api-logs:
+	@ssh -i "$(SSH_IDENTITY)" "$(DEPLOY_USER)@$(DEPLOY_HOST)" \
+		"cd '$(DEPLOY_PATH)' && docker compose -f deploy/docker-compose.remote.yml --env-file deploy/env/stack.env logs --tail=180 api"
+
+deploy-api-logs-follow:
+	@ssh -i "$(SSH_IDENTITY)" "$(DEPLOY_USER)@$(DEPLOY_HOST)" \
+		"cd '$(DEPLOY_PATH)' && docker compose -f deploy/docker-compose.remote.yml --env-file deploy/env/stack.env logs -f --tail=180 api"
 
 bootstrap-admin:
 	@EMAIL_INPUT="$${EMAIL:-}"; \

@@ -1,7 +1,7 @@
 const TURNSTILE_SCRIPT_SRC =
   "https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit";
 const TURNSTILE_SITE_KEY = (import.meta.env.VITE_TURNSTILE_SITE_KEY ?? "").trim();
-const TURNSTILE_TIMEOUT_MS = 15000;
+const TURNSTILE_TIMEOUT_MS = 6000;
 
 type TurnstileRenderOptions = {
   sitekey: string;
@@ -63,6 +63,10 @@ function ensureTurnstileScript(): Promise<TurnstileApi | null> {
   });
 
   return turnstileScriptPromise;
+}
+
+export async function preloadTurnstile(): Promise<void> {
+  await ensureTurnstileScript();
 }
 
 function createHiddenContainer(): HTMLDivElement | null {
