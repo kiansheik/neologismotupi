@@ -30,6 +30,15 @@ def hash_session_token(token: str) -> str:
     return hashlib.sha256(f"{token}:{secret_key}".encode("utf-8")).hexdigest()
 
 
+def generate_email_action_token() -> str:
+    return secrets.token_urlsafe(48)
+
+
+def hash_email_action_token(token: str) -> str:
+    secret_key = get_settings().secret_key
+    return hashlib.sha256(f"email:{token}:{secret_key}".encode("utf-8")).hexdigest()
+
+
 async def create_session(db: AsyncSession, user_id) -> str:
     now = datetime.now(UTC)
     expires_at = now + timedelta(hours=get_settings().session_ttl_hours)

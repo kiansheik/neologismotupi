@@ -3,11 +3,13 @@ from datetime import UTC, datetime, timedelta
 import pytest
 from sqlalchemy import func, select
 
+import app.api.routes.auth as auth_routes
 import app.db as db_module
 from app.core.enums import TagType
 from app.models.entry import Entry, Example, ExampleVote, Tag, Vote
 from app.models.moderation import Report
 from app.models.user import Profile, User
+from app.security import hash_password
 
 
 async def register_user(client, email: str, display_name: str, password: str = "password123"):
@@ -421,3 +423,113 @@ async def test_public_user_profile_endpoint(client):
     payload = response.json()
     assert payload["id"] == user_id
     assert payload["profile"]["display_name"] == "Profile User"
+
+
+@pytest.mark.asyncio
+async def test_password_reset_for_verified_user(client, monkeypatch):
+    sent_reset: dict[str, str] = {}
+
+    async def fake_send_password_reset_email(*, to_email: str, token: str) -> None:
+        sent_reset["email"] = to_email
+        sent_reset["token"] = token
+
+    async def fake_send_verification_email(*, to_email: str, token: str) -> None:
+        del to_email, token
+        raise AssertionError("Verification email should not be sent for verified users")
+
+    monkeypatch.setattr(auth_routes, "send_password_reset_email", fake_send_password_reset_email)
+    monkeypatch.setattr(auth_routes, "send_email_verification_email", fake_send_verification_email)
+
+    await register_user(client, "recover-verified@example.com", "Recover Verified", password="oldpassword123")
+    await client.post("/api/auth/logout")
+
+    request_reset = await client.post(
+        "/api/auth/request-password-reset",
+        json={"email": "recover-verified@example.com"},
+    )
+    assert request_reset.status_code == 200, request_reset.text
+    assert request_reset.json()["ok"] is True
+    assert sent_reset["email"] == "recover-verified@example.com"
+    assert sent_reset["token"]
+
+    do_reset = await client.post(
+        "/api/auth/reset-password",
+        json={"token": sent_reset["token"], "new_password": "newpassword123"},
+    )
+    assert do_reset.status_code == 200, do_reset.text
+
+    old_login = await client.post(
+        "/api/auth/login",
+        json={"email": "recover-verified@example.com", "password": "oldpassword123"},
+    )
+    assert old_login.status_code == 401, old_login.text
+
+    new_login = await client.post(
+        "/api/auth/login",
+        json={"email": "recover-verified@example.com", "password": "newpassword123"},
+    )
+    assert new_login.status_code == 200, new_login.text
+
+
+@pytest.mark.asyncio
+async def test_unverified_user_gets_email_verification_before_reset(client, monkeypatch):
+    captured: dict[str, str] = {}
+
+    async def fake_send_password_reset_email(*, to_email: str, token: str) -> None:
+        captured["reset_email"] = to_email
+        captured["reset_token"] = token
+
+    async def fake_send_verification_email(*, to_email: str, token: str) -> None:
+        captured["verify_email"] = to_email
+        captured["verify_token"] = token
+
+    monkeypatch.setattr(auth_routes, "send_password_reset_email", fake_send_password_reset_email)
+    monkeypatch.setattr(auth_routes, "send_email_verification_email", fake_send_verification_email)
+
+    async with db_module.AsyncSessionLocal() as session:
+        user = User(
+            email="recover-unverified@example.com",
+            hashed_password=hash_password("temporary-password"),
+            is_active=True,
+            is_verified=False,
+            is_superuser=False,
+        )
+        session.add(user)
+        await session.flush()
+        session.add(Profile(user_id=user.id, display_name="Recover Unverified"))
+        await session.commit()
+
+    request_reset = await client.post(
+        "/api/auth/request-password-reset",
+        json={"email": "recover-unverified@example.com"},
+    )
+    assert request_reset.status_code == 200, request_reset.text
+    assert request_reset.json()["ok"] is True
+    assert captured["verify_email"] == "recover-unverified@example.com"
+    assert "verify_token" in captured
+    assert "reset_token" not in captured
+
+    invalid_direct_reset = await client.post(
+        "/api/auth/reset-password",
+        json={"token": captured["verify_token"], "new_password": "newpassword123"},
+    )
+    assert invalid_direct_reset.status_code == 400, invalid_direct_reset.text
+    assert invalid_direct_reset.json()["error"]["code"] == "invalid_or_expired_token"
+
+    verify_email = await client.post("/api/auth/verify-email", json={"token": captured["verify_token"]})
+    assert verify_email.status_code == 200, verify_email.text
+    assert verify_email.json()["ok"] is True
+    assert captured["reset_email"] == "recover-unverified@example.com"
+    assert captured["reset_token"]
+
+    finish_reset = await client.post(
+        "/api/auth/reset-password",
+        json={"token": captured["reset_token"], "new_password": "newpassword123"},
+    )
+    assert finish_reset.status_code == 200, finish_reset.text
+
+    login = await client.post(
+        "/api/auth/login",
+        json={"email": "recover-unverified@example.com", "password": "newpassword123"},
+    )
+    assert login.status_code == 200, login.text

@@ -10,6 +10,7 @@ People already create contemporary Tupi usage in classrooms, communities, and on
 
 ## Current MVP scope
 - Account signup/login/logout with httpOnly session cookies.
+- Email verification and password reset/recovery flow.
 - Submit/edit entries with revision history.
 - Add usage examples.
 - Vote on entries and examples (with anti-abuse rules).
@@ -191,6 +192,7 @@ SEED_CSV_PATH=~/nhe-enga/neologisms.csv
 ```env
 APP_ENV=development
 APP_RELEASE=dev-local
+APP_PUBLIC_URL=http://localhost:5173
 DATABASE_URL=postgresql+asyncpg://localhost/nheenga_dev
 SECRET_KEY=change-me
 CORS_ORIGINS=http://localhost:5173
@@ -205,6 +207,16 @@ SESSION_COOKIE_SECURE=false
 SESSION_COOKIE_SAMESITE=lax
 SESSION_COOKIE_DOMAIN=
 SESSION_COOKIE_PATH=/
+EMAIL_DELIVERY=log
+SMTP_HOST=
+SMTP_PORT=587
+SMTP_USERNAME=
+SMTP_PASSWORD=
+SMTP_FROM_EMAIL=
+SMTP_FROM_NAME="Nheenga Neologismos"
+SMTP_USE_TLS=true
+VERIFICATION_TOKEN_TTL_MINUTES=30
+PASSWORD_RESET_TOKEN_TTL_MINUTES=30
 ```
 
 ### `apps/api/.env.production.example`
@@ -212,6 +224,7 @@ SESSION_COOKIE_PATH=/
 ```env
 APP_ENV=production
 APP_RELEASE=manual
+APP_PUBLIC_URL=https://neo.academiatupi.com
 DATABASE_URL=postgresql+asyncpg://postgres:change-me@db.example.com:5432/nheenga_prod
 SECRET_KEY=replace-with-a-long-random-secret-key-at-least-32-chars
 CORS_ORIGINS=https://academiatupi.com,https://www.academiatupi.com,https://neo.academiatupi.com
@@ -225,7 +238,28 @@ SESSION_COOKIE_SECURE=true
 SESSION_COOKIE_SAMESITE=lax
 SESSION_COOKIE_DOMAIN=
 SESSION_COOKIE_PATH=/
+EMAIL_DELIVERY=smtp
+SMTP_HOST=mail.privateemail.com
+SMTP_PORT=587
+SMTP_USERNAME=no-reply@academiatupi.com
+SMTP_PASSWORD=replace-with-namecheap-private-email-password
+SMTP_FROM_EMAIL=no-reply@academiatupi.com
+SMTP_FROM_NAME="Academia Tupi"
+SMTP_USE_TLS=true
+VERIFICATION_TOKEN_TTL_MINUTES=30
+PASSWORD_RESET_TOKEN_TTL_MINUTES=30
 ```
+
+Docker deploy stack note (Namecheap relay default):
+- `deploy/docker-compose.remote.yml` includes an internal `smtp-relay` service.
+- For that path, set `deploy/env/api.env` with:
+  - `SMTP_HOST=smtp-relay`
+  - `SMTP_PORT=25`
+  - `SMTP_USE_TLS=false`
+- And set `deploy/env/stack.env` with:
+  - `SMTP_RELAYHOST=[mail.privateemail.com]:587`
+  - `SMTP_RELAYHOST_USERNAME=no-reply@academiatupi.com`
+  - `SMTP_RELAYHOST_PASSWORD=<namecheap-private-email-password>`
 
 ### `apps/web/.env`
 
@@ -238,6 +272,7 @@ VITE_TURNSTILE_SITE_KEY=
 Turnstile note:
 - `TURNSTILE_SECRET_KEY` is validated on the API server at request time.
 - `VITE_TURNSTILE_SITE_KEY` is compiled into the frontend at build time, so changing it requires a new frontend deploy.
+- `EMAIL_DELIVERY=log` is for local/dev troubleshooting only. Use `EMAIL_DELIVERY=smtp` in production.
 
 ### `apps/web/.env.production.example`
 
@@ -263,6 +298,13 @@ Health endpoints:
 ```bash
 make dev-web
 ```
+
+Auth/recovery pages:
+- `/signup`
+- `/login`
+- `/recover`
+- `/verify-email`
+- `/reset-password`
 
 ## Build frontend (static files)
 
@@ -415,6 +457,8 @@ Optional extras:
 ```bash
 make deploy-ssh-all DEPLOY_DB_DUMP=backups/docker-postgres/<dump-file>.sql.gz
 make deploy-smoke
+make deploy-email-test TO=you@domain.com
+make deploy-smtp-logs
 ```
 
 ## Cookie domain decision
@@ -436,6 +480,6 @@ On many local setups, PostgreSQL allows passwordless access when your database r
 
 ## Future deployment direction
 - Frontend static build for GitHub Pages/Cloudflare Pages.
-- Backend deployed separately (FastAPI host).
-- Managed PostgreSQL (Supabase/Postgres-compatible) without ORM rewrite.
+- Backend + PostgreSQL + SMTP relay on one VPS Docker stack.
+- Keep Postgres schema portable for later managed Postgres migration without ORM rewrite.
 - Optional production bot verification (Cloudflare Turnstile) via the existing adapter interface.

@@ -22,12 +22,15 @@ export function AppShell() {
   return (
     <div className="min-h-screen">
       <header className="border-b border-[#d8cbb4] bg-[#f8efde]/95 backdrop-blur">
-        <nav className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3">
-          <Link to="/" className="font-semibold text-brand-800">
+        <nav className="mx-auto flex max-w-6xl flex-col gap-3 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+          <Link to="/" className="min-w-0 text-base font-semibold text-brand-800 sm:text-lg">
             {import.meta.env.VITE_APP_NAME ?? "Nheenga Neologismos"}
           </Link>
-          <div className="flex items-center gap-3 text-sm">
-            <Link to="/entries" className="rounded-md px-2 py-1 text-brand-700 hover:bg-brand-700 hover:text-white">
+          <div className="flex w-full flex-wrap items-center gap-2 text-sm sm:w-auto sm:justify-end">
+            <Link
+              to="/entries"
+              className="rounded-md px-2 py-1 text-brand-700 hover:bg-brand-700 hover:text-white"
+            >
               {t("nav.entries")}
             </Link>
             <Link to="/submit" className="rounded-md px-2 py-1 text-brand-700 hover:bg-brand-700 hover:text-white">
@@ -49,6 +52,7 @@ export function AppShell() {
                 <Button
                   type="button"
                   variant="ghost"
+                  className="px-2 py-1"
                   onClick={() => logoutMutation.mutate()}
                   disabled={logoutMutation.isPending}
                 >

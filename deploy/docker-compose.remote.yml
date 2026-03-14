@@ -24,6 +24,17 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      smtp-relay:
+        condition: service_started
+
+  smtp-relay:
+    image: boky/postfix:latest
+    restart: unless-stopped
+    environment:
+      ALLOWED_SENDER_DOMAINS: ${SMTP_ALLOWED_SENDER_DOMAINS:-academiatupi.com}
+      RELAYHOST: ${SMTP_RELAYHOST:-}
+      RELAYHOST_USERNAME: ${SMTP_RELAYHOST_USERNAME:-}
+      RELAYHOST_PASSWORD: ${SMTP_RELAYHOST_PASSWORD:-}
 
   caddy:
     image: caddy:2.10

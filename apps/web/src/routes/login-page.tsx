@@ -1,6 +1,6 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { z } from "zod";
 
 import { ApiError } from "@/lib/api";
@@ -85,6 +85,11 @@ export function LoginPage() {
         <Button type="submit" disabled={loginMutation.isPending}>
           {t("auth.loginButton")}
         </Button>
+        <p className="text-sm text-slate-700">
+          <Link className="text-brand-700 hover:underline" to="/recover">
+            {t("auth.recoverLink")}
+          </Link>
+        </p>
       </form>
     </Card>
   );

@@ -8,6 +8,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class Settings(BaseSettings):
     app_env: str = "development"
     app_release: str = "dev-local"
+    app_public_url: str = "http://localhost:5173"
     database_url: str = "postgresql+asyncpg://localhost/nheenga_dev"
     secret_key: str = "change-me"
     cors_origins: list[str] = ["http://localhost:5173"]
@@ -37,6 +38,20 @@ class Settings(BaseSettings):
     example_submission_rate_limit_window_seconds: int = 60 * 60
     report_rate_limit_count: int = 20
     report_rate_limit_window_seconds: int = 60 * 60
+    password_reset_request_rate_limit_count: int = 10
+    password_reset_request_rate_limit_window_seconds: int = 60 * 60
+
+    verification_token_ttl_minutes: int = 30
+    password_reset_token_ttl_minutes: int = 30
+
+    email_delivery: str = "log"
+    smtp_host: str | None = None
+    smtp_port: int = 587
+    smtp_username: str | None = None
+    smtp_password: str | None = None
+    smtp_from_email: str | None = None
+    smtp_from_name: str = "Nheenga Neologismos"
+    smtp_use_tls: bool = True
 
     model_config = SettingsConfigDict(
         env_file=".env",
@@ -79,10 +94,24 @@ class Settings(BaseSettings):
             return None
         return cleaned
 
+    @field_validator("email_delivery", mode="before")
+    @classmethod
+    def normalize_email_delivery(cls, value: str) -> str:
+        normalized = str(value).strip().lower()
+        if normalized not in {"log", "smtp"}:
+            raise ValueError("EMAIL_DELIVERY must be one of: log, smtp")
+        return normalized
+
     @model_validator(mode="after")
     def validate_production_safety(self) -> "Settings":
         if self.turnstile_enabled and not self.turnstile_secret_key:
             raise ValueError("TURNSTILE_SECRET_KEY is required when TURNSTILE_ENABLED=true")
+
+        if self.email_delivery == "smtp":
+            if not self.smtp_host:
+                raise ValueError("SMTP_HOST is required when EMAIL_DELIVERY=smtp")
+            if not self.smtp_from_email:
+                raise ValueError("SMTP_FROM_EMAIL is required when EMAIL_DELIVERY=smtp")
 
         if self.app_env != "production":
             return self

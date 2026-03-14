@@ -45,3 +45,21 @@ class UserOut(BaseModel):
 
 class LogoutResponse(BaseModel):
     ok: bool
+
+
+class PasswordResetRequest(BaseModel):
+    email: EmailStr
+    turnstile_token: str | None = None
+
+
+class EmailVerificationConfirmRequest(BaseModel):
+    token: str = Field(min_length=20, max_length=512)
+
+
+class PasswordResetConfirmRequest(BaseModel):
+    token: str = Field(min_length=20, max_length=512)
+    new_password: str = Field(min_length=8, max_length=128)
+
+
+class ActionAcceptedResponse(BaseModel):
+    ok: bool

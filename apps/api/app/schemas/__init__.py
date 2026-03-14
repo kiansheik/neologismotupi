@@ -1,4 +1,13 @@
-from app.schemas.auth import LoginRequest, LogoutResponse, RegisterRequest, UserOut
+from app.schemas.auth import (
+    ActionAcceptedResponse,
+    EmailVerificationConfirmRequest,
+    LoginRequest,
+    LogoutResponse,
+    PasswordResetConfirmRequest,
+    PasswordResetRequest,
+    RegisterRequest,
+    UserOut,
+)
 from app.schemas.entries import (
     DuplicateHintOut,
     EntryCreate,
@@ -23,7 +32,9 @@ from app.schemas.moderation import (
 )
 
 __all__ = [
+    "ActionAcceptedResponse",
     "DuplicateHintOut",
+    "EmailVerificationConfirmRequest",
     "EntryCreate",
     "EntryDetailOut",
     "EntryListOut",
@@ -37,6 +48,8 @@ __all__ = [
     "LogoutResponse",
     "ModerationActionRequest",
     "ModerationQueueOut",
+    "PasswordResetConfirmRequest",
+    "PasswordResetRequest",
     "RegisterRequest",
     "ReportCreate",
     "ReportOut",

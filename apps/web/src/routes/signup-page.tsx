@@ -1,6 +1,6 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { z } from "zod";
 
 import { ApiError } from "@/lib/api";
@@ -33,9 +33,13 @@ export function SignupPage() {
 
   const signupMutation = useMutation({
     mutationFn: register,
-    onSuccess: async () => {
+    onSuccess: async (user) => {
       await queryClient.invalidateQueries({ queryKey: ["me"] });
-      navigate("/entries");
+      if (user.is_verified) {
+        navigate("/entries");
+        return;
+      }
+      navigate("/verify-email");
     },
   });
 
@@ -97,6 +101,11 @@ export function SignupPage() {
         <Button type="submit" disabled={signupMutation.isPending}>
           {t("auth.signupButton")}
         </Button>
+        <p className="text-sm text-slate-700">
+          <Link className="text-brand-700 hover:underline" to="/recover">
+            {t("auth.recoverLink")}
+          </Link>
+        </p>
       </form>
     </Card>
   );

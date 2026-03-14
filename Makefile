@@ -7,6 +7,7 @@ DB_USER ?= $(shell whoami)
 DEPLOY_HOST ?= academiatupi.com
 DEPLOY_USER ?= root
 DEPLOY_PATH ?= /srv/nheenga-neologismos
+SSH_IDENTITY ?= $(HOME)/.ssh/neologismotupi_ed25519
 DEPLOY_API_URL ?= https://api.academiatupi.com
 DEPLOY_SMOKE_ORIGIN ?= https://neo.academiatupi.com
 DEPLOY_SMOKE_RETRIES ?= 60
@@ -16,7 +17,7 @@ API_DIR := apps/api
 WEB_DIR := apps/web
 API_ENV_FILE ?= .env
 
-.PHONY: help bootstrap-macos bootstrap-linux install dev dev-web dev-api web-build prod-check prod-migrate db-create db-migrate db-reset db-rebuild seed db-backup db-dump-docker db-restore-dump deploy-full deploy-daily deploy-reset deploy-smoke deploy-ssh-all bootstrap-admin change-user-password test test-web test-api test-e2e lint format
+.PHONY: help bootstrap-macos bootstrap-linux install dev dev-web dev-api web-build prod-check prod-migrate db-create db-migrate db-reset db-rebuild seed test-email db-backup db-dump-docker db-restore-dump deploy-full deploy-daily deploy-reset deploy-smoke deploy-ssh-all deploy-email-test deploy-smtp-logs bootstrap-admin change-user-password test test-web test-api test-e2e lint format
 
 help:
 	@echo "Available targets:"
@@ -34,6 +35,7 @@ help:
 	@echo "  make db-reset         # Drop/recreate database and migrate (uses DATABASE_URL)"
 	@echo "  make db-rebuild       # Reset database and seed from CSV"
 	@echo "  make seed             # Seed from CSV only"
+	@echo "  make test-email TO=<recipient@email>  # Send SMTP test email with current API env"
 	@echo "  make db-backup        # Create a compressed PostgreSQL backup"
 	@echo "  make db-dump-docker   # Dump local Docker postgres to backups/"
 	@echo "  make db-restore-dump DUMP_FILE=<file> DATABASE_URL=<url>  # Restore dump into target DB"
@@ -41,6 +43,8 @@ help:
 	@echo "  make deploy-full      # Full stack deploy: API+Postgres+Caddy + migrate + smoke checks"
 	@echo "  make deploy-reset DEPLOY_SEED_CSV=/abs/path/neologisms.csv  # Destructive reset + reseed"
 	@echo "  make deploy-smoke     # Run smoke checks against DEPLOY_API_URL (+ CORS preflight from DEPLOY_SMOKE_ORIGIN)"
+	@echo "  make deploy-email-test TO=<recipient@email> [DEPLOY_HOST=...] [DEPLOY_USER=...] [DEPLOY_PATH=...] [SSH_IDENTITY=...]"
+	@echo "  make deploy-smtp-logs [DEPLOY_HOST=...] [DEPLOY_USER=...] [DEPLOY_PATH=...] [SSH_IDENTITY=...]"
 	@echo "  make deploy-ssh-all DEPLOY_HOST=<host> [DEPLOY_USER=root] [DEPLOY_PATH=/srv/nheenga-neologismos] [DEPLOY_DB_DUMP=/path/file.sql.gz] [DEPLOY_SEED_CSV=/path/neologisms.csv] [DEPLOY_MODE=full|daily] [DEPLOY_API_URL=https://api.example.com] [DEPLOY_SMOKE_ORIGIN=https://neo.example.com] [SSH_IDENTITY=~/.ssh/id_ed25519] [DEPLOY_RESET_STACK=1] [DEPLOY_RESET_VOLUMES=1]"
 	@echo "  make bootstrap-admin EMAIL=<email> PASSWORD=<password> [DISPLAY_NAME=<name>]  # Create/update first admin"
 	@echo "  make change-user-password <email> <new_password>  # Update a user's password"
@@ -108,6 +112,13 @@ seed:
 	@set -a; [ -f .env ] && . ./.env; [ -f "$(API_DIR)/.env" ] && . "$(API_DIR)/.env"; set +a; \
 	cd $(API_DIR) && uv run python -m app.core.seed
 
+test-email:
+	@if [ -z "$(TO)" ]; then \
+		echo "Usage: make test-email TO=<recipient@email>"; \
+		exit 1; \
+	fi
+	@cd $(API_DIR) && set -a; [ -f .env ] && . ./.env; set +a; uv run python -m app.core.send_test_email "$(TO)"
+
 db-backup:
 	@bash scripts/backup-postgres.sh
 
@@ -166,6 +177,18 @@ deploy-smoke:
 	RETRIES="$(DEPLOY_SMOKE_RETRIES)" \
 	SLEEP_SECONDS="$(DEPLOY_SMOKE_SLEEP_SECONDS)" \
 	bash scripts/smoke-api.sh
+
+deploy-email-test:
+	@if [ -z "$(TO)" ]; then \
+		echo "Usage: make deploy-email-test TO=<recipient@email> [DEPLOY_HOST=...] [DEPLOY_USER=...] [DEPLOY_PATH=...] [SSH_IDENTITY=...]"; \
+		exit 1; \
+	fi
+	@ssh -i "$(SSH_IDENTITY)" "$(DEPLOY_USER)@$(DEPLOY_HOST)" \
+		"cd '$(DEPLOY_PATH)' && docker compose -f deploy/docker-compose.remote.yml --env-file deploy/env/stack.env exec -T api uv run python -m app.core.send_test_email '$(TO)'"
+
+deploy-smtp-logs:
+	@ssh -i "$(SSH_IDENTITY)" "$(DEPLOY_USER)@$(DEPLOY_HOST)" \
+		"cd '$(DEPLOY_PATH)' && docker compose -f deploy/docker-compose.remote.yml --env-file deploy/env/stack.env logs --tail=120 smtp-relay"
 
 bootstrap-admin:
 	@EMAIL_INPUT="$${EMAIL:-}"; \

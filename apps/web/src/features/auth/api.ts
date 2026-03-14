@@ -12,6 +12,19 @@ export interface LoginPayload {
   password: string;
 }
 
+export interface RequestPasswordResetPayload {
+  email: string;
+}
+
+export interface VerifyEmailPayload {
+  token: string;
+}
+
+export interface ResetPasswordPayload {
+  token: string;
+  new_password: string;
+}
+
 export async function register(payload: RegisterPayload): Promise<User> {
   return apiFetch<User>("/auth/register", { method: "POST", body: payload });
 }
@@ -37,4 +50,16 @@ export async function me(): Promise<User | null> {
 
 export async function getPublicUser(userId: string): Promise<PublicUser> {
   return apiFetch<PublicUser>(`/users/${userId}`);
+}
+
+export async function requestPasswordReset(payload: RequestPasswordResetPayload): Promise<{ ok: boolean }> {
+  return apiFetch<{ ok: boolean }>("/auth/request-password-reset", { method: "POST", body: payload });
+}
+
+export async function verifyEmail(payload: VerifyEmailPayload): Promise<{ ok: boolean }> {
+  return apiFetch<{ ok: boolean }>("/auth/verify-email", { method: "POST", body: payload });
+}
+
+export async function resetPassword(payload: ResetPasswordPayload): Promise<{ ok: boolean }> {
+  return apiFetch<{ ok: boolean }>("/auth/reset-password", { method: "POST", body: payload });
 }

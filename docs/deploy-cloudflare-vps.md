@@ -19,7 +19,7 @@ Optional:
 
 If you want provider portability, this repo includes:
 
-- `deploy/docker-compose.remote.yml` (API + Postgres + Caddy)
+- `deploy/docker-compose.remote.yml` (API + Postgres + SMTP relay + Caddy)
 - `make deploy-ssh-all ...` (sync + remote docker compose up + migrate)
 
 Quick start:
@@ -51,6 +51,10 @@ Notes for `deploy/env/api.env`:
 - `DATABASE_URL` should point to `@postgres:5432` in this stack.
 - URL-encode password if it has special chars (`@`, `!`, `#`, `/`, `:`), otherwise hostname parsing breaks.
 - If Postgres volume already exists, changing env password alone does not reinitialize credentials. Keep credentials stable, or run a reset deploy (`make deploy-reset ...`) when you intentionally need a clean re-init.
+- Use Namecheap Private Email relay through `smtp-relay`:
+  - `deploy/env/api.env`: `SMTP_HOST=smtp-relay`, `SMTP_PORT=25`, `SMTP_USE_TLS=false`
+  - `deploy/env/stack.env`: `SMTP_RELAYHOST=[mail.privateemail.com]:587`, `SMTP_RELAYHOST_USERNAME`, `SMTP_RELAYHOST_PASSWORD`
+  - `SMTP_FROM_EMAIL` should match your mailbox sender (for example `no-reply@academiatupi.com`).
 
 Remote requirements for this fast path:
 
@@ -182,9 +186,11 @@ Edit `/srv/nheenga-neologismos/apps/api/.env.production`:
 - `DATABASE_URL=postgresql+asyncpg://nheenga:<password>@localhost:5432/nheenga_prod`
 - `SECRET_KEY=<long-random-32+-char-string>`
 - `CORS_ORIGINS=https://www.academiatupi.com,https://neo.academiatupi.com`
+- `APP_PUBLIC_URL=https://neo.academiatupi.com`
 - `FIRST_USER_IS_ADMIN=false`
 - `SESSION_COOKIE_SECURE=true`
 - `SESSION_COOKIE_DOMAIN=` (host-only cookie, scoped to `api.academiatupi.com`)
+- `EMAIL_DELIVERY=smtp` and `SMTP_*` for verification/password-reset emails
 
 Install API deps:
 
@@ -263,6 +269,10 @@ Cloudflare DNS records:
 - `A api -> <VPS_IP>` (proxied or DNS-only; either works)
 - `CNAME www -> <your-pages-project>.pages.dev` (proxied)
 - `A @ -> <VPS_IP>` only if you want apex redirect there; otherwise redirect in Cloudflare rules.
+
+Email DNS records:
+- For Namecheap Private Email relay, publish the SPF/DKIM records provided by Namecheap for your mailbox/domain.
+- Keep DMARC enabled for domain policy and reporting (`_dmarc` TXT).
 
 ## 10. First smoke checks
 

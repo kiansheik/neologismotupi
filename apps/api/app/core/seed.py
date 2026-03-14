@@ -86,12 +86,15 @@ async def _get_or_create_user(
     email: str,
     display_name: str,
     is_superuser: bool = False,
+    is_verified: bool = False,
 ) -> User:
     normalized_email = email.lower().strip()
     cached_user = cache.get(normalized_email)
     if cached_user is not None:
         if is_superuser and not cached_user.is_superuser:
             cached_user.is_superuser = True
+        if is_verified and not cached_user.is_verified:
+            cached_user.is_verified = True
         return cached_user
 
     user = (
@@ -102,7 +105,7 @@ async def _get_or_create_user(
             email=normalized_email,
             hashed_password=hash_password("seed-import-password"),
             is_active=True,
-            is_verified=True,
+            is_verified=is_verified,
             is_superuser=is_superuser,
         )
         db.add(user)
@@ -111,6 +114,8 @@ async def _get_or_create_user(
     else:
         if is_superuser and not user.is_superuser:
             user.is_superuser = True
+        if is_verified and not user.is_verified:
+            user.is_verified = True
         profile = (await db.execute(select(Profile).where(Profile.user_id == user.id))).scalar_one_or_none()
         if profile is None:
             db.add(Profile(user_id=user.id, display_name=display_name[:120]))
@@ -377,6 +382,7 @@ async def seed() -> None:
             email=DEFAULT_ADMIN_EMAIL,
             display_name=_display_name_from_email(DEFAULT_ADMIN_EMAIL),
             is_superuser=True,
+            is_verified=True,
         )
         default_submitter_user = await _get_or_create_user(
             db,
