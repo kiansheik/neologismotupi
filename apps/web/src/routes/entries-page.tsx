@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 
@@ -8,15 +8,33 @@ import { Input } from "@/components/ui/input";
 import { listEntries } from "@/features/entries/api";
 import { partOfSpeechLabel, statusToKey } from "@/i18n/formatters";
 import { useI18n } from "@/i18n";
+import { trackEvent } from "@/lib/analytics";
 
 export function EntriesPage() {
   const { t } = useI18n();
+  const hasMounted = useRef(false);
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState("");
   const [partOfSpeech, setPartOfSpeech] = useState("");
   const [sort, setSort] = useState<"alphabetical" | "recent" | "score" | "most_examples">(
     "alphabetical",
   );
+
+  useEffect(() => {
+    if (!hasMounted.current) {
+      hasMounted.current = true;
+      return;
+    }
+    const timer = window.setTimeout(() => {
+      trackEvent("entries_filter_changed", {
+        has_search: search.trim().length > 0,
+        status: status || "all",
+        part_of_speech: partOfSpeech || "all",
+        sort,
+      });
+    }, 350);
+    return () => window.clearTimeout(timer);
+  }, [partOfSpeech, search, sort, status]);
 
   const params = useMemo(
     () => ({
@@ -96,7 +114,11 @@ export function EntriesPage() {
           {data?.items.map((entry) => (
             <article key={entry.id} className="rounded-md border border-brand-100 p-3">
               <div className="flex items-center justify-between gap-2">
-                <Link className="font-semibold text-brand-800 hover:underline" to={`/entries/${entry.slug}`}>
+                <Link
+                  className="font-semibold text-brand-800 hover:underline"
+                  to={`/entries/${entry.slug}`}
+                  onClick={() => trackEvent("entry_opened_from_list", { status: entry.status })}
+                >
                   {entry.headword}
                 </Link>
                 <StatusBadge status={entry.status} />

@@ -5,6 +5,7 @@ import { z } from "zod";
 
 import { ApiError } from "@/lib/api";
 import { useI18n } from "@/i18n";
+import { trackEvent } from "@/lib/analytics";
 import { getLocalizedApiErrorMessage } from "@/lib/localized-api-error";
 import { applyZodErrors } from "@/lib/zod-form";
 import { Button } from "@/components/ui/button";
@@ -29,6 +30,12 @@ export function VerifyEmailPage() {
 
   const verifyMutation = useMutation({
     mutationFn: verifyEmail,
+    onSuccess: () => {
+      trackEvent("verify_email_success");
+    },
+    onError: (error) => {
+      trackEvent("verify_email_failed", { error_code: error instanceof ApiError ? error.code : "unknown" });
+    },
   });
 
   const onSubmit = form.handleSubmit((values) => {

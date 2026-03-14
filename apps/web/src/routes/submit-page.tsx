@@ -6,6 +6,7 @@ import { z } from "zod";
 
 import { ApiError } from "@/lib/api";
 import { useI18n } from "@/i18n";
+import { trackEvent } from "@/lib/analytics";
 import { partOfSpeechLabel } from "@/i18n/formatters";
 import { getLocalizedApiErrorMessage } from "@/lib/localized-api-error";
 import type { DuplicateHint } from "@/lib/types";
@@ -61,13 +62,21 @@ export function SubmitPage() {
   const createMutation = useMutation({
     mutationFn: (payload: SubmitForm) => createEntry(payload),
     onSuccess: (entry) => {
+      trackEvent("entry_submitted", {
+        part_of_speech: entry.part_of_speech ?? "unknown",
+        status: entry.status,
+      });
       navigate(`/entries/${entry.slug}`);
     },
     onError: (error) => {
       if (error instanceof ApiError && error.code === "possible_duplicates") {
         const details = error.details as { duplicates?: DuplicateHint[] } | undefined;
-        setPossibleDuplicates(details?.duplicates ?? []);
+        const duplicates = details?.duplicates ?? [];
+        setPossibleDuplicates(duplicates);
+        trackEvent("entry_submit_possible_duplicates", { duplicate_count: duplicates.length });
+        return;
       }
+      trackEvent("entry_submit_failed", { error_code: error instanceof ApiError ? error.code : "unknown" });
     },
   });
 
@@ -126,7 +135,11 @@ export function SubmitPage() {
             <ul className="mt-2 list-disc space-y-1 pl-5">
               {[...candidateDuplicates, ...possibleDuplicates].slice(0, 5).map((entry) => (
                 <li key={entry.id}>
-                  <Link className="text-brand-800 underline" to={`/entries/${entry.slug}`}>
+                  <Link
+                    className="text-brand-800 underline"
+                    to={`/entries/${entry.slug}`}
+                    onClick={() => trackEvent("duplicate_hint_opened")}
+                  >
                     {entry.headword}
                   </Link>
                   {entry.gloss_pt ? ` - ${entry.gloss_pt}` : ""}

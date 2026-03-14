@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 
+import { ApiError } from "@/lib/api";
 import { StatusBadge } from "@/components/status-badge";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -16,6 +17,7 @@ import {
   resolveReport,
 } from "@/features/moderation/api";
 import { useI18n } from "@/i18n";
+import { trackEvent } from "@/lib/analytics";
 import { formatDateTime, reportReasonLabel, reportStatusLabel, reportTargetLabel } from "@/i18n/formatters";
 
 export function ModerationPage() {
@@ -41,11 +43,66 @@ export function ModerationPage() {
     await queryClient.invalidateQueries({ queryKey: ["entries"] });
   };
 
-  const approveEntryMutation = useMutation({ mutationFn: (entryId: string) => approveEntry(entryId), onSuccess: refreshModeration });
-  const rejectEntryMutation = useMutation({ mutationFn: (entryId: string) => rejectEntry(entryId), onSuccess: refreshModeration });
-  const approveExampleMutation = useMutation({ mutationFn: (exampleId: string) => approveExample(exampleId), onSuccess: refreshModeration });
-  const hideExampleMutation = useMutation({ mutationFn: (exampleId: string) => hideExample(exampleId), onSuccess: refreshModeration });
-  const resolveReportMutation = useMutation({ mutationFn: (reportId: string) => resolveReport(reportId), onSuccess: refreshModeration });
+  const approveEntryMutation = useMutation({
+    mutationFn: (entryId: string) => approveEntry(entryId),
+    onSuccess: () => {
+      trackEvent("moderation_entry_approved");
+      return refreshModeration();
+    },
+    onError: (error) => {
+      trackEvent("moderation_entry_approve_failed", {
+        error_code: error instanceof ApiError ? error.code : "unknown",
+      });
+    },
+  });
+  const rejectEntryMutation = useMutation({
+    mutationFn: (entryId: string) => rejectEntry(entryId),
+    onSuccess: () => {
+      trackEvent("moderation_entry_rejected");
+      return refreshModeration();
+    },
+    onError: (error) => {
+      trackEvent("moderation_entry_reject_failed", {
+        error_code: error instanceof ApiError ? error.code : "unknown",
+      });
+    },
+  });
+  const approveExampleMutation = useMutation({
+    mutationFn: (exampleId: string) => approveExample(exampleId),
+    onSuccess: () => {
+      trackEvent("moderation_example_approved");
+      return refreshModeration();
+    },
+    onError: (error) => {
+      trackEvent("moderation_example_approve_failed", {
+        error_code: error instanceof ApiError ? error.code : "unknown",
+      });
+    },
+  });
+  const hideExampleMutation = useMutation({
+    mutationFn: (exampleId: string) => hideExample(exampleId),
+    onSuccess: () => {
+      trackEvent("moderation_example_hidden");
+      return refreshModeration();
+    },
+    onError: (error) => {
+      trackEvent("moderation_example_hide_failed", {
+        error_code: error instanceof ApiError ? error.code : "unknown",
+      });
+    },
+  });
+  const resolveReportMutation = useMutation({
+    mutationFn: (reportId: string) => resolveReport(reportId),
+    onSuccess: () => {
+      trackEvent("moderation_report_resolved");
+      return refreshModeration();
+    },
+    onError: (error) => {
+      trackEvent("moderation_report_resolve_failed", {
+        error_code: error instanceof ApiError ? error.code : "unknown",
+      });
+    },
+  });
 
   if (!currentUser) {
     return (

@@ -5,6 +5,7 @@ import { z } from "zod";
 
 import { ApiError } from "@/lib/api";
 import { useI18n } from "@/i18n";
+import { trackEvent } from "@/lib/analytics";
 import { getLocalizedApiErrorMessage } from "@/lib/localized-api-error";
 import { applyZodErrors } from "@/lib/zod-form";
 import { Button } from "@/components/ui/button";
@@ -27,6 +28,14 @@ export function RecoverAccountPage() {
 
   const recoverMutation = useMutation({
     mutationFn: requestPasswordReset,
+    onSuccess: () => {
+      trackEvent("password_reset_requested");
+    },
+    onError: (error) => {
+      trackEvent("password_reset_request_failed", {
+        error_code: error instanceof ApiError ? error.code : "unknown",
+      });
+    },
   });
 
   const onSubmit = form.handleSubmit((values) => {

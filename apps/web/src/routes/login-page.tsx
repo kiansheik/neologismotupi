@@ -5,6 +5,7 @@ import { z } from "zod";
 
 import { ApiError } from "@/lib/api";
 import { useI18n } from "@/i18n";
+import { trackEvent } from "@/lib/analytics";
 import { getLocalizedApiErrorMessage } from "@/lib/localized-api-error";
 import { applyZodErrors } from "@/lib/zod-form";
 import { Button } from "@/components/ui/button";
@@ -32,8 +33,12 @@ export function LoginPage() {
   const loginMutation = useMutation({
     mutationFn: login,
     onSuccess: async () => {
+      trackEvent("login_success");
       await queryClient.invalidateQueries({ queryKey: ["me"] });
       navigate("/entries");
+    },
+    onError: (error) => {
+      trackEvent("login_failed", { error_code: error instanceof ApiError ? error.code : "unknown" });
     },
   });
 

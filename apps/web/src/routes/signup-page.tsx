@@ -5,6 +5,7 @@ import { z } from "zod";
 
 import { ApiError } from "@/lib/api";
 import { useI18n } from "@/i18n";
+import { trackEvent } from "@/lib/analytics";
 import { getLocalizedApiErrorMessage } from "@/lib/localized-api-error";
 import { applyZodErrors } from "@/lib/zod-form";
 import { Button } from "@/components/ui/button";
@@ -34,12 +35,16 @@ export function SignupPage() {
   const signupMutation = useMutation({
     mutationFn: register,
     onSuccess: async (user) => {
+      trackEvent("signup_success", { is_verified: user.is_verified });
       await queryClient.invalidateQueries({ queryKey: ["me"] });
       if (user.is_verified) {
         navigate("/entries");
         return;
       }
       navigate("/verify-email");
+    },
+    onError: (error) => {
+      trackEvent("signup_failed", { error_code: error instanceof ApiError ? error.code : "unknown" });
     },
   });
 

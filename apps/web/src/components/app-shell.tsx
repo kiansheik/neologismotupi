@@ -1,4 +1,4 @@
-import { Link, Outlet } from "react-router-dom";
+import { Link, Outlet, useLocation } from "react-router-dom";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useEffect } from "react";
 
@@ -6,12 +6,23 @@ import { useCurrentUser } from "@/features/auth/hooks";
 import { logout } from "@/features/auth/api";
 import { Button } from "@/components/ui/button";
 import { type Locale, useI18n } from "@/i18n";
+import { initAnalytics, trackEvent, trackPageView } from "@/lib/analytics";
 import { isTurnstileConfigured, preloadTurnstile } from "@/lib/turnstile";
 
 export function AppShell() {
+  const location = useLocation();
   const queryClient = useQueryClient();
   const { data: user } = useCurrentUser();
   const { locale, setLocale, t } = useI18n();
+
+  useEffect(() => {
+    initAnalytics();
+  }, []);
+
+  useEffect(() => {
+    const path = `${location.pathname}${location.search}`;
+    trackPageView(path);
+  }, [location.pathname, location.search]);
 
   useEffect(() => {
     if (!isTurnstileConfigured()) {
@@ -23,8 +34,12 @@ export function AppShell() {
   const logoutMutation = useMutation({
     mutationFn: logout,
     onSuccess: async () => {
+      trackEvent("logout_success");
       await queryClient.cancelQueries({ queryKey: ["me"] });
       queryClient.setQueryData(["me"], null);
+    },
+    onError: () => {
+      trackEvent("logout_failed");
     },
   });
 
@@ -85,7 +100,11 @@ export function AppShell() {
               aria-label={t("language.label")}
               className="rounded-md border border-[#d3c6b0] bg-[#fffaf2] px-2 py-1 text-xs"
               value={locale}
-              onChange={(event) => setLocale(event.target.value as Locale)}
+              onChange={(event) => {
+                const nextLocale = event.target.value as Locale;
+                setLocale(nextLocale);
+                trackEvent("locale_changed", { locale: nextLocale });
+              }}
             >
               <option value="pt-BR">{t("language.pt-BR")}</option>
               <option value="tupi-BR">{t("language.tupi-BR")}</option>

@@ -7,6 +7,7 @@ import { z } from "zod";
 import { ApiError } from "@/lib/api";
 import { applyZodErrors } from "@/lib/zod-form";
 import { useI18n } from "@/i18n";
+import { trackEvent } from "@/lib/analytics";
 import { getLocalizedApiErrorMessage } from "@/lib/localized-api-error";
 import { StatusBadge } from "@/components/status-badge";
 import { Card } from "@/components/ui/card";
@@ -48,46 +49,82 @@ export function EntryDetailPage() {
 
   const voteMutation = useMutation({
     mutationFn: (value: -1 | 1) => voteEntry(String(entry?.id), { value }),
-    onSuccess: () => {
+    onSuccess: (_, value) => {
+      trackEvent("entry_voted", { direction: value === 1 ? "up" : "down" });
       queryClient.invalidateQueries({ queryKey: ["entry", slug] });
       queryClient.invalidateQueries({ queryKey: ["entries"] });
+    },
+    onError: (error, value) => {
+      trackEvent("entry_vote_failed", {
+        direction: value === 1 ? "up" : "down",
+        error_code: error instanceof ApiError ? error.code : "unknown",
+      });
     },
   });
 
   const reportEntryMutation = useMutation({
     mutationFn: (reason: string) =>
       reportEntry(String(entry?.id), { reason_code: "other", free_text: reason }),
-    onSuccess: () => {
+    onSuccess: (_, reason) => {
+      trackEvent("entry_report_submitted", { reason_length: reason.trim().length });
       entryReportForm.reset();
       setShowEntryReportForm(false);
+    },
+    onError: (error) => {
+      trackEvent("entry_report_failed", { error_code: error instanceof ApiError ? error.code : "unknown" });
     },
   });
 
   const reportExampleMutation = useMutation({
     mutationFn: (exampleId: string) => reportExample(exampleId, { reason_code: "incorrect" }),
+    onSuccess: () => {
+      trackEvent("example_report_submitted");
+    },
+    onError: (error) => {
+      trackEvent("example_report_failed", { error_code: error instanceof ApiError ? error.code : "unknown" });
+    },
   });
   const voteExampleMutation = useMutation({
     mutationFn: (params: { exampleId: string; value: -1 | 1 }) =>
       voteExample(params.exampleId, { value: params.value }),
-    onSuccess: () => {
+    onSuccess: (_, params) => {
+      trackEvent("example_voted", { direction: params.value === 1 ? "up" : "down" });
       queryClient.invalidateQueries({ queryKey: ["entry", slug] });
       queryClient.invalidateQueries({ queryKey: ["entries"] });
+    },
+    onError: (error, params) => {
+      trackEvent("example_vote_failed", {
+        direction: params.value === 1 ? "up" : "down",
+        error_code: error instanceof ApiError ? error.code : "unknown",
+      });
     },
   });
   const approveEntryMutation = useMutation({
     mutationFn: () => approveEntry(String(entry?.id)),
     onSuccess: () => {
+      trackEvent("moderation_entry_approved");
       queryClient.invalidateQueries({ queryKey: ["entry", slug] });
       queryClient.invalidateQueries({ queryKey: ["entries"] });
       queryClient.invalidateQueries({ queryKey: ["mod-queue"] });
+    },
+    onError: (error) => {
+      trackEvent("moderation_entry_approve_failed", {
+        error_code: error instanceof ApiError ? error.code : "unknown",
+      });
     },
   });
   const rejectEntryMutation = useMutation({
     mutationFn: () => rejectEntry(String(entry?.id)),
     onSuccess: () => {
+      trackEvent("moderation_entry_rejected");
       queryClient.invalidateQueries({ queryKey: ["entry", slug] });
       queryClient.invalidateQueries({ queryKey: ["entries"] });
       queryClient.invalidateQueries({ queryKey: ["mod-queue"] });
+    },
+    onError: (error) => {
+      trackEvent("moderation_entry_reject_failed", {
+        error_code: error instanceof ApiError ? error.code : "unknown",
+      });
     },
   });
 
@@ -106,9 +143,15 @@ export function EntryDetailPage() {
 
   const createExampleMutation = useMutation({
     mutationFn: (payload: ExampleForm) => createExample(String(entry?.id), payload),
-    onSuccess: () => {
+    onSuccess: (_, payload) => {
+      trackEvent("example_submitted", {
+        has_translation_pt: Boolean(payload.translation_pt?.trim()),
+      });
       exampleForm.reset();
       queryClient.invalidateQueries({ queryKey: ["entry", slug] });
+    },
+    onError: (error) => {
+      trackEvent("example_submit_failed", { error_code: error instanceof ApiError ? error.code : "unknown" });
     },
   });
 
@@ -207,7 +250,10 @@ export function EntryDetailPage() {
             type="button"
             variant="ghost"
             disabled={!canWrite || reportEntryMutation.isPending}
-            onClick={() => setShowEntryReportForm((current) => !current)}
+            onClick={() => {
+              setShowEntryReportForm((current) => !current);
+              trackEvent("entry_report_form_toggled");
+            }}
           >
             {t("entry.reportEntry")}
           </Button>
