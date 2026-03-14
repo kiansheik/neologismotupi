@@ -8,12 +8,14 @@ import { ApiError } from "@/lib/api";
 import { applyZodErrors } from "@/lib/zod-form";
 import { useI18n } from "@/i18n";
 import { trackEvent } from "@/lib/analytics";
+import { formatDate } from "@/i18n/formatters";
 import { getLocalizedApiErrorMessage } from "@/lib/localized-api-error";
 import { StatusBadge } from "@/components/status-badge";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { UserBadge } from "@/components/user-badge";
 import { useCurrentUser } from "@/features/auth/hooks";
 import { reportExample, voteExample } from "@/features/examples/api";
 import { createExample, getEntry, reportEntry, voteEntry } from "@/features/entries/api";
@@ -34,7 +36,7 @@ export function EntryDetailPage() {
   const { slug } = useParams();
   const queryClient = useQueryClient();
   const { data: currentUser } = useCurrentUser();
-  const { t } = useI18n();
+  const { locale, t } = useI18n();
   const [showEntryReportForm, setShowEntryReportForm] = useState(false);
 
   const {
@@ -212,8 +214,11 @@ export function EntryDetailPage() {
             {entry.proposer.display_name}
           </Link>
           {" · "}
+          <UserBadge displayName={entry.proposer.display_name} />
+          {" · "}
           {t("reputation.label", { score: entry.proposer.reputation_score })}
         </p>
+        <p className="mt-1 text-sm text-slate-600">{t("entry.firstRegistered", { date: formatDate(entry.created_at, locale) })}</p>
         {entry.morphology_notes ? (
           <p className="mt-2 text-sm text-slate-700">
             {t("entry.morphology")}: {entry.morphology_notes}
@@ -224,7 +229,7 @@ export function EntryDetailPage() {
           <Button
             type="button"
             variant="secondary"
-            className="h-10 w-10 rounded-full border border-[#d3c6b0] bg-[#fffaf2] p-0 text-lg shadow-sm hover:border-brand-500 hover:bg-brand-50"
+            className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-[#d3c6b0] bg-[#fffaf2] p-0 text-lg leading-none shadow-sm hover:border-brand-500 hover:bg-brand-50"
             onClick={() => voteMutation.mutate(1)}
             disabled={!canWrite || voteMutation.isPending}
             title={t("entry.upvote")}
@@ -235,7 +240,7 @@ export function EntryDetailPage() {
           <Button
             type="button"
             variant="secondary"
-            className="h-10 w-10 rounded-full border border-[#d3c6b0] bg-[#fffaf2] p-0 text-lg shadow-sm hover:border-red-500 hover:bg-red-100"
+            className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-[#d3c6b0] bg-[#fffaf2] p-0 text-lg leading-none shadow-sm hover:border-red-500 hover:bg-red-100"
             onClick={() => voteMutation.mutate(-1)}
             disabled={!canWrite || voteMutation.isPending}
             title={t("entry.downvote")}
@@ -373,7 +378,7 @@ export function EntryDetailPage() {
                   <Button
                     type="button"
                     variant="secondary"
-                    className="h-8 w-8 rounded-full border border-[#d3c6b0] bg-[#fffaf2] p-0 text-base shadow-sm hover:border-brand-500 hover:bg-brand-50"
+                    className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-[#d3c6b0] bg-[#fffaf2] p-0 text-base leading-none shadow-sm hover:border-brand-500 hover:bg-brand-50"
                     onClick={() => voteExampleMutation.mutate({ exampleId: example.id, value: 1 })}
                     disabled={!canWrite || voteExampleMutation.isPending}
                     title={t("entry.upvote")}
@@ -384,7 +389,7 @@ export function EntryDetailPage() {
                   <Button
                     type="button"
                     variant="secondary"
-                    className="h-8 w-8 rounded-full border border-[#d3c6b0] bg-[#fffaf2] p-0 text-base shadow-sm hover:border-red-500 hover:bg-red-100"
+                    className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-[#d3c6b0] bg-[#fffaf2] p-0 text-base leading-none shadow-sm hover:border-red-500 hover:bg-red-100"
                     onClick={() => voteExampleMutation.mutate({ exampleId: example.id, value: -1 })}
                     disabled={!canWrite || voteExampleMutation.isPending}
                     title={t("entry.downvote")}

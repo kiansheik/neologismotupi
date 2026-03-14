@@ -23,6 +23,7 @@ from app.security import (
     clear_auth_cookie,
     create_session,
     destroy_session,
+    get_user_by_session_token,
     hash_password,
     set_auth_cookie,
     verify_password,
@@ -96,6 +97,8 @@ async def register(
     else:
         raw_token = await create_session(db, user.id)
         set_auth_cookie(response, raw_token)
+        request.state.auth_user_email = user.email
+        request.state.auth_user_id = str(user.id)
 
     await db.commit()
 
@@ -159,6 +162,8 @@ async def login(
     await db.commit()
 
     set_auth_cookie(response, raw_token)
+    request.state.auth_user_email = user.email
+    request.state.auth_user_id = str(user.id)
     return UserOut.model_validate(user)
 
 
@@ -167,6 +172,10 @@ async def logout(request: Request, response: Response, db: SessionDep) -> Logout
     cookie_name = get_settings().session_cookie_name
     raw_token = request.cookies.get(cookie_name)
     if raw_token:
+        user = await get_user_by_session_token(db, raw_token)
+        if user:
+            request.state.auth_user_email = user.email
+            request.state.auth_user_id = str(user.id)
         await destroy_session(db, raw_token)
         await db.commit()
 

@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 
 import { StatusBadge } from "@/components/status-badge";
 import { Card } from "@/components/ui/card";
+import { UserBadge } from "@/components/user-badge";
 import { useCurrentUser } from "@/features/auth/hooks";
 import { listEntries } from "@/features/entries/api";
 import { useI18n } from "@/i18n";
@@ -30,9 +31,11 @@ export function MePage() {
     <section className="space-y-4">
       <Card>
         <h1 className="text-xl font-semibold text-brand-900">{t("me.title")}</h1>
-        <p className="mt-2 text-sm text-slate-700">
-          {currentUser.profile?.display_name ?? t("me.fallbackUser")} · {currentUser.email}
-        </p>
+        <div className="mt-2 flex flex-wrap items-center gap-2 text-sm text-slate-700">
+          <span>{currentUser.profile?.display_name ?? t("me.fallbackUser")}</span>
+          <UserBadge displayName={currentUser.profile?.display_name} />
+          <span>· {currentUser.email}</span>
+        </div>
         <p className="mt-1 text-sm text-slate-600">
           {t("reputation.label", { score: currentUser.profile?.reputation_score ?? 0 })}
         </p>

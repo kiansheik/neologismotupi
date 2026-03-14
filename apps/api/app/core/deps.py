@@ -18,7 +18,11 @@ async def get_current_user_optional(request: Request, db: SessionDep) -> User | 
     raw_token = request.cookies.get(cookie_name)
     if not raw_token:
         return None
-    return await get_user_by_session_token(db, raw_token)
+    user = await get_user_by_session_token(db, raw_token)
+    if user:
+        request.state.auth_user_email = user.email
+        request.state.auth_user_id = str(user.id)
+    return user
 
 
 async def get_current_user(request: Request, db: SessionDep) -> User:

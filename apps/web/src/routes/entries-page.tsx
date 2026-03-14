@@ -5,6 +5,7 @@ import { Link } from "react-router-dom";
 import { StatusBadge } from "@/components/status-badge";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { UserBadge } from "@/components/user-badge";
 import { listEntries } from "@/features/entries/api";
 import { partOfSpeechLabel, statusToKey } from "@/i18n/formatters";
 import { useI18n } from "@/i18n";
@@ -131,10 +132,11 @@ export function EntriesPage() {
                 })}
               </p>
               <p className="mt-1 text-xs text-slate-600">
-                {t("entries.submittedBy")}{" "}
                 <Link className="text-brand-700 hover:underline" to={`/profiles/${entry.proposer.id}`}>
                   {entry.proposer.display_name}
                 </Link>
+                {" · "}
+                <UserBadge displayName={entry.proposer.display_name} />
                 {" · "}
                 {t("reputation.label", { score: entry.proposer.reputation_score })}
               </p>

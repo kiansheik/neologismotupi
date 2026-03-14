@@ -99,3 +99,13 @@ export function formatDateTime(iso: string, locale: Locale): string {
     timeStyle: "short",
   }).format(parsed);
 }
+
+export function formatDate(iso: string, locale: Locale): string {
+  const parsed = new Date(iso);
+  if (Number.isNaN(parsed.valueOf())) {
+    return iso;
+  }
+  return new Intl.DateTimeFormat(locale, {
+    dateStyle: "long",
+  }).format(parsed);
+}

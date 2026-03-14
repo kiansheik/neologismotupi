@@ -6,6 +6,7 @@ import { StatusBadge } from "@/components/status-badge";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { UserBadge } from "@/components/user-badge";
 import { useCurrentUser } from "@/features/auth/hooks";
 import {
   approveEntry,
@@ -206,6 +207,12 @@ export function ModerationPage() {
                 >
                   {report.reporter_display_name ?? t("moderation.unknownReporter")}
                 </Link>
+                {report.reporter_display_name ? (
+                  <>
+                    {" · "}
+                    <UserBadge displayName={report.reporter_display_name} />
+                  </>
+                ) : null}
               </p>
               <p className="mt-1 text-sm text-slate-700">
                 <span className="font-medium text-brand-900">{t("moderation.reportedAt")}:</span>{" "}

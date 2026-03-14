@@ -3,6 +3,7 @@ import { Link, useParams } from "react-router-dom";
 
 import { StatusBadge } from "@/components/status-badge";
 import { Card } from "@/components/ui/card";
+import { UserBadge } from "@/components/user-badge";
 import { getPublicUser } from "@/features/auth/api";
 import { listEntries } from "@/features/entries/api";
 import { useI18n } from "@/i18n";
@@ -40,7 +41,10 @@ export function ProfilePage() {
   return (
     <section className="space-y-4">
       <Card>
-        <h1 className="text-xl font-semibold text-brand-900">{profile.display_name}</h1>
+        <div className="flex flex-wrap items-center gap-2">
+          <h1 className="text-xl font-semibold text-brand-900">{profile.display_name}</h1>
+          <UserBadge displayName={profile.display_name} />
+        </div>
         <p className="mt-1 text-sm text-slate-600">{t("reputation.label", { score: profile.reputation_score })}</p>
         {profile.role_label ? <p className="mt-1 text-sm text-slate-700">{profile.role_label}</p> : null}
         {profile.affiliation_label ? (
