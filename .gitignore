@@ -32,6 +32,8 @@ apps/api/.env
 apps/api/.env.production
 apps/web/.env
 apps/web/.env.production
+deploy/env/*.env
+!deploy/env/*.example
 
 # Local backups
 backups/

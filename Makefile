@@ -4,12 +4,18 @@ SHELL := /bin/bash
 APP_ENV ?= development
 DB_NAME ?= nheenga_dev
 DB_USER ?= $(shell whoami)
+DEPLOY_HOST ?= academiatupi.com
+DEPLOY_USER ?= root
+DEPLOY_PATH ?= /srv/nheenga-neologismos
+DEPLOY_API_URL ?= https://api.academiatupi.com
+DEPLOY_SMOKE_RETRIES ?= 60
+DEPLOY_SMOKE_SLEEP_SECONDS ?= 2
 
 API_DIR := apps/api
 WEB_DIR := apps/web
 API_ENV_FILE ?= .env
 
-.PHONY: help bootstrap-macos bootstrap-linux install dev dev-web dev-api web-build prod-check prod-migrate db-create db-migrate db-reset db-rebuild seed db-backup db-dump-docker db-restore-dump bootstrap-admin change-user-password test test-web test-api test-e2e lint format
+.PHONY: help bootstrap-macos bootstrap-linux install dev dev-web dev-api web-build prod-check prod-migrate db-create db-migrate db-reset db-rebuild seed db-backup db-dump-docker db-restore-dump deploy-full deploy-daily deploy-reset deploy-smoke deploy-ssh-all bootstrap-admin change-user-password test test-web test-api test-e2e lint format
 
 help:
 	@echo "Available targets:"
@@ -30,6 +36,11 @@ help:
 	@echo "  make db-backup        # Create a compressed PostgreSQL backup"
 	@echo "  make db-dump-docker   # Dump local Docker postgres to backups/"
 	@echo "  make db-restore-dump DUMP_FILE=<file> DATABASE_URL=<url>  # Restore dump into target DB"
+	@echo "  make deploy-daily     # Fast daily deploy: API build/migrate/restart + smoke checks (no seed/reset)"
+	@echo "  make deploy-full      # Full stack deploy: API+Postgres+Caddy + migrate + smoke checks"
+	@echo "  make deploy-reset DEPLOY_SEED_CSV=/abs/path/neologisms.csv  # Destructive reset + reseed"
+	@echo "  make deploy-smoke     # Run smoke checks against DEPLOY_API_URL"
+	@echo "  make deploy-ssh-all DEPLOY_HOST=<host> [DEPLOY_USER=root] [DEPLOY_PATH=/srv/nheenga-neologismos] [DEPLOY_DB_DUMP=/path/file.sql.gz] [DEPLOY_SEED_CSV=/path/neologisms.csv] [DEPLOY_MODE=full|daily] [DEPLOY_API_URL=https://api.example.com] [SSH_IDENTITY=~/.ssh/id_ed25519] [DEPLOY_RESET_STACK=1] [DEPLOY_RESET_VOLUMES=1]"
 	@echo "  make bootstrap-admin EMAIL=<email> PASSWORD=<password> [DISPLAY_NAME=<name>]  # Create/update first admin"
 	@echo "  make change-user-password <email> <new_password>  # Update a user's password"
 	@echo "  make test             # Run all tests"
@@ -104,6 +115,52 @@ db-dump-docker:
 
 db-restore-dump:
 	@bash scripts/restore-postgres-from-dump.sh
+
+deploy-ssh-all:
+	@bash scripts/deploy-ssh-all.sh
+
+deploy-full:
+	@DEPLOY_MODE=full \
+	DEPLOY_HOST="$(DEPLOY_HOST)" \
+	DEPLOY_USER="$(DEPLOY_USER)" \
+	DEPLOY_PATH="$(DEPLOY_PATH)" \
+	DEPLOY_API_URL="$(DEPLOY_API_URL)" \
+	DEPLOY_SMOKE_RETRIES="$(DEPLOY_SMOKE_RETRIES)" \
+	DEPLOY_SMOKE_SLEEP_SECONDS="$(DEPLOY_SMOKE_SLEEP_SECONDS)" \
+	bash scripts/deploy-ssh-all.sh
+
+deploy-daily:
+	@DEPLOY_MODE=daily \
+	DEPLOY_HOST="$(DEPLOY_HOST)" \
+	DEPLOY_USER="$(DEPLOY_USER)" \
+	DEPLOY_PATH="$(DEPLOY_PATH)" \
+	DEPLOY_API_URL="$(DEPLOY_API_URL)" \
+	DEPLOY_SMOKE_RETRIES="$(DEPLOY_SMOKE_RETRIES)" \
+	DEPLOY_SMOKE_SLEEP_SECONDS="$(DEPLOY_SMOKE_SLEEP_SECONDS)" \
+	bash scripts/deploy-ssh-all.sh
+
+deploy-reset:
+	@if [ -z "$(DEPLOY_SEED_CSV)" ]; then \
+		echo "Usage: make deploy-reset DEPLOY_SEED_CSV=/abs/path/neologisms.csv [DEPLOY_HOST=...] [DEPLOY_USER=...] [DEPLOY_PATH=...]"; \
+		exit 1; \
+	fi
+	@DEPLOY_MODE=full \
+	DEPLOY_RESET_STACK=1 \
+	DEPLOY_RESET_VOLUMES=1 \
+	DEPLOY_HOST="$(DEPLOY_HOST)" \
+	DEPLOY_USER="$(DEPLOY_USER)" \
+	DEPLOY_PATH="$(DEPLOY_PATH)" \
+	DEPLOY_API_URL="$(DEPLOY_API_URL)" \
+	DEPLOY_SMOKE_RETRIES="$(DEPLOY_SMOKE_RETRIES)" \
+	DEPLOY_SMOKE_SLEEP_SECONDS="$(DEPLOY_SMOKE_SLEEP_SECONDS)" \
+	DEPLOY_SEED_CSV="$(DEPLOY_SEED_CSV)" \
+	bash scripts/deploy-ssh-all.sh
+
+deploy-smoke:
+	@API_BASE_URL="$(DEPLOY_API_URL)" \
+	RETRIES="$(DEPLOY_SMOKE_RETRIES)" \
+	SLEEP_SECONDS="$(DEPLOY_SMOKE_SLEEP_SECONDS)" \
+	bash scripts/smoke-api.sh
 
 bootstrap-admin:
 	@EMAIL_INPUT="$${EMAIL:-}"; \

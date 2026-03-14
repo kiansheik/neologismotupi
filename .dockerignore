@@ -1,0 +1,13 @@
+.git
+.gitignore
+.DS_Store
+node_modules
+apps/web/node_modules
+apps/web/dist
+apps/api/.venv
+.venv
+__pycache__
+.pytest_cache
+.mypy_cache
+.ruff_cache
+backups

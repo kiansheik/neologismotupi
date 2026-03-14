@@ -190,6 +190,7 @@ SEED_CSV_PATH=~/nhe-enga/neologisms.csv
 
 ```env
 APP_ENV=development
+APP_RELEASE=dev-local
 DATABASE_URL=postgresql+asyncpg://localhost/nheenga_dev
 SECRET_KEY=change-me
 CORS_ORIGINS=http://localhost:5173
@@ -210,6 +211,7 @@ SESSION_COOKIE_PATH=/
 
 ```env
 APP_ENV=production
+APP_RELEASE=manual
 DATABASE_URL=postgresql+asyncpg://postgres:change-me@db.example.com:5432/nheenga_prod
 SECRET_KEY=replace-with-a-long-random-secret-key-at-least-32-chars
 CORS_ORIGINS=https://academiatupi.com,https://app.academiatupi.com
@@ -249,7 +251,7 @@ make dev-api
 
 OpenAPI docs will be available at `http://localhost:8000/docs`.
 Health endpoints:
-- `GET /healthz` (includes DB ping)
+- `GET /healthz` (includes DB ping + current `release` id)
 - `GET /health` (alias)
 
 ## Run frontend only
@@ -350,6 +352,65 @@ It includes:
 - VPS + Postgres setup
 - systemd + Caddy setup
 - copying your local Docker DB to production
+- explicit fix for `wrangler deploy` misconfiguration on static Pages deploys
+
+## Provider-independent Docker deploy over SSH
+
+Routine deploys are now simplified in Make:
+
+```bash
+make deploy-daily
+```
+
+`deploy-daily` does a quick live-safe path for a small single-server setup:
+- sync repo to VPS
+- build API image only
+- run Alembic migrations
+- restart API container (keeps Postgres data)
+- run smoke checks against `https://api.academiatupi.com`
+
+Defaults are tuned for this repo:
+- `DEPLOY_HOST=academiatupi.com`
+- `DEPLOY_USER=root`
+- `DEPLOY_PATH=/srv/nheenga-neologismos`
+- `DEPLOY_API_URL=https://api.academiatupi.com`
+
+When you need infra-level updates (not just daily API code updates):
+
+```bash
+make deploy-full
+```
+
+When you intentionally want a destructive reset + reseed:
+
+```bash
+make deploy-reset DEPLOY_SEED_CSV=/absolute/path/neologisms.csv
+```
+
+`deploy-reset` runs with `DEPLOY_RESET_STACK=1 DEPLOY_RESET_VOLUMES=1`, so it wipes remote DB volumes before migrating and seeding.
+
+All deploy commands include a unique deploy ID (timestamp + git SHA) and poll `/healthz` until the API reports that exact release.
+
+Advanced/manual command is still available:
+
+```bash
+make deploy-ssh-all DEPLOY_HOST=<server-ip-or-hostname> DEPLOY_USER=root DEPLOY_PATH=/srv/nheenga-neologismos [DEPLOY_MODE=full|daily]
+```
+
+Before first run, create secret env files:
+
+```bash
+cp deploy/env/api.env.example deploy/env/api.env
+cp deploy/env/postgres.env.example deploy/env/postgres.env
+cp deploy/env/stack.env.example deploy/env/stack.env
+```
+
+Optional extras:
+
+```bash
+make deploy-ssh-all DEPLOY_DB_DUMP=backups/docker-postgres/<dump-file>.sql.gz
+make deploy-smoke
+```
 
 ## Cookie domain decision
 Current default is **API-host scoped cookie** (host-only behavior, `SESSION_COOKIE_DOMAIN=`).

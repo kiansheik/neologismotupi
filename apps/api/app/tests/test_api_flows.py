@@ -30,6 +30,7 @@ async def test_healthz(client):
     payload = response.json()
     assert payload["ok"] is True
     assert payload["database"] == "ok"
+    assert "release" in payload
 
 
 async def login_user(client, email: str, password: str = "password123"):

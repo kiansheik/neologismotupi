@@ -7,6 +7,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class Settings(BaseSettings):
     app_env: str = "development"
+    app_release: str = "dev-local"
     database_url: str = "postgresql+asyncpg://localhost/nheenga_dev"
     secret_key: str = "change-me"
     cors_origins: list[str] = ["http://localhost:5173"]

@@ -15,6 +15,84 @@ Optional:
 - Uptime monitor (UptimeRobot/Better Stack/etc.).
 - Off-box backup destination later (S3/R2/B2).
 
+## 1.1 Optional fast path: one-command Docker deploy over SSH
+
+If you want provider portability, this repo includes:
+
+- `deploy/docker-compose.remote.yml` (API + Postgres + Caddy)
+- `make deploy-ssh-all ...` (sync + remote docker compose up + migrate)
+
+Quick start:
+
+```bash
+cp deploy/env/api.env.example deploy/env/api.env
+cp deploy/env/postgres.env.example deploy/env/postgres.env
+cp deploy/env/stack.env.example deploy/env/stack.env
+make deploy-daily DEPLOY_HOST=<server-ip> DEPLOY_USER=root DEPLOY_PATH=/srv/nheenga-neologismos
+```
+
+You still use Cloudflare Pages for frontend.
+
+Deploy commands for a small single-server workflow:
+
+```bash
+make deploy-daily
+make deploy-full
+make deploy-reset DEPLOY_SEED_CSV=/absolute/path/neologisms.csv
+```
+
+- `deploy-daily`: API-only rebuild/restart + migration + smoke checks.
+- `deploy-full`: full stack compose deploy (API/Postgres/Caddy) + migration + smoke checks.
+- `deploy-reset`: destructive DB reset volume + migrate + seed (use only when intentional).
+
+Each deploy carries a unique release ID and polls `https://api.academiatupi.com/healthz` until the API reports that same release.
+
+Notes for `deploy/env/api.env`:
+- `DATABASE_URL` should point to `@postgres:5432` in this stack.
+- URL-encode password if it has special chars (`@`, `!`, `#`, `/`, `:`), otherwise hostname parsing breaks.
+- If Postgres volume already exists, changing env password alone does not reinitialize credentials. Keep credentials stable, or run a reset deploy (`make deploy-reset ...`) when you intentionally need a clean re-init.
+
+Remote requirements for this fast path:
+
+```bash
+apt update
+apt install -y ca-certificates curl gnupg
+install -m 0755 -d /etc/apt/keyrings
+curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+chmod a+r /etc/apt/keyrings/docker.gpg
+echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu $(. /etc/os-release && echo ${VERSION_CODENAME}) stable" | tee /etc/apt/sources.list.d/docker.list > /dev/null
+apt update
+apt install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+systemctl enable --now docker
+usermod -aG docker deploy
+```
+
+Then reconnect SSH so group membership takes effect.
+
+Optional: include DB import in same command:
+
+```bash
+make deploy-ssh-all DEPLOY_HOST=<server-ip> DEPLOY_DB_DUMP=backups/docker-postgres/<dump-file>.sql.gz
+```
+
+Optional: seed from CSV in same command:
+
+```bash
+make deploy-ssh-all DEPLOY_HOST=<server-ip> DEPLOY_SEED_CSV=/absolute/path/neologisms.csv
+```
+
+Optional: force reset old containers/images before deploy:
+
+```bash
+make deploy-ssh-all DEPLOY_HOST=<server-ip> DEPLOY_RESET_STACK=1
+```
+
+To also wipe volumes (destructive, removes DB data):
+
+```bash
+make deploy-ssh-all DEPLOY_HOST=<server-ip> DEPLOY_RESET_STACK=1 DEPLOY_RESET_VOLUMES=1
+```
+
 ## 2. Why your Cloudflare wizard failed
 
 You used a Workers-style deploy command:
@@ -30,9 +108,15 @@ This repo frontend is static Vite output, so use **Cloudflare Pages build settin
 Create a **Pages project** from GitHub repo and use:
 
 - Framework preset: `None` (or `Vite` if offered)
-- Build command: `pnpm --filter @nheenga/web build`
+- Build command: `pnpm --dir apps/web build`
 - Build output directory: `apps/web/dist`
 - Root directory: leave empty (repo root)
+- Deploy command: leave empty / disabled
+
+Important:
+- Do **not** set deploy command to `npx wrangler deploy` for this project.
+- If Cloudflare forces a deploy command in your UI, use:
+  - `npx wrangler pages deploy apps/web/dist --project-name <your-pages-project-name>`
 
 Set environment variables in Pages:
 

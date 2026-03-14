@@ -47,12 +47,13 @@ def create_app() -> FastAPI:
 
     @app.get("/healthz")
     async def healthz():
+        release = settings.app_release
         try:
             async with AsyncSessionLocal() as db:
                 await db.execute(text("SELECT 1"))
-            return {"ok": True, "database": "ok"}
+            return {"ok": True, "database": "ok", "release": release}
         except Exception:
-            return JSONResponse(status_code=503, content={"ok": False, "database": "error"})
+            return JSONResponse(status_code=503, content={"ok": False, "database": "error", "release": release})
 
     @app.get("/health")
     async def health():
