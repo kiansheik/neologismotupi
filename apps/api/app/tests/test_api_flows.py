@@ -217,6 +217,34 @@ async def test_cannot_edit_others_entry(client):
 
 
 @pytest.mark.asyncio
+async def test_superuser_can_edit_others_entry_with_version_log(client):
+    await register_user(client, "owner-super-edit@example.com", "Owner Super Edit")
+    entry = await create_entry(client, "super-edit-target")
+
+    await client.post("/api/auth/logout")
+    await register_user(client, "super-editor@example.com", "Super Editor")
+
+    async with db_module.AsyncSessionLocal() as session:
+        moderator = (await session.execute(select(User).where(User.email == "super-editor@example.com"))).scalar_one()
+        moderator.is_superuser = True
+        await session.commit()
+
+    patch_response = await client.patch(
+        f"/api/entries/{entry['id']}",
+        json={
+            "headword": "super-edit-target-revised",
+            "short_definition": "Updated by moderator",
+            "edit_summary": "moderator cleanup",
+        },
+    )
+    assert patch_response.status_code == 200, patch_response.text
+    payload = patch_response.json()
+    assert payload["headword"] == "super-edit-target-revised"
+    assert payload["short_definition"] == "Updated by moderator"
+    assert any(version["edit_summary"] == "moderator cleanup" for version in payload["versions"])
+
+
+@pytest.mark.asyncio
 async def test_add_example(client):
     await register_user(client, "example-owner@example.com", "Example Owner")
     entry = await create_entry(client, "example-entry")

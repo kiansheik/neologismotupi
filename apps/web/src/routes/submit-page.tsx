@@ -116,16 +116,19 @@ export function SubmitPage() {
       <p className="mt-1 text-xs text-slate-600">{t("submit.onlyRequired")}</p>
       <div className="mt-3 rounded-md border border-brand-200 bg-brand-50/40 p-3">
         <h2 className="text-sm font-semibold text-brand-900">{t("submit.exampleTitle")}</h2>
-        <div className="mt-2 space-y-1 text-xs text-slate-700">
-          <p className="text-sm font-semibold text-brand-900">
-            Mba&apos;eekokuaba <span className="text-blue-600">✓</span>
-          </p>
-          <p>Física.</p>
-          <p>Física</p>
+        <div className="mt-2 space-y-2 text-xs text-slate-700">
           <p>
-            {t("entry.submittedBy")} Moscomonteiro · {t("badge.karmaLeader")} · {t("reputation.label", { score: 7 })}
+            <span className="font-semibold">{t("submit.exampleHeadword")}:</span>{" "}
+            <Link className="text-brand-700 underline" to="/entries/mba-eekokuaba">
+              Mba&apos;eekokuaba
+            </Link>
           </p>
-          <p>{t("entry.firstRegistered", { date: "14 de março de 2026" })}</p>
+          <p>
+            <span className="font-semibold">{t("submit.exampleGloss")}:</span> Física
+          </p>
+          <p>
+            <span className="font-semibold">{t("submit.exampleDefinition")}:</span> Física.
+          </p>
           <p>
             <span className="font-semibold">{t("entry.morphology")}:</span>{" "}
             Calque do guarani, estudo de como as coisas agem. &quot;Estudo&quot; deixado como kuaba, verbo

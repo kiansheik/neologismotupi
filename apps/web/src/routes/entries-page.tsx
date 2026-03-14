@@ -10,6 +10,7 @@ import { listEntries } from "@/features/entries/api";
 import { partOfSpeechLabel, statusToKey } from "@/i18n/formatters";
 import { useI18n } from "@/i18n";
 import { trackEvent } from "@/lib/analytics";
+import { entryDefinitionPreview } from "@/lib/entry-definition";
 
 export function EntriesPage() {
   const { t } = useI18n();
@@ -124,7 +125,7 @@ export function EntriesPage() {
                 </Link>
                 <StatusBadge status={entry.status} />
               </div>
-              <p className="mt-1 text-sm text-slate-700">{entry.short_definition}</p>
+              <p className="mt-1 text-sm text-slate-700">{entryDefinitionPreview(entry.short_definition)}</p>
               <p className="mt-2 text-xs text-slate-600">
                 {t("entries.scoreExamples", {
                   score: entry.score_cache,

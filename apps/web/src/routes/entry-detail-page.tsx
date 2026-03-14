@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { z } from "zod";
 
@@ -8,6 +8,7 @@ import { ApiError } from "@/lib/api";
 import { applyZodErrors } from "@/lib/zod-form";
 import { useI18n } from "@/i18n";
 import { trackEvent } from "@/lib/analytics";
+import { splitEntryDefinition } from "@/lib/entry-definition";
 import { formatDate } from "@/i18n/formatters";
 import { getLocalizedApiErrorMessage } from "@/lib/localized-api-error";
 import { StatusBadge } from "@/components/status-badge";
@@ -18,7 +19,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { UserBadge } from "@/components/user-badge";
 import { useCurrentUser } from "@/features/auth/hooks";
 import { reportExample, voteExample } from "@/features/examples/api";
-import { createExample, getEntry, reportEntry, voteEntry } from "@/features/entries/api";
+import { createExample, getEntry, reportEntry, updateEntry, voteEntry } from "@/features/entries/api";
 import { approveEntry, approveExample, rejectEntry, rejectExample } from "@/features/moderation/api";
 
 type ExampleForm = {
@@ -30,6 +31,16 @@ type ReportForm = {
   reason: string;
 };
 
+type EntryEditForm = {
+  headword: string;
+  gloss_pt: string;
+  gloss_en: string;
+  part_of_speech: string;
+  short_definition: string;
+  morphology_notes: string;
+  edit_summary: string;
+};
+
 const REPORT_REASON_MAX = 280;
 
 export function EntryDetailPage() {
@@ -38,6 +49,7 @@ export function EntryDetailPage() {
   const { data: currentUser } = useCurrentUser();
   const { locale, t } = useI18n();
   const [showEntryReportForm, setShowEntryReportForm] = useState(false);
+  const [showEditForm, setShowEditForm] = useState(false);
 
   const {
     data: entry,
@@ -172,6 +184,33 @@ export function EntryDetailPage() {
     },
   });
 
+  const entryEditForm = useForm<EntryEditForm>({
+    defaultValues: {
+      headword: "",
+      gloss_pt: "",
+      gloss_en: "",
+      part_of_speech: "",
+      short_definition: "",
+      morphology_notes: "",
+      edit_summary: "",
+    },
+  });
+
+  useEffect(() => {
+    if (!entry) {
+      return;
+    }
+    entryEditForm.reset({
+      headword: entry.headword ?? "",
+      gloss_pt: entry.gloss_pt ?? "",
+      gloss_en: entry.gloss_en ?? "",
+      part_of_speech: entry.part_of_speech ?? "",
+      short_definition: entry.short_definition ?? "",
+      morphology_notes: entry.morphology_notes ?? "",
+      edit_summary: "",
+    });
+  }, [entry, entryEditForm]);
+
   const createExampleMutation = useMutation({
     mutationFn: (payload: ExampleForm) => createExample(String(entry?.id), payload),
     onSuccess: (_, payload) => {
@@ -183,6 +222,23 @@ export function EntryDetailPage() {
     },
     onError: (error) => {
       trackEvent("example_submit_failed", { error_code: error instanceof ApiError ? error.code : "unknown" });
+    },
+  });
+
+  const updateEntryMutation = useMutation({
+    mutationFn: (payload: Parameters<typeof updateEntry>[1]) => updateEntry(String(entry?.id), payload),
+    onSuccess: () => {
+      trackEvent("entry_moderator_edited");
+      entryEditForm.resetField("edit_summary");
+      setShowEditForm(false);
+      queryClient.invalidateQueries({ queryKey: ["entry", slug] });
+      queryClient.invalidateQueries({ queryKey: ["entries"] });
+      queryClient.invalidateQueries({ queryKey: ["mod-queue"] });
+    },
+    onError: (error) => {
+      trackEvent("entry_moderator_edit_failed", {
+        error_code: error instanceof ApiError ? error.code : "unknown",
+      });
     },
   });
 
@@ -217,6 +273,25 @@ export function EntryDetailPage() {
     reportEntryMutation.mutate(parsed.data.reason);
   });
 
+  const onEntryEditSubmit = entryEditForm.handleSubmit((payload) => {
+    entryEditForm.clearErrors();
+    const editSchema = z.object({
+      headword: z.string().trim().min(1, t("submit.error.headwordRequired")),
+      gloss_pt: z.string().trim().min(1, t("submit.error.glossRequired")),
+      gloss_en: z.string().optional(),
+      part_of_speech: z.string().optional(),
+      short_definition: z.string().optional(),
+      morphology_notes: z.string().optional(),
+      edit_summary: z.string().trim().min(3, t("entry.error.editSummaryMin")),
+    });
+    const parsed = editSchema.safeParse(payload);
+    if (!parsed.success) {
+      applyZodErrors(parsed.error, entryEditForm.setError);
+      return;
+    }
+    updateEntryMutation.mutate(parsed.data);
+  });
+
   const canWrite = Boolean(currentUser);
   const isModerator = Boolean(currentUser?.is_superuser);
   const promptRequiredReason = (promptText: string): string | null => {
@@ -240,6 +315,8 @@ export function EntryDetailPage() {
     return <p className="text-sm text-red-700">{t("entry.loadError")}</p>;
   }
 
+  const definitionParts = splitEntryDefinition(entry.short_definition);
+
   return (
     <section className="space-y-4">
       <Card>
@@ -247,7 +324,18 @@ export function EntryDetailPage() {
           <h1 className="text-2xl font-semibold text-brand-900">{entry.headword}</h1>
           <StatusBadge status={entry.status} />
         </div>
-        <p className="mt-2 text-sm text-slate-700">{entry.short_definition}</p>
+        {definitionParts.length <= 1 ? (
+          <p className="mt-2 text-sm text-slate-700">{entry.short_definition}</p>
+        ) : (
+          <ul className="mt-2 space-y-1 text-sm text-slate-700">
+            {definitionParts.map((part, index) => (
+              <li key={`${index}-${part}`} className="flex gap-2">
+                <span className="mt-0.5 text-brand-700">•</span>
+                <span>{part}</span>
+              </li>
+            ))}
+          </ul>
+        )}
         <p className="mt-1 text-sm text-slate-600">{entry.gloss_pt || "-"}</p>
         <p className="mt-1 text-sm text-slate-600">
           {t("entry.submittedBy")}{" "}
@@ -391,7 +479,117 @@ export function EntryDetailPage() {
             >
               {t("entry.reject")}
             </Button>
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={() => {
+                setShowEditForm((current) => !current);
+                trackEvent("entry_moderator_edit_toggled");
+              }}
+            >
+              {t("entry.editButton")}
+            </Button>
           </div>
+        ) : null}
+
+        {isModerator && showEditForm ? (
+          <form
+            className="mt-3 space-y-3 rounded-lg border border-brand-200 bg-brand-50/40 p-3"
+            onSubmit={(event) => {
+              void onEntryEditSubmit(event).catch(() => undefined);
+            }}
+          >
+            <h3 className="text-sm font-semibold text-brand-900">{t("entry.editTitle")}</h3>
+            <div>
+              <label className="mb-1 block text-sm font-medium" htmlFor="edit_headword">
+                {t("submit.headword")}
+              </label>
+              <Input id="edit_headword" {...entryEditForm.register("headword")} />
+              {entryEditForm.formState.errors.headword?.message ? (
+                <p className="mt-1 text-xs text-red-700">{entryEditForm.formState.errors.headword.message}</p>
+              ) : null}
+            </div>
+            <div>
+              <label className="mb-1 block text-sm font-medium" htmlFor="edit_gloss_pt">
+                {t("submit.glossPt")}
+              </label>
+              <Input id="edit_gloss_pt" {...entryEditForm.register("gloss_pt")} />
+              {entryEditForm.formState.errors.gloss_pt?.message ? (
+                <p className="mt-1 text-xs text-red-700">{entryEditForm.formState.errors.gloss_pt.message}</p>
+              ) : null}
+            </div>
+            <div>
+              <label className="mb-1 block text-sm font-medium" htmlFor="edit_gloss_en">
+                {t("entry.editGlossEn")}
+              </label>
+              <Input id="edit_gloss_en" {...entryEditForm.register("gloss_en")} />
+            </div>
+            <div>
+              <label className="mb-1 block text-sm font-medium" htmlFor="edit_part_of_speech">
+                {t("submit.partOfSpeech")}
+              </label>
+              <select
+                id="edit_part_of_speech"
+                className="w-full rounded-md border border-brand-300 bg-white px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-200"
+                {...entryEditForm.register("part_of_speech")}
+              >
+                <option value="">{t("partOfSpeech.any")}</option>
+                <option value="noun">{t("partOfSpeech.noun")}</option>
+                <option value="verb">{t("partOfSpeech.verb")}</option>
+                <option value="adjective">{t("partOfSpeech.adjective")}</option>
+                <option value="adverb">{t("partOfSpeech.adverb")}</option>
+                <option value="expression">{t("partOfSpeech.expression")}</option>
+                <option value="pronoun">{t("partOfSpeech.pronoun")}</option>
+                <option value="particle">{t("partOfSpeech.particle")}</option>
+                <option value="other">{t("partOfSpeech.other")}</option>
+              </select>
+            </div>
+            <div>
+              <label className="mb-1 block text-sm font-medium" htmlFor="edit_short_definition">
+                {t("submit.definition")}
+              </label>
+              <Textarea id="edit_short_definition" {...entryEditForm.register("short_definition")} />
+            </div>
+            <div>
+              <label className="mb-1 block text-sm font-medium" htmlFor="edit_morphology_notes">
+                {t("entry.morphology")}
+              </label>
+              <Textarea id="edit_morphology_notes" {...entryEditForm.register("morphology_notes")} />
+            </div>
+            <div>
+              <label className="mb-1 block text-sm font-medium" htmlFor="edit_summary">
+                {t("entry.editSummary")}
+              </label>
+              <Input id="edit_summary" {...entryEditForm.register("edit_summary")} />
+              <p className="mt-1 text-xs text-slate-600">{t("entry.editSummaryHelp")}</p>
+              {entryEditForm.formState.errors.edit_summary?.message ? (
+                <p className="mt-1 text-xs text-red-700">{entryEditForm.formState.errors.edit_summary.message}</p>
+              ) : null}
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <Button type="submit" disabled={updateEntryMutation.isPending}>
+                {t("entry.editSave")}
+              </Button>
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={() => {
+                  entryEditForm.reset({
+                    headword: entry.headword ?? "",
+                    gloss_pt: entry.gloss_pt ?? "",
+                    gloss_en: entry.gloss_en ?? "",
+                    part_of_speech: entry.part_of_speech ?? "",
+                    short_definition: entry.short_definition ?? "",
+                    morphology_notes: entry.morphology_notes ?? "",
+                    edit_summary: "",
+                  });
+                  setShowEditForm(false);
+                }}
+              >
+                {t("entry.editCancel")}
+              </Button>
+            </div>
+          </form>
         ) : null}
 
         {approveEntryMutation.isSuccess ? (
@@ -408,6 +606,14 @@ export function EntryDetailPage() {
         {rejectEntryMutation.error instanceof ApiError ? (
           <p className="mt-2 text-sm text-red-700">
             {getLocalizedApiErrorMessage(rejectEntryMutation.error, t)}
+          </p>
+        ) : null}
+        {updateEntryMutation.isSuccess ? (
+          <p className="mt-2 text-sm text-green-700">{t("entry.editSaved")}</p>
+        ) : null}
+        {updateEntryMutation.error instanceof ApiError ? (
+          <p className="mt-2 text-sm text-red-700">
+            {getLocalizedApiErrorMessage(updateEntryMutation.error, t)}
           </p>
         ) : null}
         {approveExampleMutation.error instanceof ApiError ? (

@@ -5,6 +5,7 @@ import { Card } from "@/components/ui/card";
 import { StatusBadge } from "@/components/status-badge";
 import { listEntries } from "@/features/entries/api";
 import { useI18n } from "@/i18n";
+import { entryDefinitionPreview } from "@/lib/entry-definition";
 
 export function HomePage() {
   const { t } = useI18n();
@@ -40,7 +41,7 @@ export function HomePage() {
                   </Link>
                   <StatusBadge status={entry.status} />
                 </div>
-                <p className="mt-1 text-sm text-slate-700">{entry.short_definition}</p>
+                <p className="mt-1 text-sm text-slate-700">{entryDefinitionPreview(entry.short_definition)}</p>
               </article>
             ))
           ) : (

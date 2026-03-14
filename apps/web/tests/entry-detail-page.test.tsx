@@ -4,8 +4,9 @@ import userEvent from "@testing-library/user-event";
 import { EntryDetailPage } from "@/routes/entry-detail-page";
 import { renderWithRoute } from "./test-utils";
 
-const { voteEntryMock, authState } = vi.hoisted(() => ({
+const { voteEntryMock, updateEntryMock, authState } = vi.hoisted(() => ({
   voteEntryMock: vi.fn().mockResolvedValue({ score_cache: 1 }),
+  updateEntryMock: vi.fn().mockResolvedValue({}),
   authState: { currentUser: undefined as unknown },
 }));
 
@@ -36,6 +37,7 @@ vi.mock("@/features/entries/api", () => ({
     examples: [],
   }),
   voteEntry: voteEntryMock,
+  updateEntry: updateEntryMock,
   reportEntry: vi.fn(),
   createExample: vi.fn(),
 }));
@@ -75,5 +77,36 @@ describe("EntryDetailPage", () => {
     await user.click(upvote);
 
     expect(voteEntryMock).toHaveBeenCalledWith("entry-1", { value: 1 });
+  });
+
+  it("lets moderators edit and save entries", async () => {
+    authState.currentUser = {
+      id: "mod-1",
+      email: "mod@example.com",
+      is_active: true,
+      is_verified: true,
+      is_superuser: true,
+      created_at: "2026-01-01T00:00:00Z",
+      updated_at: "2026-01-01T00:00:00Z",
+      profile: null,
+    };
+
+    const user = userEvent.setup();
+    renderWithRoute(<EntryDetailPage />, "/entries/:slug", "/entries/entry-one");
+
+    await user.click(await screen.findByRole("button", { name: "Editar verbete" }));
+    await user.clear(screen.getByLabelText("Verbete"));
+    await user.type(screen.getByLabelText("Verbete"), "entry one edited");
+    await user.type(screen.getByLabelText("Resumo da edição"), "Ajuste de revisão");
+
+    await user.click(screen.getByRole("button", { name: "Salvar edição" }));
+
+    expect(updateEntryMock).toHaveBeenCalledWith(
+      "entry-1",
+      expect.objectContaining({
+        headword: "entry one edited",
+        edit_summary: "Ajuste de revisão",
+      }),
+    );
   });
 });
