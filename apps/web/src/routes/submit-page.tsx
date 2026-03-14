@@ -59,6 +59,23 @@ export function SubmitPage() {
     return duplicateQuery.data?.filter((entry) => entry.headword !== watchedHeadword) ?? [];
   }, [duplicateQuery.data, watchedHeadword]);
 
+  const exemplarQuery = useQuery({
+    queryKey: ["submit-exemplar-entry"],
+    queryFn: async () => {
+      const approved = await listEntries({
+        page: 1,
+        page_size: 1,
+        status: "approved",
+        sort: "score",
+      });
+      if (approved.items[0]) {
+        return approved.items[0];
+      }
+      const anyStatus = await listEntries({ page: 1, page_size: 1, sort: "score" });
+      return anyStatus.items[0] ?? null;
+    },
+  });
+
   const createMutation = useMutation({
     mutationFn: (payload: SubmitForm) => createEntry(payload),
     onSuccess: (entry) => {
@@ -113,6 +130,40 @@ export function SubmitPage() {
   return (
     <Card>
       <h1 className="text-xl font-semibold text-brand-900">{t("submit.title")}</h1>
+      <div className="mt-3 rounded-md border border-brand-200 bg-brand-50/40 p-3">
+        <h2 className="text-sm font-semibold text-brand-900">{t("submit.exampleTitle")}</h2>
+        {exemplarQuery.isLoading ? (
+          <p className="mt-1 text-xs text-slate-600">{t("submit.exampleLoading")}</p>
+        ) : exemplarQuery.data ? (
+          <div className="mt-2 space-y-1 text-xs text-slate-700">
+            <p>
+              <span className="font-semibold">{t("submit.exampleHeadword")}:</span>{" "}
+              {exemplarQuery.data.headword}
+            </p>
+            <p>
+              <span className="font-semibold">{t("submit.exampleGloss")}:</span>{" "}
+              {exemplarQuery.data.gloss_pt || "-"}
+            </p>
+            <p>
+              <span className="font-semibold">{t("submit.examplePartOfSpeech")}:</span>{" "}
+              {partOfSpeechLabel(exemplarQuery.data.part_of_speech || "other", t)}
+            </p>
+            <p>
+              <span className="font-semibold">{t("submit.exampleDefinition")}:</span>{" "}
+              {exemplarQuery.data.short_definition}
+            </p>
+            <p>
+              <span className="font-semibold">{t("submit.exampleScore")}:</span>{" "}
+              {exemplarQuery.data.score_cache}
+            </p>
+            <Link className="text-brand-700 underline" to={`/entries/${exemplarQuery.data.slug}`}>
+              {t("submit.exampleOpen")}
+            </Link>
+          </div>
+        ) : (
+          <p className="mt-1 text-xs text-slate-600">{t("submit.exampleEmpty")}</p>
+        )}
+      </div>
       <form
         className="mt-4 space-y-3"
         onSubmit={(event) => {
@@ -123,6 +174,7 @@ export function SubmitPage() {
           <label className="mb-1 block text-sm font-medium" htmlFor="headword">
             {t("submit.headword")}
           </label>
+          <p className="mb-1 text-xs text-slate-600">{t("submit.help.headword")}</p>
           <Input id="headword" {...form.register("headword")} />
           {form.formState.errors.headword?.message ? (
             <p className="mt-1 text-xs text-red-700">{form.formState.errors.headword.message}</p>
@@ -157,6 +209,7 @@ export function SubmitPage() {
           <label className="mb-1 block text-sm font-medium" htmlFor="gloss_pt">
             {t("submit.glossPt")}
           </label>
+          <p className="mb-1 text-xs text-slate-600">{t("submit.help.glossPt")}</p>
           <Input id="gloss_pt" {...form.register("gloss_pt")} />
         </div>
 
@@ -164,6 +217,7 @@ export function SubmitPage() {
           <label className="mb-1 block text-sm font-medium" htmlFor="part_of_speech">
             {t("submit.partOfSpeech")}
           </label>
+          <p className="mb-1 text-xs text-slate-600">{t("submit.help.partOfSpeech")}</p>
           <select
             id="part_of_speech"
             className="w-full rounded-md border border-brand-300 bg-white px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-200"
@@ -183,6 +237,7 @@ export function SubmitPage() {
           <label className="mb-1 block text-sm font-medium" htmlFor="short_definition">
             {t("submit.definition")}
           </label>
+          <p className="mb-1 text-xs text-slate-600">{t("submit.help.definition")}</p>
           <Textarea id="short_definition" {...form.register("short_definition")} />
           {form.formState.errors.short_definition?.message ? (
             <p className="mt-1 text-xs text-red-700">{form.formState.errors.short_definition.message}</p>
@@ -193,6 +248,7 @@ export function SubmitPage() {
           <label className="mb-1 block text-sm font-medium" htmlFor="morphology_notes">
             {t("submit.morphologyNotes")}
           </label>
+          <p className="mb-1 text-xs text-slate-600">{t("submit.help.morphologyNotes")}</p>
           <Textarea id="morphology_notes" {...form.register("morphology_notes")} />
         </div>
 
