@@ -20,7 +20,7 @@ from app.config import get_settings
 from app.core.errors import http_exception_handler, validation_exception_handler
 from app.db import AsyncSessionLocal
 
-request_logger = logging.getLogger("uvicorn.access")
+request_logger = logging.getLogger("uvicorn.error")
 
 
 def create_app() -> FastAPI:
@@ -59,7 +59,7 @@ def create_app() -> FastAPI:
             user_email = getattr(request.state, "auth_user_email", None) or "-"
             duration_ms = (perf_counter() - started_at) * 1000
             request_logger.info(
-                '%s:%s - "%s %s" %s user_email=%s duration_ms=%.1f',
+                'request %s:%s - "%s %s" %s user_email=%s duration_ms=%.1f',
                 client_host,
                 client_port,
                 request.method,
