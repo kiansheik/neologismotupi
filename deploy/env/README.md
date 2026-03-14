@@ -29,6 +29,12 @@ make deploy-full
 make deploy-reset DEPLOY_SEED_CSV=/absolute/path/neologisms.csv
 ```
 
+Smoke checks can validate CORS preflight too (default origin is `https://neo.academiatupi.com`):
+
+```bash
+make deploy-smoke
+```
+
 Example:
 
 ```bash

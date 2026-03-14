@@ -81,6 +81,9 @@ class Settings(BaseSettings):
 
     @model_validator(mode="after")
     def validate_production_safety(self) -> "Settings":
+        if self.turnstile_enabled and not self.turnstile_secret_key:
+            raise ValueError("TURNSTILE_SECRET_KEY is required when TURNSTILE_ENABLED=true")
+
         if self.app_env != "production":
             return self
 

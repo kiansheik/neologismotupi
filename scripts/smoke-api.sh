@@ -5,6 +5,7 @@ API_BASE_URL="${API_BASE_URL:-${1:-}}"
 EXPECTED_RELEASE="${EXPECTED_RELEASE:-}"
 RETRIES="${RETRIES:-60}"
 SLEEP_SECONDS="${SLEEP_SECONDS:-2}"
+SMOKE_ORIGIN="${SMOKE_ORIGIN:-}"
 
 if [[ -z "$API_BASE_URL" ]]; then
   echo "Missing API_BASE_URL."
@@ -83,8 +84,50 @@ if [[ "$healthy" -ne 1 ]]; then
   exit 1
 fi
 
-curl -fsS --max-time 10 "$META_URL" >/dev/null
-curl -fsS --max-time 10 "$ENTRIES_URL" >/dev/null
-curl -fsS --max-time 10 "$TAGS_URL" >/dev/null
+echo "Health OK. Release: ${observed_release:-unknown}"
+
+meta_code="$(curl -sS --max-time 10 -o /tmp/smoke_meta.json -w '%{http_code}' "$META_URL" || true)"
+entries_code="$(curl -sS --max-time 10 -o /tmp/smoke_entries.json -w '%{http_code}' "$ENTRIES_URL" || true)"
+tags_code="$(curl -sS --max-time 10 -o /tmp/smoke_tags.json -w '%{http_code}' "$TAGS_URL" || true)"
+
+echo "GET /api/meta/statuses -> HTTP ${meta_code}"
+echo "GET /api/entries?page=1&page_size=1 -> HTTP ${entries_code}"
+echo "GET /api/tags -> HTTP ${tags_code}"
+
+if [[ "$meta_code" != "200" || "$entries_code" != "200" || "$tags_code" != "200" ]]; then
+  echo "One or more API checks failed."
+  exit 1
+fi
+
+python3 - <<'PY'
+import json
+
+with open("/tmp/smoke_entries.json", "r", encoding="utf-8") as fh:
+    entries = json.load(fh)
+with open("/tmp/smoke_tags.json", "r", encoding="utf-8") as fh:
+    tags = json.load(fh)
+
+items = entries.get("items", [])
+first = items[0]["headword"] if items else "<none>"
+print(f"Entries total: {entries.get('total', 0)} | first headword: {first}")
+print(f"Tags count: {len(tags)}")
+PY
+
+if [[ -n "$SMOKE_ORIGIN" ]]; then
+  preflight_code="$(curl -sS --max-time 10 -o /tmp/smoke_preflight_body.txt -D /tmp/smoke_preflight_headers.txt -X OPTIONS \
+    "${API_BASE_URL}/api/auth/me" \
+    -H "Origin: ${SMOKE_ORIGIN}" \
+    -H 'Access-Control-Request-Method: GET' \
+    -H 'Access-Control-Request-Headers: content-type' \
+    -w '%{http_code}' || true)"
+  allow_origin="$(awk -F': ' 'BEGIN{IGNORECASE=1} tolower($1)=="access-control-allow-origin" {print $2}' /tmp/smoke_preflight_headers.txt | tr -d '\r' | tail -n 1)"
+  echo "CORS preflight from ${SMOKE_ORIGIN} -> HTTP ${preflight_code}, allow-origin: ${allow_origin:-<none>}"
+  if [[ "$preflight_code" != "200" || "$allow_origin" != "$SMOKE_ORIGIN" ]]; then
+    echo "CORS check failed for origin ${SMOKE_ORIGIN}."
+    echo "Preflight response:"
+    cat /tmp/smoke_preflight_body.txt || true
+    exit 1
+  fi
+fi
 
 echo "Smoke checks passed."

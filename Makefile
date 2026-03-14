@@ -8,6 +8,7 @@ DEPLOY_HOST ?= academiatupi.com
 DEPLOY_USER ?= root
 DEPLOY_PATH ?= /srv/nheenga-neologismos
 DEPLOY_API_URL ?= https://api.academiatupi.com
+DEPLOY_SMOKE_ORIGIN ?= https://neo.academiatupi.com
 DEPLOY_SMOKE_RETRIES ?= 60
 DEPLOY_SMOKE_SLEEP_SECONDS ?= 2
 
@@ -39,8 +40,8 @@ help:
 	@echo "  make deploy-daily     # Fast daily deploy: API build/migrate/restart + smoke checks (no seed/reset)"
 	@echo "  make deploy-full      # Full stack deploy: API+Postgres+Caddy + migrate + smoke checks"
 	@echo "  make deploy-reset DEPLOY_SEED_CSV=/abs/path/neologisms.csv  # Destructive reset + reseed"
-	@echo "  make deploy-smoke     # Run smoke checks against DEPLOY_API_URL"
-	@echo "  make deploy-ssh-all DEPLOY_HOST=<host> [DEPLOY_USER=root] [DEPLOY_PATH=/srv/nheenga-neologismos] [DEPLOY_DB_DUMP=/path/file.sql.gz] [DEPLOY_SEED_CSV=/path/neologisms.csv] [DEPLOY_MODE=full|daily] [DEPLOY_API_URL=https://api.example.com] [SSH_IDENTITY=~/.ssh/id_ed25519] [DEPLOY_RESET_STACK=1] [DEPLOY_RESET_VOLUMES=1]"
+	@echo "  make deploy-smoke     # Run smoke checks against DEPLOY_API_URL (+ CORS preflight from DEPLOY_SMOKE_ORIGIN)"
+	@echo "  make deploy-ssh-all DEPLOY_HOST=<host> [DEPLOY_USER=root] [DEPLOY_PATH=/srv/nheenga-neologismos] [DEPLOY_DB_DUMP=/path/file.sql.gz] [DEPLOY_SEED_CSV=/path/neologisms.csv] [DEPLOY_MODE=full|daily] [DEPLOY_API_URL=https://api.example.com] [DEPLOY_SMOKE_ORIGIN=https://neo.example.com] [SSH_IDENTITY=~/.ssh/id_ed25519] [DEPLOY_RESET_STACK=1] [DEPLOY_RESET_VOLUMES=1]"
 	@echo "  make bootstrap-admin EMAIL=<email> PASSWORD=<password> [DISPLAY_NAME=<name>]  # Create/update first admin"
 	@echo "  make change-user-password <email> <new_password>  # Update a user's password"
 	@echo "  make test             # Run all tests"
@@ -125,6 +126,7 @@ deploy-full:
 	DEPLOY_USER="$(DEPLOY_USER)" \
 	DEPLOY_PATH="$(DEPLOY_PATH)" \
 	DEPLOY_API_URL="$(DEPLOY_API_URL)" \
+	DEPLOY_SMOKE_ORIGIN="$(DEPLOY_SMOKE_ORIGIN)" \
 	DEPLOY_SMOKE_RETRIES="$(DEPLOY_SMOKE_RETRIES)" \
 	DEPLOY_SMOKE_SLEEP_SECONDS="$(DEPLOY_SMOKE_SLEEP_SECONDS)" \
 	bash scripts/deploy-ssh-all.sh
@@ -135,6 +137,7 @@ deploy-daily:
 	DEPLOY_USER="$(DEPLOY_USER)" \
 	DEPLOY_PATH="$(DEPLOY_PATH)" \
 	DEPLOY_API_URL="$(DEPLOY_API_URL)" \
+	DEPLOY_SMOKE_ORIGIN="$(DEPLOY_SMOKE_ORIGIN)" \
 	DEPLOY_SMOKE_RETRIES="$(DEPLOY_SMOKE_RETRIES)" \
 	DEPLOY_SMOKE_SLEEP_SECONDS="$(DEPLOY_SMOKE_SLEEP_SECONDS)" \
 	bash scripts/deploy-ssh-all.sh
@@ -151,6 +154,7 @@ deploy-reset:
 	DEPLOY_USER="$(DEPLOY_USER)" \
 	DEPLOY_PATH="$(DEPLOY_PATH)" \
 	DEPLOY_API_URL="$(DEPLOY_API_URL)" \
+	DEPLOY_SMOKE_ORIGIN="$(DEPLOY_SMOKE_ORIGIN)" \
 	DEPLOY_SMOKE_RETRIES="$(DEPLOY_SMOKE_RETRIES)" \
 	DEPLOY_SMOKE_SLEEP_SECONDS="$(DEPLOY_SMOKE_SLEEP_SECONDS)" \
 	DEPLOY_SEED_CSV="$(DEPLOY_SEED_CSV)" \
@@ -158,6 +162,7 @@ deploy-reset:
 
 deploy-smoke:
 	@API_BASE_URL="$(DEPLOY_API_URL)" \
+	SMOKE_ORIGIN="$(DEPLOY_SMOKE_ORIGIN)" \
 	RETRIES="$(DEPLOY_SMOKE_RETRIES)" \
 	SLEEP_SECONDS="$(DEPLOY_SMOKE_SLEEP_SECONDS)" \
 	bash scripts/smoke-api.sh

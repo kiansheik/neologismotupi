@@ -214,7 +214,7 @@ APP_ENV=production
 APP_RELEASE=manual
 DATABASE_URL=postgresql+asyncpg://postgres:change-me@db.example.com:5432/nheenga_prod
 SECRET_KEY=replace-with-a-long-random-secret-key-at-least-32-chars
-CORS_ORIGINS=https://academiatupi.com,https://app.academiatupi.com
+CORS_ORIGINS=https://academiatupi.com,https://www.academiatupi.com,https://neo.academiatupi.com
 TURNSTILE_ENABLED=true
 TURNSTILE_SECRET_KEY=replace-with-turnstile-secret
 FIRST_USER_IS_ADMIN=false
@@ -234,6 +234,10 @@ VITE_API_BASE_URL=http://localhost:8000/api
 VITE_APP_NAME=Nheenga Neologismos
 VITE_TURNSTILE_SITE_KEY=
 ```
+
+Turnstile note:
+- `TURNSTILE_SECRET_KEY` is validated on the API server at request time.
+- `VITE_TURNSTILE_SITE_KEY` is compiled into the frontend at build time, so changing it requires a new frontend deploy.
 
 ### `apps/web/.env.production.example`
 
@@ -374,6 +378,7 @@ Defaults are tuned for this repo:
 - `DEPLOY_USER=root`
 - `DEPLOY_PATH=/srv/nheenga-neologismos`
 - `DEPLOY_API_URL=https://api.academiatupi.com`
+- `DEPLOY_SMOKE_ORIGIN=https://neo.academiatupi.com`
 
 When you need infra-level updates (not just daily API code updates):
 

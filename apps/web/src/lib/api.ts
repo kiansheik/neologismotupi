@@ -1,4 +1,5 @@
 import type { ApiErrorShape } from "@/lib/types";
+import { getTurnstileToken, isTurnstileConfigured } from "@/lib/turnstile";
 
 export class ApiError extends Error {
   code: string;
@@ -27,6 +28,28 @@ function buildUrl(path: string): string {
 
 export async function apiFetch<T>(path: string, options: RequestInitWithBody = {}): Promise<T> {
   const { body, headers, ...rest } = options;
+  const method = (rest.method ?? "GET").toUpperCase();
+
+  let requestBody = body;
+  if (
+    body !== undefined &&
+    method !== "GET" &&
+    method !== "HEAD" &&
+    typeof body === "object" &&
+    body !== null &&
+    !Array.isArray(body)
+  ) {
+    const bodyWithToken = body as Record<string, unknown>;
+    if (bodyWithToken.turnstile_token === undefined && isTurnstileConfigured()) {
+      const token = await getTurnstileToken();
+      if (token) {
+        requestBody = {
+          ...bodyWithToken,
+          turnstile_token: token,
+        };
+      }
+    }
+  }
 
   const response = await fetch(buildUrl(path), {
     credentials: "include",
@@ -35,7 +58,7 @@ export async function apiFetch<T>(path: string, options: RequestInitWithBody = {
       "Content-Type": "application/json",
       ...(headers ?? {}),
     },
-    body: body !== undefined ? JSON.stringify(body) : undefined,
+    body: requestBody !== undefined ? JSON.stringify(requestBody) : undefined,
   });
 
   if (!response.ok) {

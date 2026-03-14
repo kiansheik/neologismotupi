@@ -181,7 +181,7 @@ Edit `/srv/nheenga-neologismos/apps/api/.env.production`:
 
 - `DATABASE_URL=postgresql+asyncpg://nheenga:<password>@localhost:5432/nheenga_prod`
 - `SECRET_KEY=<long-random-32+-char-string>`
-- `CORS_ORIGINS=https://www.academiatupi.com`
+- `CORS_ORIGINS=https://www.academiatupi.com,https://neo.academiatupi.com`
 - `FIRST_USER_IS_ADMIN=false`
 - `SESSION_COOKIE_SECURE=true`
 - `SESSION_COOKIE_DOMAIN=` (host-only cookie, scoped to `api.academiatupi.com`)
