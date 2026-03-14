@@ -43,7 +43,9 @@ export const ptBR = {
   "entries.scoreExamples": "Pontuação: {score} · Exemplos: {examples}",
   "entries.submittedBy": "Enviado por",
   "reputation.label": "Karma: {score}",
-  "badge.creator": "Criador",
+  "badge.founder": "Fundador",
+  "badge.topContributor": "Maior colaborador",
+  "badge.karmaLeader": "Maior karma",
   "badge.community": "Comunidade",
 
   "me.title": "Meu perfil",
@@ -275,7 +277,9 @@ export const enUS: Record<TranslationKey, string> = {
   "entries.scoreExamples": "Score: {score} · Examples: {examples}",
   "entries.submittedBy": "Submitted by",
   "reputation.label": "Karma: {score}",
-  "badge.creator": "Creator",
+  "badge.founder": "Founder",
+  "badge.topContributor": "Top contributor",
+  "badge.karmaLeader": "Karma leader",
   "badge.community": "Community",
 
   "me.title": "My profile",

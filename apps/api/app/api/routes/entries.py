@@ -50,6 +50,7 @@ from app.services.entries import (
 from app.services.reputation import recompute_user_reputation
 from app.services.rate_limit import enforce_rate_limit
 from app.services.serializers import serialize_entry_detail, serialize_entry_summary
+from app.services.user_badges import get_user_badge_leaders
 
 router = APIRouter(prefix="/entries", tags=["entries"])
 
@@ -147,9 +148,10 @@ async def list_entries(
 
     total = int((await db.execute(count_stmt)).scalar_one())
     entries = (await db.execute(stmt)).scalars().unique().all()
+    badge_leaders = await get_user_badge_leaders(db)
 
     return EntryListOut(
-        items=[serialize_entry_summary(entry) for entry in entries],
+        items=[serialize_entry_summary(entry, badge_leaders) for entry in entries],
         page=page,
         page_size=page_size,
         total=total,
@@ -184,7 +186,8 @@ async def get_entry(
             example for example in entry.examples if example.status == ExampleStatus.approved
         ]
 
-    return serialize_entry_detail(entry, examples=visible_examples)
+    badge_leaders = await get_user_badge_leaders(db)
+    return serialize_entry_detail(entry, examples=visible_examples, badge_leaders=badge_leaders)
 
 
 @router.post("", response_model=EntryDetailOut, status_code=status.HTTP_201_CREATED)
@@ -269,7 +272,8 @@ async def create_entry(
     hydrated = await _load_entry_with_relations(db, entry.id)
     if not hydrated:
         raise_api_error(status_code=500, code="entry_create_failed", message="Could not load new entry")
-    return serialize_entry_detail(hydrated, examples=[])
+    badge_leaders = await get_user_badge_leaders(db)
+    return serialize_entry_detail(hydrated, examples=[], badge_leaders=badge_leaders)
 
 
 @router.patch("/{entry_id}", response_model=EntryDetailOut)
@@ -348,7 +352,8 @@ async def update_entry(
         if can_view_all_examples
         else [ex for ex in hydrated.examples if ex.status == ExampleStatus.approved]
     )
-    return serialize_entry_detail(hydrated, examples=examples)
+    badge_leaders = await get_user_badge_leaders(db)
+    return serialize_entry_detail(hydrated, examples=examples, badge_leaders=badge_leaders)
 
 
 @router.get("/{entry_id}/versions", response_model=list[EntryVersionOut])

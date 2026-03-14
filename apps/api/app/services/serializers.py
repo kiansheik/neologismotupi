@@ -7,6 +7,7 @@ from app.schemas.entries import (
     ExampleOut,
     TagOut,
 )
+from app.services.user_badges import UserBadgeLeaders, resolve_user_badges
 
 
 def serialize_tag(tag: Tag) -> TagOut:
@@ -29,18 +30,31 @@ def serialize_entry_version(version: EntryVersion) -> EntryVersionOut:
     return EntryVersionOut.model_validate(version)
 
 
-def serialize_entry_author(entry: Entry) -> EntryAuthorOut:
+def serialize_entry_author(
+    entry: Entry,
+    badge_leaders: UserBadgeLeaders | None = None,
+) -> EntryAuthorOut:
     fallback_name = f"user-{str(entry.proposer_user_id)[:8]}"
+    badges = resolve_user_badges(entry.proposer_user_id, badge_leaders)
     if entry.proposer and entry.proposer.profile:
         return EntryAuthorOut(
             id=entry.proposer.id,
             display_name=entry.proposer.profile.display_name,
             reputation_score=entry.proposer.profile.reputation_score,
+            badges=badges,
         )
-    return EntryAuthorOut(id=entry.proposer_user_id, display_name=fallback_name, reputation_score=0)
+    return EntryAuthorOut(
+        id=entry.proposer_user_id,
+        display_name=fallback_name,
+        reputation_score=0,
+        badges=badges,
+    )
 
 
-def serialize_entry_summary(entry: Entry) -> EntrySummaryOut:
+def serialize_entry_summary(
+    entry: Entry,
+    badge_leaders: UserBadgeLeaders | None = None,
+) -> EntrySummaryOut:
     payload = {
         "id": entry.id,
         "slug": entry.slug,
@@ -56,7 +70,7 @@ def serialize_entry_summary(entry: Entry) -> EntrySummaryOut:
         "downvote_count_cache": entry.downvote_count_cache,
         "example_count_cache": entry.example_count_cache,
         "proposer_user_id": entry.proposer_user_id,
-        "proposer": serialize_entry_author(entry),
+        "proposer": serialize_entry_author(entry, badge_leaders),
         "created_at": entry.created_at,
         "updated_at": entry.updated_at,
         "tags": serialize_entry_tags(entry.tags),
@@ -64,9 +78,14 @@ def serialize_entry_summary(entry: Entry) -> EntrySummaryOut:
     return EntrySummaryOut.model_validate(payload)
 
 
-def serialize_entry_detail(entry: Entry, *, examples: list[Example]) -> EntryDetailOut:
+def serialize_entry_detail(
+    entry: Entry,
+    *,
+    examples: list[Example],
+    badge_leaders: UserBadgeLeaders | None = None,
+) -> EntryDetailOut:
     payload = {
-        **serialize_entry_summary(entry).model_dump(),
+        **serialize_entry_summary(entry, badge_leaders).model_dump(),
         "morphology_notes": entry.morphology_notes,
         "approved_at": entry.approved_at,
         "approved_by_user_id": entry.approved_by_user_id,

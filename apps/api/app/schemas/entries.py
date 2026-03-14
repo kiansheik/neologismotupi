@@ -4,6 +4,7 @@ from datetime import datetime
 from pydantic import BaseModel, Field
 
 from app.core.enums import EntryStatus, ExampleStatus, ReportReasonCode, TagType
+from app.schemas.badges import UserBadgeKind
 
 
 class TagOut(BaseModel):
@@ -19,6 +20,7 @@ class EntryAuthorOut(BaseModel):
     id: uuid.UUID
     display_name: str
     reputation_score: int
+    badges: list[UserBadgeKind] = Field(default_factory=list)
 
 
 class EntrySummaryOut(BaseModel):

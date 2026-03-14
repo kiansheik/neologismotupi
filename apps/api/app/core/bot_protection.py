@@ -28,7 +28,9 @@ class TurnstileVerifier:
             return False
 
         payload: dict[str, str] = {"secret": secret_key, "response": token}
-        if remote_ip:
+        # `remoteip` can cause false negatives behind proxies/CDNs if IP forwarding
+        # is not perfectly configured. Keep it opt-in.
+        if remote_ip and settings.turnstile_include_remote_ip:
             payload["remoteip"] = remote_ip
 
         encoded = urlencode(payload).encode("utf-8")
@@ -41,7 +43,7 @@ class TurnstileVerifier:
 
         def _verify_sync() -> bool:
             try:
-                with urlopen(request, timeout=10) as response:  # noqa: S310
+                with urlopen(request, timeout=10) as response:
                     data = json.loads(response.read().decode("utf-8"))
                 return bool(data.get("success"))
             except Exception:

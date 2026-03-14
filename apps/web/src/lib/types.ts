@@ -1,5 +1,6 @@
 export type EntryStatus = "pending" | "approved" | "disputed" | "rejected" | "archived";
 export type ExampleStatus = "pending" | "approved" | "hidden" | "rejected";
+export type UserBadgeKind = "founder" | "top_contributor" | "karma_leader";
 
 export interface Tag {
   id: string;
@@ -12,6 +13,7 @@ export interface EntryAuthor {
   id: string;
   display_name: string;
   reputation_score: number;
+  badges?: UserBadgeKind[];
 }
 
 export interface EntrySummary {
@@ -84,6 +86,7 @@ export interface Profile {
   affiliation_label: string | null;
   role_label: string | null;
   reputation_score: number;
+  badges?: UserBadgeKind[];
   created_at: string;
   updated_at: string;
 }

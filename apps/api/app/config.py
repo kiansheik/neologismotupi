@@ -9,11 +9,13 @@ class Settings(BaseSettings):
     app_env: str = "development"
     app_release: str = "dev-local"
     app_public_url: str = "http://localhost:5173"
+    founder_email: str | None = "kiansheik3128@gmail.com"
     database_url: str = "postgresql+asyncpg://localhost/nheenga_dev"
     secret_key: str = "change-me"
     cors_origins: list[str] = ["http://localhost:5173"]
     turnstile_enabled: bool = False
     turnstile_secret_key: str | None = None
+    turnstile_include_remote_ip: bool = False
     first_user_is_admin: bool = False
 
     require_verified_email: bool = False
@@ -120,14 +122,23 @@ class Settings(BaseSettings):
             raise ValueError("FIRST_USER_IS_ADMIN must be false in production")
 
         default_like_keys = {"change-me", "changeme", "test-secret", "dev-secret"}
-        if not self.secret_key or len(self.secret_key) < 32 or self.secret_key.lower() in default_like_keys:
-            raise ValueError("SECRET_KEY must be set to a strong random value (>=32 chars) in production")
+        if (
+            not self.secret_key
+            or len(self.secret_key) < 32
+            or self.secret_key.lower() in default_like_keys
+        ):
+            raise ValueError(
+                "SECRET_KEY must be set to a strong random value (>=32 chars) in production"
+            )
 
         if not self.session_cookie_secure:
             raise ValueError("SESSION_COOKIE_SECURE must be true in production")
 
         localhost_values = ("localhost", "127.0.0.1")
-        if any(any(marker in origin for marker in localhost_values) for origin in self.cors_origins):
+        if any(
+            any(marker in origin for marker in localhost_values)
+            for origin in self.cors_origins
+        ):
             raise ValueError("CORS_ORIGINS cannot include localhost/127.0.0.1 in production")
 
         return self

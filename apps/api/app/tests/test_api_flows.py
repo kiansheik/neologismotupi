@@ -1,3 +1,4 @@
+import uuid
 from datetime import UTC, datetime, timedelta
 
 import pytest
@@ -465,6 +466,40 @@ async def test_public_user_profile_endpoint(client):
     payload = response.json()
     assert payload["id"] == user_id
     assert payload["profile"]["display_name"] == "Profile User"
+
+
+@pytest.mark.asyncio
+async def test_user_badges_include_founder_top_contributor_and_karma_leader(client):
+    founder = await register_user(client, "kiansheik3128@gmail.com", "Kian Founder")
+    founder_id = founder["id"]
+    founder_uuid = uuid.UUID(founder_id)
+    await create_entry(client, "badge-entry-one")
+    await create_entry(client, "badge-entry-two")
+
+    await client.post("/api/auth/logout")
+    await register_user(client, "badge-other@example.com", "Badge Other")
+    await create_entry(client, "badge-entry-three")
+
+    async with db_module.AsyncSessionLocal() as session:
+        founder_user = (await session.execute(select(User).where(User.id == founder_uuid))).scalar_one()
+        founder_profile = (
+            await session.execute(select(Profile).where(Profile.user_id == founder_user.id))
+        ).scalar_one()
+        founder_profile.reputation_score = 42
+        await session.commit()
+
+    profile_response = await client.get(f"/api/users/{founder_id}")
+    assert profile_response.status_code == 200, profile_response.text
+    profile_badges = profile_response.json()["profile"]["badges"]
+    assert "founder" in profile_badges
+    assert "top_contributor" in profile_badges
+    assert "karma_leader" in profile_badges
+
+    entries_response = await client.get("/api/entries", params={"proposer_user_id": founder_id})
+    assert entries_response.status_code == 200, entries_response.text
+    items = entries_response.json()["items"]
+    assert len(items) >= 1
+    assert "founder" in items[0]["proposer"]["badges"]
 
 
 @pytest.mark.asyncio

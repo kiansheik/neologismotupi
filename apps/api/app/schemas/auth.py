@@ -3,6 +3,8 @@ from datetime import datetime
 
 from pydantic import BaseModel, EmailStr, Field
 
+from app.schemas.badges import UserBadgeKind
+
 
 class RegisterRequest(BaseModel):
     email: EmailStr
@@ -24,6 +26,7 @@ class ProfileOut(BaseModel):
     affiliation_label: str | None
     role_label: str | None
     reputation_score: int
+    badges: list[UserBadgeKind] = Field(default_factory=list)
     created_at: datetime
     updated_at: datetime
 

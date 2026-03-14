@@ -193,11 +193,13 @@ SEED_CSV_PATH=~/nhe-enga/neologisms.csv
 APP_ENV=development
 APP_RELEASE=dev-local
 APP_PUBLIC_URL=http://localhost:5173
+FOUNDER_EMAIL=kiansheik3128@gmail.com
 DATABASE_URL=postgresql+asyncpg://localhost/nheenga_dev
 SECRET_KEY=change-me
 CORS_ORIGINS=http://localhost:5173
 TURNSTILE_ENABLED=false
 TURNSTILE_SECRET_KEY=
+TURNSTILE_INCLUDE_REMOTE_IP=false
 # Dev only. Must be false in production.
 FIRST_USER_IS_ADMIN=true
 REQUIRE_VERIFIED_EMAIL=false
@@ -225,11 +227,13 @@ PASSWORD_RESET_TOKEN_TTL_MINUTES=30
 APP_ENV=production
 APP_RELEASE=manual
 APP_PUBLIC_URL=https://neo.academiatupi.com
+FOUNDER_EMAIL=kiansheik3128@gmail.com
 DATABASE_URL=postgresql+asyncpg://postgres:change-me@db.example.com:5432/nheenga_prod
 SECRET_KEY=replace-with-a-long-random-secret-key-at-least-32-chars
 CORS_ORIGINS=https://academiatupi.com,https://www.academiatupi.com,https://neo.academiatupi.com
 TURNSTILE_ENABLED=true
 TURNSTILE_SECRET_KEY=replace-with-turnstile-secret
+TURNSTILE_INCLUDE_REMOTE_IP=false
 FIRST_USER_IS_ADMIN=false
 REQUIRE_VERIFIED_EMAIL=true
 SESSION_COOKIE_NAME=nheenga_session
@@ -272,8 +276,10 @@ VITE_GA_MEASUREMENT_ID=
 
 Turnstile note:
 - `TURNSTILE_SECRET_KEY` is validated on the API server at request time.
+- `TURNSTILE_INCLUDE_REMOTE_IP=false` is recommended behind reverse proxies/CDN to avoid false negatives from IP forwarding mismatches.
 - `VITE_TURNSTILE_SITE_KEY` is compiled into the frontend at build time, so changing it requires a new frontend deploy.
 - `EMAIL_DELIVERY=log` is for local/dev troubleshooting only. Use `EMAIL_DELIVERY=smtp` in production.
+- `FOUNDER_EMAIL` controls who receives the `fundador/founder` badge.
 
 ### `apps/web/.env.production.example`
 

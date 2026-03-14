@@ -37,8 +37,16 @@ from app.services.auth_tokens import (
 )
 from app.services.email_delivery import send_email_verification_email, send_password_reset_email
 from app.services.rate_limit import enforce_rate_limit
+from app.services.user_badges import get_user_badge_leaders, resolve_user_badges
 
 router = APIRouter(prefix="/auth", tags=["auth"])
+
+
+def _serialize_user(user: User, *, badge_leaders) -> UserOut:
+    payload = UserOut.model_validate(user)
+    if payload.profile:
+        payload.profile.badges = resolve_user_badges(user.id, badge_leaders)
+    return payload
 
 
 @router.post("/register", response_model=UserOut, status_code=status.HTTP_201_CREATED)
@@ -113,7 +121,8 @@ async def register(
     if not hydrated_user:
         raise_api_error(status_code=500, code="registration_failed", message="Unable to load user")
 
-    return UserOut.model_validate(hydrated_user)
+    badge_leaders = await get_user_badge_leaders(db)
+    return _serialize_user(hydrated_user, badge_leaders=badge_leaders)
 
 
 @router.post("/login", response_model=UserOut)
@@ -164,7 +173,8 @@ async def login(
     set_auth_cookie(response, raw_token)
     request.state.auth_user_email = user.email
     request.state.auth_user_id = str(user.id)
-    return UserOut.model_validate(user)
+    badge_leaders = await get_user_badge_leaders(db)
+    return _serialize_user(user, badge_leaders=badge_leaders)
 
 
 @router.post("/logout", response_model=LogoutResponse)
@@ -184,8 +194,12 @@ async def logout(request: Request, response: Response, db: SessionDep) -> Logout
 
 
 @router.get("/me", response_model=UserOut)
-async def me(user: Annotated[User, Depends(get_current_user)]) -> UserOut:
-    return UserOut.model_validate(user)
+async def me(
+    user: Annotated[User, Depends(get_current_user)],
+    db: SessionDep,
+) -> UserOut:
+    badge_leaders = await get_user_badge_leaders(db)
+    return _serialize_user(user, badge_leaders=badge_leaders)
 
 
 @router.post("/request-password-reset", response_model=ActionAcceptedResponse)

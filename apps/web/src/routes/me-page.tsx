@@ -33,7 +33,10 @@ export function MePage() {
         <h1 className="text-xl font-semibold text-brand-900">{t("me.title")}</h1>
         <div className="mt-2 flex flex-wrap items-center gap-2 text-sm text-slate-700">
           <span>{currentUser.profile?.display_name ?? t("me.fallbackUser")}</span>
-          <UserBadge displayName={currentUser.profile?.display_name} />
+          <UserBadge
+            displayName={currentUser.profile?.display_name}
+            badges={currentUser.profile?.badges}
+          />
           <span>· {currentUser.email}</span>
         </div>
         <p className="mt-1 text-sm text-slate-600">

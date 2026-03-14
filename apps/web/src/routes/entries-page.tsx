@@ -136,7 +136,7 @@ export function EntriesPage() {
                   {entry.proposer.display_name}
                 </Link>
                 {" · "}
-                <UserBadge displayName={entry.proposer.display_name} />
+                <UserBadge displayName={entry.proposer.display_name} badges={entry.proposer.badges} />
                 {" · "}
                 {t("reputation.label", { score: entry.proposer.reputation_score })}
               </p>
