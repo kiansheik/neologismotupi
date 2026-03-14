@@ -125,6 +125,8 @@ export interface QueueEntry {
 export interface QueueExample {
   id: string;
   entry_id: string;
+  entry_slug: string;
+  entry_headword: string;
   user_id: string;
   sentence_original: string;
   status: ExampleStatus;
@@ -134,6 +136,28 @@ export interface QueueExample {
 export interface ModerationQueue {
   entries: QueueEntry[];
   examples: QueueExample[];
+}
+
+export interface PeriodCount {
+  today: number;
+  week: number;
+  month: number;
+}
+
+export interface ModerationDashboard {
+  users_total: number;
+  entries_total: number;
+  examples_total: number;
+  pending_entries_total: number;
+  pending_examples_total: number;
+  open_reports_total: number;
+  new_users: PeriodCount;
+  new_entries: PeriodCount;
+  new_examples: PeriodCount;
+  active_contributors: PeriodCount;
+  votes: PeriodCount;
+  reports: PeriodCount;
+  approved_entries: PeriodCount;
 }
 
 export interface ModerationReport {

@@ -413,6 +413,48 @@ async def test_report_flow(client):
 
 
 @pytest.mark.asyncio
+async def test_moderation_dashboard(client):
+    await register_user(client, "dash-author@example.com", "Dash Author")
+    entry = await create_entry(client, "dashboard-entry")
+    example_response = await client.post(
+        f"/api/entries/{entry['id']}/examples",
+        json={"sentence_original": "Dashboard example"},
+    )
+    assert example_response.status_code == 201, example_response.text
+
+    await client.post("/api/auth/logout")
+    await register_user(client, "dash-mod@example.com", "Dash Moderator")
+
+    async with db_module.AsyncSessionLocal() as session:
+        moderator = (await session.execute(select(User).where(User.email == "dash-mod@example.com"))).scalar_one()
+        moderator.is_superuser = True
+        await session.commit()
+
+    response = await client.get("/api/mod/dashboard")
+    assert response.status_code == 200, response.text
+    payload = response.json()
+
+    assert payload["users_total"] >= 2
+    assert payload["entries_total"] >= 1
+    assert payload["examples_total"] >= 1
+    assert payload["pending_entries_total"] >= 1
+    assert payload["pending_examples_total"] >= 1
+
+    for key in [
+        "new_users",
+        "new_entries",
+        "new_examples",
+        "active_contributors",
+        "votes",
+        "reports",
+        "approved_entries",
+    ]:
+        assert isinstance(payload[key]["today"], int)
+        assert isinstance(payload[key]["week"], int)
+        assert isinstance(payload[key]["month"], int)
+
+
+@pytest.mark.asyncio
 async def test_public_user_profile_endpoint(client):
     created = await register_user(client, "profile-user@example.com", "Profile User")
     user_id = created["id"]

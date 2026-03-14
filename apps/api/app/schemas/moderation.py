@@ -18,6 +18,8 @@ class ModerationEntryOut(BaseModel):
 class ModerationExampleOut(BaseModel):
     id: uuid.UUID
     entry_id: uuid.UUID
+    entry_slug: str
+    entry_headword: str
     user_id: uuid.UUID
     sentence_original: str
     status: ExampleStatus
@@ -27,6 +29,28 @@ class ModerationExampleOut(BaseModel):
 class ModerationQueueOut(BaseModel):
     entries: list[ModerationEntryOut]
     examples: list[ModerationExampleOut]
+
+
+class PeriodCountOut(BaseModel):
+    today: int
+    week: int
+    month: int
+
+
+class ModerationDashboardOut(BaseModel):
+    users_total: int
+    entries_total: int
+    examples_total: int
+    pending_entries_total: int
+    pending_examples_total: int
+    open_reports_total: int
+    new_users: PeriodCountOut
+    new_entries: PeriodCountOut
+    new_examples: PeriodCountOut
+    active_contributors: PeriodCountOut
+    votes: PeriodCountOut
+    reports: PeriodCountOut
+    approved_entries: PeriodCountOut
 
 
 class ModerationActionRequest(BaseModel):

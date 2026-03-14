@@ -1,21 +1,24 @@
 import uuid
 from datetime import UTC, datetime
+from datetime import timedelta
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Query
-from sqlalchemy import select
+from sqlalchemy import func, select, union_all
 
 from app.core.deps import SessionDep, require_moderator
 from app.core.enums import EntryStatus, ExampleStatus, ReportStatus, ReportTargetType
 from app.core.errors import raise_api_error
-from app.models.entry import Entry, Example
+from app.models.entry import Entry, Example, ExampleVote, Vote
 from app.models.moderation import Report
 from app.models.user import Profile, User
 from app.schemas.moderation import (
+    ModerationDashboardOut,
     ModerationActionRequest,
     ModerationEntryOut,
     ModerationExampleOut,
     ModerationQueueOut,
+    PeriodCountOut,
     ReportOut,
     ReportReviewRequest,
 )
@@ -29,6 +32,114 @@ def _truncate_text(value: str, limit: int = 120) -> str:
     if len(cleaned) <= limit:
         return cleaned
     return f"{cleaned[: limit - 3].rstrip()}..."
+
+
+async def _count_rows(db: SessionDep, stmt) -> int:
+    return int((await db.execute(stmt)).scalar_one())
+
+
+def _period_starts(now: datetime) -> tuple[datetime, datetime, datetime]:
+    start_today = datetime(now.year, now.month, now.day, tzinfo=UTC)
+    start_week = start_today - timedelta(days=start_today.weekday())
+    start_month = datetime(now.year, now.month, 1, tzinfo=UTC)
+    return start_today, start_week, start_month
+
+
+@router.get("/dashboard", response_model=ModerationDashboardOut)
+async def moderation_dashboard(
+    db: SessionDep,
+    _: Annotated[User, Depends(require_moderator)],
+) -> ModerationDashboardOut:
+    now = datetime.now(UTC)
+    start_today, start_week, start_month = _period_starts(now)
+
+    async def count_period(model, timestamp_column) -> PeriodCountOut:
+        return PeriodCountOut(
+            today=await _count_rows(
+                db, select(func.count()).select_from(model).where(timestamp_column >= start_today)
+            ),
+            week=await _count_rows(
+                db, select(func.count()).select_from(model).where(timestamp_column >= start_week)
+            ),
+            month=await _count_rows(
+                db, select(func.count()).select_from(model).where(timestamp_column >= start_month)
+            ),
+        )
+
+    async def count_active_contributors(since: datetime) -> int:
+        contributors_subquery = union_all(
+            select(Entry.proposer_user_id.label("user_id")).where(Entry.created_at >= since),
+            select(Example.user_id.label("user_id")).where(Example.created_at >= since),
+        ).subquery()
+        return await _count_rows(
+            db,
+            select(func.count(func.distinct(contributors_subquery.c.user_id))),
+        )
+
+    async def count_votes(since: datetime) -> int:
+        entry_votes = await _count_rows(
+            db, select(func.count()).select_from(Vote).where(Vote.created_at >= since)
+        )
+        example_votes = await _count_rows(
+            db, select(func.count()).select_from(ExampleVote).where(ExampleVote.created_at >= since)
+        )
+        return entry_votes + example_votes
+
+    users_total = await _count_rows(db, select(func.count()).select_from(User))
+    entries_total = await _count_rows(db, select(func.count()).select_from(Entry))
+    examples_total = await _count_rows(db, select(func.count()).select_from(Example))
+    pending_entries_total = await _count_rows(
+        db, select(func.count()).select_from(Entry).where(Entry.status == EntryStatus.pending)
+    )
+    pending_examples_total = await _count_rows(
+        db, select(func.count()).select_from(Example).where(Example.status == ExampleStatus.pending)
+    )
+    open_reports_total = await _count_rows(
+        db, select(func.count()).select_from(Report).where(Report.status == ReportStatus.open)
+    )
+
+    new_users = await count_period(User, User.created_at)
+    new_entries = await count_period(Entry, Entry.created_at)
+    new_examples = await count_period(Example, Example.created_at)
+    reports = await count_period(Report, Report.created_at)
+    approved_entries = PeriodCountOut(
+        today=await _count_rows(
+            db, select(func.count()).select_from(Entry).where(Entry.approved_at >= start_today)
+        ),
+        week=await _count_rows(
+            db, select(func.count()).select_from(Entry).where(Entry.approved_at >= start_week)
+        ),
+        month=await _count_rows(
+            db, select(func.count()).select_from(Entry).where(Entry.approved_at >= start_month)
+        ),
+    )
+
+    active_contributors = PeriodCountOut(
+        today=await count_active_contributors(start_today),
+        week=await count_active_contributors(start_week),
+        month=await count_active_contributors(start_month),
+    )
+    votes = PeriodCountOut(
+        today=await count_votes(start_today),
+        week=await count_votes(start_week),
+        month=await count_votes(start_month),
+    )
+
+    return ModerationDashboardOut(
+        users_total=users_total,
+        entries_total=entries_total,
+        examples_total=examples_total,
+        pending_entries_total=pending_entries_total,
+        pending_examples_total=pending_examples_total,
+        open_reports_total=open_reports_total,
+        new_users=new_users,
+        new_entries=new_entries,
+        new_examples=new_examples,
+        active_contributors=active_contributors,
+        votes=votes,
+        reports=reports,
+        approved_entries=approved_entries,
+    )
 
 
 @router.get("/queue", response_model=ModerationQueueOut)
@@ -45,12 +156,13 @@ async def moderation_queue(
 
     examples = (
         await db.execute(
-            select(Example)
+            select(Example, Entry.slug, Entry.headword)
+            .join(Entry, Example.entry_id == Entry.id)
             .where(Example.status == ExampleStatus.pending)
             .order_by(Example.created_at.asc())
             .limit(limit)
         )
-    ).scalars().all()
+    ).all()
 
     return ModerationQueueOut(
         entries=[
@@ -68,12 +180,14 @@ async def moderation_queue(
             ModerationExampleOut(
                 id=example.id,
                 entry_id=example.entry_id,
+                entry_slug=entry_slug,
+                entry_headword=entry_headword,
                 user_id=example.user_id,
                 sentence_original=example.sentence_original,
                 status=example.status,
                 created_at=example.created_at,
             )
-            for example in examples
+            for example, entry_slug, entry_headword in examples
         ],
     )
 

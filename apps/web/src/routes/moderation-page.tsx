@@ -11,6 +11,7 @@ import { useCurrentUser } from "@/features/auth/hooks";
 import {
   approveEntry,
   approveExample,
+  getModerationDashboard,
   getModerationQueue,
   getModerationReports,
   hideExample,
@@ -31,6 +32,11 @@ export function ModerationPage() {
     queryFn: getModerationQueue,
     enabled: Boolean(currentUser?.is_superuser),
   });
+  const dashboardQuery = useQuery({
+    queryKey: ["mod-dashboard"],
+    queryFn: getModerationDashboard,
+    enabled: Boolean(currentUser?.is_superuser),
+  });
 
   const reportsQuery = useQuery({
     queryKey: ["mod-reports", "open"],
@@ -39,6 +45,7 @@ export function ModerationPage() {
   });
 
   const refreshModeration = async () => {
+    await queryClient.invalidateQueries({ queryKey: ["mod-dashboard"] });
     await queryClient.invalidateQueries({ queryKey: ["mod-queue"] });
     await queryClient.invalidateQueries({ queryKey: ["mod-reports"] });
     await queryClient.invalidateQueries({ queryKey: ["entries"] });
@@ -160,6 +167,12 @@ export function ModerationPage() {
             <div className="mt-2 space-y-2">
               {queueQuery.data?.examples.map((example) => (
                 <article key={example.id} className="rounded-md border border-brand-100 p-3">
+                  <p className="text-xs text-slate-600">
+                    <span className="font-medium text-brand-900">{t("moderation.exampleForEntry")}:</span>{" "}
+                    <Link className="font-medium text-brand-700 hover:underline" to={`/entries/${example.entry_slug}`}>
+                      {example.entry_headword}
+                    </Link>
+                  </p>
                   <p className="text-sm text-slate-800">{example.sentence_original}</p>
                   <div className="mt-2 flex gap-2">
                     <Button type="button" onClick={() => approveExampleMutation.mutate(example.id)}>
@@ -249,6 +262,94 @@ export function ModerationPage() {
             <p className="text-sm text-slate-600">{t("moderation.noOpenReports")}</p>
           ) : null}
         </div>
+      </Card>
+
+      <Card>
+        <h2 className="text-lg font-semibold text-brand-900">{t("moderation.dashboardTitle")}</h2>
+        <p className="mt-1 text-sm text-slate-700">{t("moderation.dashboardSubtitle")}</p>
+
+        {dashboardQuery.isLoading ? (
+          <p className="mt-3 text-sm text-slate-600">{t("moderation.dashboardLoading")}</p>
+        ) : null}
+        {dashboardQuery.error ? (
+          <p className="mt-3 text-sm text-red-700">{t("moderation.dashboardLoadError")}</p>
+        ) : null}
+
+        {dashboardQuery.data ? (
+          <>
+            <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              <article className="rounded-md border border-brand-100 bg-brand-50/20 p-3">
+                <p className="text-xs font-medium uppercase tracking-wide text-slate-600">
+                  {t("moderation.metric.usersTotal")}
+                </p>
+                <p className="mt-1 text-2xl font-semibold text-brand-900">{dashboardQuery.data.users_total}</p>
+              </article>
+              <article className="rounded-md border border-brand-100 bg-brand-50/20 p-3">
+                <p className="text-xs font-medium uppercase tracking-wide text-slate-600">
+                  {t("moderation.metric.entriesTotal")}
+                </p>
+                <p className="mt-1 text-2xl font-semibold text-brand-900">{dashboardQuery.data.entries_total}</p>
+              </article>
+              <article className="rounded-md border border-brand-100 bg-brand-50/20 p-3">
+                <p className="text-xs font-medium uppercase tracking-wide text-slate-600">
+                  {t("moderation.metric.examplesTotal")}
+                </p>
+                <p className="mt-1 text-2xl font-semibold text-brand-900">{dashboardQuery.data.examples_total}</p>
+              </article>
+              <article className="rounded-md border border-brand-100 bg-brand-50/20 p-3">
+                <p className="text-xs font-medium uppercase tracking-wide text-slate-600">
+                  {t("moderation.metric.openReportsTotal")}
+                </p>
+                <p className="mt-1 text-2xl font-semibold text-brand-900">{dashboardQuery.data.open_reports_total}</p>
+              </article>
+              <article className="rounded-md border border-brand-100 bg-brand-50/20 p-3">
+                <p className="text-xs font-medium uppercase tracking-wide text-slate-600">
+                  {t("moderation.metric.pendingEntriesTotal")}
+                </p>
+                <p className="mt-1 text-2xl font-semibold text-brand-900">
+                  {dashboardQuery.data.pending_entries_total}
+                </p>
+              </article>
+              <article className="rounded-md border border-brand-100 bg-brand-50/20 p-3">
+                <p className="text-xs font-medium uppercase tracking-wide text-slate-600">
+                  {t("moderation.metric.pendingExamplesTotal")}
+                </p>
+                <p className="mt-1 text-2xl font-semibold text-brand-900">
+                  {dashboardQuery.data.pending_examples_total}
+                </p>
+              </article>
+            </div>
+
+            <div className="mt-4 grid gap-3 sm:grid-cols-2">
+              {[
+                { key: "newUsers", label: t("moderation.metric.newUsers"), data: dashboardQuery.data.new_users },
+                { key: "newEntries", label: t("moderation.metric.newEntries"), data: dashboardQuery.data.new_entries },
+                { key: "newExamples", label: t("moderation.metric.newExamples"), data: dashboardQuery.data.new_examples },
+                {
+                  key: "activeContributors",
+                  label: t("moderation.metric.activeContributors"),
+                  data: dashboardQuery.data.active_contributors,
+                },
+                { key: "votes", label: t("moderation.metric.votes"), data: dashboardQuery.data.votes },
+                { key: "reports", label: t("moderation.metric.reports"), data: dashboardQuery.data.reports },
+                {
+                  key: "approvedEntries",
+                  label: t("moderation.metric.approvedEntries"),
+                  data: dashboardQuery.data.approved_entries,
+                },
+              ].map((metric) => (
+                <article key={metric.key} className="rounded-md border border-brand-100 p-3">
+                  <p className="text-sm font-medium text-brand-900">{metric.label}</p>
+                  <p className="mt-1 text-sm text-slate-700">
+                    {t("moderation.period.today")}: <strong>{metric.data.today}</strong> ·{" "}
+                    {t("moderation.period.week")}: <strong>{metric.data.week}</strong> ·{" "}
+                    {t("moderation.period.month")}: <strong>{metric.data.month}</strong>
+                  </p>
+                </article>
+              ))}
+            </div>
+          </>
+        ) : null}
       </Card>
     </section>
   );

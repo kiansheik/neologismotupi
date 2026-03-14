@@ -1,8 +1,12 @@
 import { apiFetch, withQuery } from "@/lib/api";
-import type { ModerationQueue, ModerationReport } from "@/lib/types";
+import type { ModerationDashboard, ModerationQueue, ModerationReport } from "@/lib/types";
 
 export function getModerationQueue() {
   return apiFetch<ModerationQueue>("/mod/queue");
+}
+
+export function getModerationDashboard() {
+  return apiFetch<ModerationDashboard>("/mod/dashboard");
 }
 
 export function getModerationReports(status = "open") {
