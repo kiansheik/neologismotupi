@@ -113,6 +113,8 @@ export function EntriesPage() {
                 <Link className="text-brand-700 hover:underline" to={`/profiles/${entry.proposer.id}`}>
                   {entry.proposer.display_name}
                 </Link>
+                {" · "}
+                {t("reputation.label", { score: entry.proposer.reputation_score })}
               </p>
             </article>
           ))}

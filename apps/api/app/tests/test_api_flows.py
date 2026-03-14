@@ -5,9 +5,9 @@ from sqlalchemy import func, select
 
 import app.db as db_module
 from app.core.enums import TagType
-from app.models.entry import Entry, Example, Tag, Vote
+from app.models.entry import Entry, Example, ExampleVote, Tag, Vote
 from app.models.moderation import Report
-from app.models.user import User
+from app.models.user import Profile, User
 
 
 async def register_user(client, email: str, display_name: str, password: str = "password123"):
@@ -226,6 +226,61 @@ async def test_vote_once_and_change_updates_row(client):
         vote = (await session.execute(select(Vote))).scalar_one()
         assert vote.value == -1
 
+        proposer = (await session.execute(select(User).where(User.email == "proposer@example.com"))).scalar_one()
+        proposer_profile = (
+            await session.execute(select(Profile).where(Profile.user_id == proposer.id))
+        ).scalar_one()
+        assert proposer_profile.reputation_score == -1
+
+
+@pytest.mark.asyncio
+async def test_example_vote_updates_reputation(client):
+    await register_user(client, "example-author@example.com", "Example Author")
+
+    async with db_module.AsyncSessionLocal() as session:
+        author = (await session.execute(select(User).where(User.email == "example-author@example.com"))).scalar_one()
+        author.is_superuser = True
+        await session.commit()
+
+    entry = await create_entry(client, "example-vote-entry")
+    example_response = await client.post(
+        f"/api/entries/{entry['id']}/examples",
+        json={
+            "sentence_original": "Example sentence to vote on.",
+            "translation_pt": "Frase de exemplo para voto.",
+        },
+    )
+    assert example_response.status_code == 201, example_response.text
+    example_id = example_response.json()["id"]
+    assert example_response.json()["status"] == "approved"
+
+    await client.post("/api/auth/logout")
+    await register_user(client, "example-voter@example.com", "Example Voter")
+
+    async with db_module.AsyncSessionLocal() as session:
+        voter = (await session.execute(select(User).where(User.email == "example-voter@example.com"))).scalar_one()
+        voter.created_at = datetime.now(UTC) - timedelta(days=4)
+        await session.commit()
+
+    upvote = await client.post(f"/api/examples/{example_id}/vote", json={"value": 1})
+    assert upvote.status_code == 200, upvote.text
+
+    downvote = await client.post(f"/api/examples/{example_id}/vote", json={"value": -1})
+    assert downvote.status_code == 200, downvote.text
+
+    async with db_module.AsyncSessionLocal() as session:
+        total_example_votes = int((await session.execute(select(func.count()).select_from(ExampleVote))).scalar_one())
+        assert total_example_votes == 1
+
+        example_vote = (await session.execute(select(ExampleVote))).scalar_one()
+        assert example_vote.value == -1
+
+        author = (await session.execute(select(User).where(User.email == "example-author@example.com"))).scalar_one()
+        author_profile = (
+            await session.execute(select(Profile).where(Profile.user_id == author.id))
+        ).scalar_one()
+        assert author_profile.reputation_score == -1
+
 
 @pytest.mark.asyncio
 async def test_new_user_cannot_downvote_before_threshold(client):
@@ -237,6 +292,25 @@ async def test_new_user_cannot_downvote_before_threshold(client):
 
     response = await client.post(f"/api/entries/{entry['id']}/vote", json={"value": -1})
     assert response.status_code == 403
+
+
+@pytest.mark.asyncio
+async def test_cannot_vote_own_content(client):
+    await register_user(client, "self-voter@example.com", "Self Voter")
+    entry = await create_entry(client, "self-vote-entry")
+
+    own_entry_vote = await client.post(f"/api/entries/{entry['id']}/vote", json={"value": 1})
+    assert own_entry_vote.status_code == 403, own_entry_vote.text
+
+    example_response = await client.post(
+        f"/api/entries/{entry['id']}/examples",
+        json={"sentence_original": "My own example to test self-vote blocking."},
+    )
+    assert example_response.status_code == 201, example_response.text
+    example_id = example_response.json()["id"]
+
+    own_example_vote = await client.post(f"/api/examples/{example_id}/vote", json={"value": 1})
+    assert own_example_vote.status_code == 403, own_example_vote.text
 
 
 @pytest.mark.asyncio

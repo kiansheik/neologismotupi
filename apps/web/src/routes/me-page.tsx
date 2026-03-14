@@ -33,6 +33,9 @@ export function MePage() {
         <p className="mt-2 text-sm text-slate-700">
           {currentUser.profile?.display_name ?? t("me.fallbackUser")} · {currentUser.email}
         </p>
+        <p className="mt-1 text-sm text-slate-600">
+          {t("reputation.label", { score: currentUser.profile?.reputation_score ?? 0 })}
+        </p>
       </Card>
 
       <Card>

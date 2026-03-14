@@ -12,7 +12,7 @@ People already create contemporary Tupi usage in classrooms, communities, and on
 - Account signup/login/logout with httpOnly session cookies.
 - Submit/edit entries with revision history.
 - Add usage examples.
-- Vote on entries (with anti-abuse rules).
+- Vote on entries and examples (with anti-abuse rules).
 - Report entries/examples.
 - Moderator queue and report resolution.
 - Search/filter entry lists.
@@ -233,6 +233,14 @@ VITE_APP_NAME=Nheenga Neologismos
 VITE_TURNSTILE_SITE_KEY=
 ```
 
+### `apps/web/.env.production.example`
+
+```env
+VITE_API_BASE_URL=https://api.academiatupi.com/api
+VITE_APP_NAME=Nheenga Neologismos
+VITE_TURNSTILE_SITE_KEY=
+```
+
 ## Run backend only
 
 ```bash
@@ -249,6 +257,14 @@ Health endpoints:
 ```bash
 make dev-web
 ```
+
+## Build frontend (static files)
+
+```bash
+make web-build
+```
+
+Output directory: `apps/web/dist`
 
 ## Frontend localization
 - Default UI locale is `pt-BR`.
@@ -308,6 +324,32 @@ Example cron (daily at 02:30 UTC):
 ```cron
 30 2 * * * cd /path/to/neologismotupi && make db-backup >> /var/log/nheenga-backup.log 2>&1
 ```
+
+## Docker DB dump/restore helpers
+
+Dump local Docker Postgres:
+
+```bash
+make db-dump-docker
+```
+
+Restore a dump into a target DB URL:
+
+```bash
+make db-restore-dump DUMP_FILE=/path/to/dump.sql.gz DATABASE_URL=postgresql://user:pass@host:5432/dbname
+```
+
+## Production deploy runbook
+
+Use this step-by-step guide for first production deploy:
+
+- [docs/deploy-cloudflare-vps.md](docs/deploy-cloudflare-vps.md)
+
+It includes:
+- correct Cloudflare Pages build settings for this monorepo
+- VPS + Postgres setup
+- systemd + Caddy setup
+- copying your local Docker DB to production
 
 ## Cookie domain decision
 Current default is **API-host scoped cookie** (host-only behavior, `SESSION_COOKIE_DOMAIN=`).

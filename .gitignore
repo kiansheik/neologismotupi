@@ -27,8 +27,11 @@ apps/api/.venv/
 # Env files
 .env
 .env.local
+.env.production
 apps/api/.env
+apps/api/.env.production
 apps/web/.env
+apps/web/.env.production
 
 # Local backups
 backups/

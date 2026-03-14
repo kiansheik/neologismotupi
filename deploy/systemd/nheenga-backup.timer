@@ -1,0 +1,10 @@
+[Unit]
+Description=Daily backup timer for Nheenga PostgreSQL
+
+[Timer]
+OnCalendar=*-*-* 02:30:00
+Persistent=true
+Unit=nheenga-backup.service
+
+[Install]
+WantedBy=timers.target

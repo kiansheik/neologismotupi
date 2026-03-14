@@ -32,8 +32,12 @@ def serialize_entry_version(version: EntryVersion) -> EntryVersionOut:
 def serialize_entry_author(entry: Entry) -> EntryAuthorOut:
     fallback_name = f"user-{str(entry.proposer_user_id)[:8]}"
     if entry.proposer and entry.proposer.profile:
-        return EntryAuthorOut(id=entry.proposer.id, display_name=entry.proposer.profile.display_name)
-    return EntryAuthorOut(id=entry.proposer_user_id, display_name=fallback_name)
+        return EntryAuthorOut(
+            id=entry.proposer.id,
+            display_name=entry.proposer.profile.display_name,
+            reputation_score=entry.proposer.profile.reputation_score,
+        )
+    return EntryAuthorOut(id=entry.proposer_user_id, display_name=fallback_name, reputation_score=0)
 
 
 def serialize_entry_summary(entry: Entry) -> EntrySummaryOut:

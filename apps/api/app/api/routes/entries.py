@@ -13,7 +13,7 @@ from app.core.enums import EntryStatus, ExampleStatus, ReportStatus, ReportTarge
 from app.core.errors import raise_api_error
 from app.core.permissions import can_edit_entry, can_edit_example, is_moderator
 from app.core.utils import collapse_whitespace, slugify
-from app.models.entry import Entry, EntryTag, EntryVersion, Example, Tag, Vote
+from app.models.entry import Entry, EntryTag, EntryVersion, Example, ExampleVote, Tag, Vote
 from app.models.moderation import Report
 from app.models.user import User
 from app.schemas.entries import (
@@ -25,6 +25,7 @@ from app.schemas.entries import (
     EntryVersionOut,
     ExampleCreate,
     ExampleOut,
+    ExampleVoteOut,
     ExampleUpdate,
     ReportCreate,
     VoteOut,
@@ -42,9 +43,11 @@ from app.services.entries import (
     is_effectively_empty,
     load_entry_for_update,
     normalize_headword,
+    refresh_example_vote_caches,
     refresh_vote_and_example_caches,
     set_entry_tags,
 )
+from app.services.reputation import recompute_user_reputation
 from app.services.rate_limit import enforce_rate_limit
 from app.services.serializers import serialize_entry_detail, serialize_entry_summary
 
@@ -380,6 +383,13 @@ async def vote_entry(
     if not entry:
         raise_api_error(status_code=404, code="entry_not_found", message="Entry not found")
 
+    if entry.proposer_user_id == user.id:
+        raise_api_error(
+            status_code=403,
+            code="self_vote_forbidden",
+            message="You cannot vote on your own entry",
+        )
+
     existing_vote = (
         await db.execute(select(Vote).where(and_(Vote.entry_id == entry_id, Vote.user_id == user.id)))
     ).scalar_one_or_none()
@@ -393,6 +403,7 @@ async def vote_entry(
 
     await db.flush()
     await refresh_vote_and_example_caches(db, entry)
+    await recompute_user_reputation(db, entry.proposer_user_id)
     await db.commit()
 
     return VoteOut(entry_id=entry_id, user_id=user.id, value=vote.value, score_cache=entry.score_cache)
@@ -415,6 +426,7 @@ async def delete_vote(
         await db.delete(existing_vote)
         await db.flush()
         await refresh_vote_and_example_caches(db, entry)
+        await recompute_user_reputation(db, entry.proposer_user_id)
 
     await db.commit()
     return Response(status_code=status.HTTP_204_NO_CONTENT)
@@ -580,6 +592,89 @@ async def update_example(
 
     await db.commit()
     return ExampleOut.model_validate(example)
+
+
+@example_router.post("/{example_id}/vote", response_model=ExampleVoteOut)
+async def vote_example(
+    example_id: uuid.UUID,
+    payload: VoteRequest,
+    db: SessionDep,
+    user: Annotated[User, Depends(get_current_user)],
+) -> ExampleVoteOut:
+    if payload.value not in (-1, 1):
+        raise_api_error(status_code=422, code="invalid_vote", message="Vote must be -1 or 1")
+
+    if payload.value == -1 and not can_downvote(user):
+        raise_api_error(
+            status_code=403,
+            code="downvote_blocked",
+            message="New users cannot downvote until account age is at least 72 hours",
+        )
+
+    example = (await db.execute(select(Example).where(Example.id == example_id))).scalar_one_or_none()
+    if not example:
+        raise_api_error(status_code=404, code="example_not_found", message="Example not found")
+
+    if example.user_id == user.id:
+        raise_api_error(
+            status_code=403,
+            code="self_vote_forbidden",
+            message="You cannot vote on your own example",
+        )
+
+    existing_vote = (
+        await db.execute(
+            select(ExampleVote).where(
+                and_(ExampleVote.example_id == example_id, ExampleVote.user_id == user.id)
+            )
+        )
+    ).scalar_one_or_none()
+
+    if existing_vote:
+        existing_vote.value = payload.value
+        vote = existing_vote
+    else:
+        vote = ExampleVote(example_id=example_id, user_id=user.id, value=payload.value)
+        db.add(vote)
+
+    await db.flush()
+    await refresh_example_vote_caches(db, example)
+    await recompute_user_reputation(db, example.user_id)
+    await db.commit()
+
+    return ExampleVoteOut(
+        example_id=example_id,
+        user_id=user.id,
+        value=vote.value,
+        score_cache=example.score_cache,
+    )
+
+
+@example_router.delete("/{example_id}/vote", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_example_vote(
+    example_id: uuid.UUID,
+    db: SessionDep,
+    user: Annotated[User, Depends(get_current_user)],
+) -> Response:
+    example = (await db.execute(select(Example).where(Example.id == example_id))).scalar_one_or_none()
+    if not example:
+        raise_api_error(status_code=404, code="example_not_found", message="Example not found")
+
+    existing_vote = (
+        await db.execute(
+            select(ExampleVote).where(
+                and_(ExampleVote.example_id == example_id, ExampleVote.user_id == user.id)
+            )
+        )
+    ).scalar_one_or_none()
+    if existing_vote:
+        await db.delete(existing_vote)
+        await db.flush()
+        await refresh_example_vote_caches(db, example)
+        await recompute_user_reputation(db, example.user_id)
+
+    await db.commit()
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 @example_router.post("/{example_id}/reports", status_code=status.HTTP_201_CREATED)

@@ -98,10 +98,16 @@ class Example(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     status: Mapped[ExampleStatus] = mapped_column(
         Enum(ExampleStatus, native_enum=False), default=ExampleStatus.pending, nullable=False
     )
+    score_cache: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    upvote_count_cache: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    downvote_count_cache: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     approved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     approved_by_user_id: Mapped[uuid.UUID | None] = mapped_column(Uuid, ForeignKey("users.id"), nullable=True)
 
     entry: Mapped[Entry] = relationship(back_populates="examples")
+    votes: Mapped[list["ExampleVote"]] = relationship(
+        back_populates="example", cascade="all, delete-orphan"
+    )
 
 
 class Vote(Base, UUIDPrimaryKeyMixin, TimestampMixin):
@@ -116,6 +122,22 @@ class Vote(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     value: Mapped[int] = mapped_column(Integer, nullable=False)
 
     entry: Mapped[Entry] = relationship(back_populates="votes")
+
+
+class ExampleVote(Base, UUIDPrimaryKeyMixin, TimestampMixin):
+    __tablename__ = "example_votes"
+    __table_args__ = (
+        UniqueConstraint("example_id", "user_id", name="uq_example_votes_example_id_user_id"),
+        CheckConstraint("value IN (-1, 1)", name="value_in_range"),
+    )
+
+    example_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid, ForeignKey("examples.id", ondelete="CASCADE"), index=True
+    )
+    user_id: Mapped[uuid.UUID] = mapped_column(Uuid, ForeignKey("users.id"), index=True)
+    value: Mapped[int] = mapped_column(Integer, nullable=False)
+
+    example: Mapped[Example] = relationship(back_populates="votes")
 
 
 class Tag(Base, UUIDPrimaryKeyMixin):

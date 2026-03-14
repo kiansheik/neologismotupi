@@ -1,0 +1,16 @@
+{
+  email admin@academiatupi.com
+}
+
+api.academiatupi.com {
+  encode gzip
+
+  @health path /health /healthz
+  handle @health {
+    reverse_proxy 127.0.0.1:8000
+  }
+
+  handle {
+    reverse_proxy 127.0.0.1:8000
+  }
+}

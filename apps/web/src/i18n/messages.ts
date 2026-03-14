@@ -42,6 +42,7 @@ export const ptBR = {
   "entries.noMatches": "Nenhum verbete encontrado.",
   "entries.scoreExamples": "Pontuação: {score} · Exemplos: {examples}",
   "entries.submittedBy": "Enviado por",
+  "reputation.label": "Karma: {score}",
 
   "me.title": "Meu perfil",
   "me.signInPrompt": "Entre para ver seus envios e estados de moderação.",
@@ -86,6 +87,7 @@ export const ptBR = {
   "entry.upvoteEmoji": "👍",
   "entry.downvoteEmoji": "👎",
   "entry.score": "Pontuação: {score}",
+  "entry.exampleScore": "Pontuação do exemplo: {score}",
   "entry.reportEntry": "Denunciar verbete",
   "entry.reportReason": "Motivo da denúncia",
   "entry.reportReasonPlaceholder": "Explique brevemente por que este verbete deve ser revisado.",
@@ -176,6 +178,7 @@ export const ptBR = {
   "api.example_not_found": "Exemplo não encontrado.",
   "api.user_not_found": "Usuário não encontrado.",
   "api.downvote_blocked": "Novos usuários só podem votar negativamente após 72 horas de conta.",
+  "api.self_vote_forbidden": "Você não pode votar no seu próprio conteúdo.",
   "api.request_failed": "Não foi possível concluir a solicitação.",
 } as const;
 
@@ -225,6 +228,7 @@ export const enUS: Record<TranslationKey, string> = {
   "entries.noMatches": "No matching entries.",
   "entries.scoreExamples": "Score: {score} · Examples: {examples}",
   "entries.submittedBy": "Submitted by",
+  "reputation.label": "Karma: {score}",
 
   "me.title": "My profile",
   "me.signInPrompt": "Sign in to see your submissions and moderation states.",
@@ -269,6 +273,7 @@ export const enUS: Record<TranslationKey, string> = {
   "entry.upvoteEmoji": "👍",
   "entry.downvoteEmoji": "👎",
   "entry.score": "Score: {score}",
+  "entry.exampleScore": "Example score: {score}",
   "entry.reportEntry": "Report entry",
   "entry.reportReason": "Report reason",
   "entry.reportReasonPlaceholder": "Briefly explain why this entry should be reviewed.",
@@ -359,6 +364,7 @@ export const enUS: Record<TranslationKey, string> = {
   "api.example_not_found": "Example not found.",
   "api.user_not_found": "User not found.",
   "api.downvote_blocked": "New users cannot downvote until account age is at least 72 hours.",
+  "api.self_vote_forbidden": "You cannot vote on your own content.",
   "api.request_failed": "Request failed.",
 };
 

@@ -7,8 +7,9 @@ DB_USER ?= $(shell whoami)
 
 API_DIR := apps/api
 WEB_DIR := apps/web
+API_ENV_FILE ?= .env
 
-.PHONY: help bootstrap-macos bootstrap-linux install dev dev-web dev-api db-create db-migrate db-reset db-rebuild seed db-backup bootstrap-admin change-user-password test test-web test-api test-e2e lint format
+.PHONY: help bootstrap-macos bootstrap-linux install dev dev-web dev-api web-build prod-check prod-migrate db-create db-migrate db-reset db-rebuild seed db-backup db-dump-docker db-restore-dump bootstrap-admin change-user-password test test-web test-api test-e2e lint format
 
 help:
 	@echo "Available targets:"
@@ -18,12 +19,17 @@ help:
 	@echo "  make dev              # Run API and web together"
 	@echo "  make dev-api          # Run FastAPI only"
 	@echo "  make dev-web          # Run Vite app only"
+	@echo "  make web-build        # Build static frontend assets"
+	@echo "  make prod-check       # Validate production API config from .env.production"
+	@echo "  make prod-migrate     # Run migrations using apps/api/.env.production"
 	@echo "  make db-create        # Create local development database if missing"
 	@echo "  make db-migrate       # Apply Alembic migrations"
 	@echo "  make db-reset         # Drop/recreate database and migrate (uses DATABASE_URL)"
 	@echo "  make db-rebuild       # Reset database and seed from CSV"
 	@echo "  make seed             # Seed from CSV only"
 	@echo "  make db-backup        # Create a compressed PostgreSQL backup"
+	@echo "  make db-dump-docker   # Dump local Docker postgres to backups/"
+	@echo "  make db-restore-dump DUMP_FILE=<file> DATABASE_URL=<url>  # Restore dump into target DB"
 	@echo "  make bootstrap-admin EMAIL=<email> PASSWORD=<password> [DISPLAY_NAME=<name>]  # Create/update first admin"
 	@echo "  make change-user-password <email> <new_password>  # Update a user's password"
 	@echo "  make test             # Run all tests"
@@ -52,6 +58,15 @@ dev:
 dev-web:
 	@cd $(WEB_DIR) && pnpm dev
 
+web-build:
+	@cd $(WEB_DIR) && pnpm build
+
+prod-check:
+	@bash scripts/prod-check-api-config.sh
+
+prod-migrate:
+	@cd $(API_DIR) && set -a; [ -f .env.production ] && . ./.env.production; set +a; uv run alembic upgrade head
+
 dev-api:
 	@cd $(API_DIR) && uv run uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 
@@ -69,7 +84,7 @@ db-create:
 	fi
 
 db-migrate:
-	@cd $(API_DIR) && set -a; [ -f .env ] && . ./.env; set +a; uv run alembic upgrade head
+	@cd $(API_DIR) && set -a; [ -f $(API_ENV_FILE) ] && . ./$(API_ENV_FILE); set +a; uv run alembic upgrade head
 
 db-reset:
 	@cd $(API_DIR) && set -a; [ -f .env ] && . ./.env; set +a; uv run python -m app.core.db_reset
@@ -83,6 +98,12 @@ seed:
 
 db-backup:
 	@bash scripts/backup-postgres.sh
+
+db-dump-docker:
+	@bash scripts/dump-docker-postgres.sh
+
+db-restore-dump:
+	@bash scripts/restore-postgres-from-dump.sh
 
 bootstrap-admin:
 	@EMAIL_INPUT="$${EMAIL:-}"; \

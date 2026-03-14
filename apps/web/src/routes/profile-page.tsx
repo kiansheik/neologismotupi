@@ -41,6 +41,7 @@ export function ProfilePage() {
     <section className="space-y-4">
       <Card>
         <h1 className="text-xl font-semibold text-brand-900">{profile.display_name}</h1>
+        <p className="mt-1 text-sm text-slate-600">{t("reputation.label", { score: profile.reputation_score })}</p>
         {profile.role_label ? <p className="mt-1 text-sm text-slate-700">{profile.role_label}</p> : null}
         {profile.affiliation_label ? (
           <p className="text-sm text-slate-700">{profile.affiliation_label}</p>

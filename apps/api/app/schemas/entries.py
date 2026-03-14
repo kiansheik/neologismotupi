@@ -18,6 +18,7 @@ class TagOut(BaseModel):
 class EntryAuthorOut(BaseModel):
     id: uuid.UUID
     display_name: str
+    reputation_score: int
 
 
 class EntrySummaryOut(BaseModel):
@@ -63,6 +64,9 @@ class ExampleOut(BaseModel):
     usage_note: str | None
     context_tag: str | None
     status: ExampleStatus
+    score_cache: int
+    upvote_count_cache: int
+    downvote_count_cache: int
     created_at: datetime
     updated_at: datetime
 
@@ -138,6 +142,13 @@ class VoteRequest(BaseModel):
 
 class VoteOut(BaseModel):
     entry_id: uuid.UUID
+    user_id: uuid.UUID
+    value: int
+    score_cache: int
+
+
+class ExampleVoteOut(BaseModel):
+    example_id: uuid.UUID
     user_id: uuid.UUID
     value: int
     score_cache: int

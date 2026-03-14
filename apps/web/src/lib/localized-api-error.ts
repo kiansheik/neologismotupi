@@ -15,6 +15,7 @@ const codeToTranslation: Partial<Record<string, TranslationKey>> = {
   example_not_found: "api.example_not_found",
   user_not_found: "api.user_not_found",
   downvote_blocked: "api.downvote_blocked",
+  self_vote_forbidden: "api.self_vote_forbidden",
 };
 
 export function getLocalizedApiErrorMessage(error: ApiError, t: TranslateFn): string {

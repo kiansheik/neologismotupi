@@ -6,8 +6,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import get_settings
 from app.core.enums import EntryStatus, ExampleStatus
-from app.core.utils import collapse_whitespace, normalize_text, slugify
-from app.models.entry import Entry, EntryTag, EntryVersion, Example, Tag, Vote
+from app.core.utils import collapse_whitespace, normalize_text
+from app.models.entry import Entry, EntryTag, EntryVersion, Example, ExampleVote, Tag, Vote
 from app.models.user import User
 
 
@@ -126,6 +126,22 @@ async def refresh_vote_and_example_caches(db: AsyncSession, entry: Entry) -> Non
     entry.downvote_count_cache = downvotes
     entry.score_cache = upvotes - downvotes
     entry.example_count_cache = examples
+
+
+async def refresh_example_vote_caches(db: AsyncSession, example: Example) -> None:
+    upvote_stmt = select(func.count()).where(
+        and_(ExampleVote.example_id == example.id, ExampleVote.value == 1)
+    )
+    downvote_stmt = select(func.count()).where(
+        and_(ExampleVote.example_id == example.id, ExampleVote.value == -1)
+    )
+
+    upvotes = int((await db.execute(upvote_stmt)).scalar_one())
+    downvotes = int((await db.execute(downvote_stmt)).scalar_one())
+
+    example.upvote_count_cache = upvotes
+    example.downvote_count_cache = downvotes
+    example.score_cache = upvotes - downvotes
 
 
 def should_new_entry_be_pending(user_entry_count: int, is_superuser: bool) -> bool:

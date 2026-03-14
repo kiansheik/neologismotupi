@@ -14,7 +14,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { useCurrentUser } from "@/features/auth/hooks";
-import { reportExample } from "@/features/examples/api";
+import { reportExample, voteExample } from "@/features/examples/api";
 import { createExample, getEntry, reportEntry, voteEntry } from "@/features/entries/api";
 import { approveEntry, rejectEntry } from "@/features/moderation/api";
 
@@ -65,6 +65,14 @@ export function EntryDetailPage() {
 
   const reportExampleMutation = useMutation({
     mutationFn: (exampleId: string) => reportExample(exampleId, { reason_code: "incorrect" }),
+  });
+  const voteExampleMutation = useMutation({
+    mutationFn: (params: { exampleId: string; value: -1 | 1 }) =>
+      voteExample(params.exampleId, { value: params.value }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["entry", slug] });
+      queryClient.invalidateQueries({ queryKey: ["entries"] });
+    },
   });
   const approveEntryMutation = useMutation({
     mutationFn: () => approveEntry(String(entry?.id)),
@@ -160,6 +168,8 @@ export function EntryDetailPage() {
           <Link className="text-brand-700 hover:underline" to={`/profiles/${entry.proposer.id}`}>
             {entry.proposer.display_name}
           </Link>
+          {" · "}
+          {t("reputation.label", { score: entry.proposer.reputation_score })}
         </p>
         {entry.morphology_notes ? (
           <p className="mt-2 text-sm text-slate-700">
@@ -313,6 +323,33 @@ export function EntryDetailPage() {
                     {t("entry.translationPt")}: {example.translation_pt}
                   </p>
                 ) : null}
+                <div className="mt-2 flex flex-wrap items-center gap-2">
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    className="h-8 w-8 rounded-full border border-[#d3c6b0] bg-[#fffaf2] p-0 text-base shadow-sm hover:border-brand-500 hover:bg-brand-50"
+                    onClick={() => voteExampleMutation.mutate({ exampleId: example.id, value: 1 })}
+                    disabled={!canWrite || voteExampleMutation.isPending}
+                    title={t("entry.upvote")}
+                    aria-label={t("entry.upvote")}
+                  >
+                    <span aria-hidden>{t("entry.upvoteEmoji")}</span>
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    className="h-8 w-8 rounded-full border border-[#d3c6b0] bg-[#fffaf2] p-0 text-base shadow-sm hover:border-red-500 hover:bg-red-100"
+                    onClick={() => voteExampleMutation.mutate({ exampleId: example.id, value: -1 })}
+                    disabled={!canWrite || voteExampleMutation.isPending}
+                    title={t("entry.downvote")}
+                    aria-label={t("entry.downvote")}
+                  >
+                    <span aria-hidden>{t("entry.downvoteEmoji")}</span>
+                  </Button>
+                  <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-xs text-slate-700">
+                    {t("entry.exampleScore", { score: example.score_cache })}
+                  </span>
+                </div>
                 {canWrite ? (
                   <Button
                     type="button"
@@ -323,6 +360,11 @@ export function EntryDetailPage() {
                   >
                     {t("entry.reportExample")}
                   </Button>
+                ) : null}
+                {voteExampleMutation.error instanceof ApiError ? (
+                  <p className="mt-2 text-xs text-red-700">
+                    {getLocalizedApiErrorMessage(voteExampleMutation.error, t)}
+                  </p>
                 ) : null}
               </article>
             ))

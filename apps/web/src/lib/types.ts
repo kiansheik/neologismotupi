@@ -11,6 +11,7 @@ export interface Tag {
 export interface EntryAuthor {
   id: string;
   display_name: string;
+  reputation_score: number;
 }
 
 export interface EntrySummary {
@@ -54,6 +55,9 @@ export interface Example {
   usage_note: string | null;
   context_tag: string | null;
   status: ExampleStatus;
+  score_cache: number;
+  upvote_count_cache: number;
+  downvote_count_cache: number;
   created_at: string;
   updated_at: string;
 }

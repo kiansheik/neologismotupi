@@ -21,7 +21,7 @@ vi.mock("@/features/entries/api", () => ({
         downvote_count_cache: 0,
         example_count_cache: 1,
         proposer_user_id: "user-1",
-        proposer: { id: "user-1", display_name: "Test User" },
+        proposer: { id: "user-1", display_name: "Test User", reputation_score: 0 },
         created_at: "2026-01-01T00:00:00Z",
         updated_at: "2026-01-01T00:00:00Z",
         tags: [],
