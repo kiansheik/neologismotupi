@@ -20,9 +20,9 @@ import { createEntry, listEntries } from "@/features/entries/api";
 
 type SubmitForm = {
   headword: string;
-  gloss_pt?: string;
+  gloss_pt: string;
   part_of_speech?: string;
-  short_definition: string;
+  short_definition?: string;
   morphology_notes?: string;
   force_submit: boolean;
 };
@@ -59,23 +59,6 @@ export function SubmitPage() {
     return duplicateQuery.data?.filter((entry) => entry.headword !== watchedHeadword) ?? [];
   }, [duplicateQuery.data, watchedHeadword]);
 
-  const exemplarQuery = useQuery({
-    queryKey: ["submit-exemplar-entry"],
-    queryFn: async () => {
-      const approved = await listEntries({
-        page: 1,
-        page_size: 1,
-        status: "approved",
-        sort: "score",
-      });
-      if (approved.items[0]) {
-        return approved.items[0];
-      }
-      const anyStatus = await listEntries({ page: 1, page_size: 1, sort: "score" });
-      return anyStatus.items[0] ?? null;
-    },
-  });
-
   const createMutation = useMutation({
     mutationFn: (payload: SubmitForm) => createEntry(payload),
     onSuccess: (entry) => {
@@ -101,9 +84,9 @@ export function SubmitPage() {
     form.clearErrors();
     const schema = z.object({
       headword: z.string().trim().min(1, t("submit.error.headwordRequired")),
-      gloss_pt: z.string().optional(),
+      gloss_pt: z.string().trim().min(1, t("submit.error.glossRequired")),
       part_of_speech: z.string().optional(),
-      short_definition: z.string().trim().min(3, t("submit.error.definitionMin")),
+      short_definition: z.string().trim().optional(),
       morphology_notes: z.string().optional(),
       force_submit: z.boolean().default(false),
     });
@@ -130,39 +113,25 @@ export function SubmitPage() {
   return (
     <Card>
       <h1 className="text-xl font-semibold text-brand-900">{t("submit.title")}</h1>
+      <p className="mt-1 text-xs text-slate-600">{t("submit.onlyRequired")}</p>
       <div className="mt-3 rounded-md border border-brand-200 bg-brand-50/40 p-3">
         <h2 className="text-sm font-semibold text-brand-900">{t("submit.exampleTitle")}</h2>
-        {exemplarQuery.isLoading ? (
-          <p className="mt-1 text-xs text-slate-600">{t("submit.exampleLoading")}</p>
-        ) : exemplarQuery.data ? (
-          <div className="mt-2 space-y-1 text-xs text-slate-700">
-            <p>
-              <span className="font-semibold">{t("submit.exampleHeadword")}:</span>{" "}
-              {exemplarQuery.data.headword}
-            </p>
-            <p>
-              <span className="font-semibold">{t("submit.exampleGloss")}:</span>{" "}
-              {exemplarQuery.data.gloss_pt || "-"}
-            </p>
-            <p>
-              <span className="font-semibold">{t("submit.examplePartOfSpeech")}:</span>{" "}
-              {partOfSpeechLabel(exemplarQuery.data.part_of_speech || "other", t)}
-            </p>
-            <p>
-              <span className="font-semibold">{t("submit.exampleDefinition")}:</span>{" "}
-              {exemplarQuery.data.short_definition}
-            </p>
-            <p>
-              <span className="font-semibold">{t("submit.exampleScore")}:</span>{" "}
-              {exemplarQuery.data.score_cache}
-            </p>
-            <Link className="text-brand-700 underline" to={`/entries/${exemplarQuery.data.slug}`}>
-              {t("submit.exampleOpen")}
-            </Link>
-          </div>
-        ) : (
-          <p className="mt-1 text-xs text-slate-600">{t("submit.exampleEmpty")}</p>
-        )}
+        <div className="mt-2 space-y-1 text-xs text-slate-700">
+          <p className="text-sm font-semibold text-brand-900">
+            Mba&apos;eekokuaba <span className="text-blue-600">✓</span>
+          </p>
+          <p>Física.</p>
+          <p>Física</p>
+          <p>
+            {t("entry.submittedBy")} Moscomonteiro · {t("badge.karmaLeader")} · {t("reputation.label", { score: 7 })}
+          </p>
+          <p>{t("entry.firstRegistered", { date: "14 de março de 2026" })}</p>
+          <p>
+            <span className="font-semibold">{t("entry.morphology")}:</span>{" "}
+            Calque do guarani, estudo de como as coisas agem. &quot;Estudo&quot; deixado como kuaba, verbo
+            nominalizado, pois é o ato de estudar, e não alguma circunstância.
+          </p>
+        </div>
       </div>
       <form
         className="mt-4 space-y-3"
@@ -211,6 +180,9 @@ export function SubmitPage() {
           </label>
           <p className="mb-1 text-xs text-slate-600">{t("submit.help.glossPt")}</p>
           <Input id="gloss_pt" {...form.register("gloss_pt")} />
+          {form.formState.errors.gloss_pt?.message ? (
+            <p className="mt-1 text-xs text-red-700">{form.formState.errors.gloss_pt.message}</p>
+          ) : null}
         </div>
 
         <div>
@@ -239,9 +211,6 @@ export function SubmitPage() {
           </label>
           <p className="mb-1 text-xs text-slate-600">{t("submit.help.definition")}</p>
           <Textarea id="short_definition" {...form.register("short_definition")} />
-          {form.formState.errors.short_definition?.message ? (
-            <p className="mt-1 text-xs text-red-700">{form.formState.errors.short_definition.message}</p>
-          ) : null}
         </div>
 
         <div>

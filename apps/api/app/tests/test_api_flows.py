@@ -86,6 +86,28 @@ async def test_create_entry(client):
 
 
 @pytest.mark.asyncio
+async def test_create_entry_uses_gloss_when_definition_is_blank(client):
+    await register_user(client, "creator-blank@example.com", "Creator Blank")
+
+    response = await client.post(
+        "/api/entries",
+        json={
+            "headword": "mbaeekokuaba",
+            "gloss_pt": "Física",
+            "part_of_speech": "noun",
+            "short_definition": "",
+            "morphology_notes": "",
+            "force_submit": True,
+            "tag_ids": [],
+        },
+    )
+    assert response.status_code == 201, response.text
+    payload = response.json()
+    assert payload["gloss_pt"] == "Física"
+    assert payload["short_definition"] == "Física"
+
+
+@pytest.mark.asyncio
 async def test_rejected_entries_only_show_with_rejected_filter(client):
     owner = await register_user(client, "hidden-owner@example.com", "Hidden Owner")
     entry = await create_entry(client, "hidden-rejected-entry")

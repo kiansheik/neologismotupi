@@ -1,13 +1,13 @@
-export type UserBadgeKind = "founder" | "top_contributor" | "karma_leader" | "community";
+export type UserBadgeKind = "founder" | "top_contributor" | "karma_leader";
 
 const FOUNDER_HANDLE = "kiansheik3128";
-const ORDERED_BADGES: UserBadgeKind[] = ["founder", "top_contributor", "karma_leader", "community"];
+const ORDERED_BADGES: UserBadgeKind[] = ["founder", "top_contributor", "karma_leader"];
 
 function normalizeHandle(value: string | null | undefined): string {
   return (value ?? "").trim().toLowerCase();
 }
 
-function isSupportedBadge(value: string): value is Exclude<UserBadgeKind, "community"> {
+function isSupportedBadge(value: string): value is UserBadgeKind {
   return value === "founder" || value === "top_contributor" || value === "karma_leader";
 }
 
@@ -30,5 +30,5 @@ export function resolveUserBadges(
   if (normalizeHandle(displayName) === FOUNDER_HANDLE) {
     return ["founder"];
   }
-  return ["community"];
+  return [];
 }

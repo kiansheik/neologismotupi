@@ -132,13 +132,13 @@ export function EntriesPage() {
                 })}
               </p>
               <p className="mt-1 text-xs text-slate-600">
-                <Link className="text-brand-700 hover:underline" to={`/profiles/${entry.proposer.id}`}>
-                  {entry.proposer.display_name}
-                </Link>
-                {" · "}
-                <UserBadge displayName={entry.proposer.display_name} badges={entry.proposer.badges} />
-                {" · "}
-                {t("reputation.label", { score: entry.proposer.reputation_score })}
+                <span className="inline-flex flex-wrap items-center gap-1">
+                  <Link className="text-brand-700 hover:underline" to={`/profiles/${entry.proposer.id}`}>
+                    {entry.proposer.display_name}
+                  </Link>
+                  <UserBadge displayName={entry.proposer.display_name} badges={entry.proposer.badges} />
+                  <span>· {t("reputation.label", { score: entry.proposer.reputation_score })}</span>
+                </span>
               </p>
             </article>
           ))}

@@ -17,10 +17,10 @@ export interface ListEntriesParams {
 
 export interface CreateEntryPayload {
   headword: string;
-  gloss_pt?: string;
+  gloss_pt: string;
   gloss_en?: string;
   part_of_speech?: string;
-  short_definition: string;
+  short_definition?: string;
   morphology_notes?: string;
   tag_ids?: string[];
   force_submit?: boolean;

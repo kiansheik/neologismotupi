@@ -254,18 +254,17 @@ export function ModerationPage() {
               </p>
               <p className="mt-1 text-sm text-slate-700">
                 <span className="font-medium text-brand-900">{t("moderation.reportedBy")}:</span>{" "}
-                <Link
-                  className="font-medium text-brand-700 hover:underline"
-                  to={report.reporter_profile_url ?? `/profiles/${report.reporter_user_id}`}
-                >
-                  {report.reporter_display_name ?? t("moderation.unknownReporter")}
-                </Link>
-                {report.reporter_display_name ? (
-                  <>
-                    {" · "}
+                <span className="inline-flex flex-wrap items-center gap-1">
+                  <Link
+                    className="font-medium text-brand-700 hover:underline"
+                    to={report.reporter_profile_url ?? `/profiles/${report.reporter_user_id}`}
+                  >
+                    {report.reporter_display_name ?? t("moderation.unknownReporter")}
+                  </Link>
+                  {report.reporter_display_name ? (
                     <UserBadge displayName={report.reporter_display_name} />
-                  </>
-                ) : null}
+                  ) : null}
+                </span>
               </p>
               <p className="mt-1 text-sm text-slate-700">
                 <span className="font-medium text-brand-900">{t("moderation.reportedAt")}:</span>{" "}

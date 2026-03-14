@@ -312,8 +312,14 @@ async def create_entry(
     if not is_human:
         raise_api_error(status_code=400, code="bot_check_failed", message="Bot verification failed")
 
-    if is_effectively_empty(payload.headword) or is_effectively_empty(payload.short_definition):
+    if is_effectively_empty(payload.headword) or is_effectively_empty(payload.gloss_pt):
         raise_api_error(status_code=400, code="empty_submission", message="Entry content cannot be empty")
+
+    short_definition = (
+        collapse_whitespace(payload.short_definition)
+        if payload.short_definition is not None and not is_effectively_empty(payload.short_definition)
+        else collapse_whitespace(payload.gloss_pt)
+    )
 
     normalized_headword = normalize_headword(payload.headword)
     duplicates = await find_possible_duplicates(
@@ -352,7 +358,7 @@ async def create_entry(
         gloss_pt=payload.gloss_pt,
         gloss_en=payload.gloss_en,
         part_of_speech=payload.part_of_speech,
-        short_definition=collapse_whitespace(payload.short_definition),
+        short_definition=short_definition,
         morphology_notes=payload.morphology_notes,
         status=status_value,
         proposer_user_id=user.id,
@@ -400,6 +406,12 @@ async def update_entry(
         changed = True
 
     if payload.gloss_pt is not None:
+        if is_effectively_empty(payload.gloss_pt):
+            raise_api_error(
+                status_code=400,
+                code="empty_submission",
+                message="Gloss cannot be empty",
+            )
         entry.gloss_pt = payload.gloss_pt
         changed = True
 
@@ -413,12 +425,15 @@ async def update_entry(
 
     if payload.short_definition is not None:
         if is_effectively_empty(payload.short_definition):
-            raise_api_error(
-                status_code=400,
-                code="empty_submission",
-                message="Definition cannot be empty",
-            )
-        entry.short_definition = collapse_whitespace(payload.short_definition)
+            if is_effectively_empty(entry.gloss_pt):
+                raise_api_error(
+                    status_code=400,
+                    code="empty_submission",
+                    message="Definition cannot be empty without a gloss",
+                )
+            entry.short_definition = collapse_whitespace(entry.gloss_pt)
+        else:
+            entry.short_definition = collapse_whitespace(payload.short_definition)
         changed = True
 
     if payload.morphology_notes is not None:

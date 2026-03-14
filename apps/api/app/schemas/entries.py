@@ -106,10 +106,10 @@ class EntryListOut(BaseModel):
 
 class EntryCreate(BaseModel):
     headword: str = Field(min_length=1, max_length=180)
-    gloss_pt: str | None = Field(default=None, max_length=255)
+    gloss_pt: str = Field(min_length=1, max_length=255)
     gloss_en: str | None = Field(default=None, max_length=255)
     part_of_speech: str | None = Field(default=None, max_length=64)
-    short_definition: str = Field(min_length=3)
+    short_definition: str | None = None
     morphology_notes: str | None = None
     tag_ids: list[uuid.UUID] = Field(default_factory=list)
     force_submit: bool = False
