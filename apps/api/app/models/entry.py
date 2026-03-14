@@ -1,6 +1,6 @@
 import uuid
 from datetime import datetime
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from sqlalchemy import (
     CheckConstraint,
@@ -20,6 +20,9 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.core.enums import EntryStatus, ExampleStatus, TagType
 from app.db import Base
 from app.models.mixins import TimestampMixin, UUIDPrimaryKeyMixin
+
+if TYPE_CHECKING:
+    from app.models.user import User
 
 
 class Entry(Base, UUIDPrimaryKeyMixin, TimestampMixin):
@@ -58,6 +61,8 @@ class Entry(Base, UUIDPrimaryKeyMixin, TimestampMixin):
         foreign_keys="EntryVersion.entry_id",
         order_by="EntryVersion.version_number",
     )
+    proposer: Mapped["User"] = relationship(foreign_keys=[proposer_user_id])
+    approved_by_user: Mapped["User | None"] = relationship(foreign_keys=[approved_by_user_id])
     current_version: Mapped["EntryVersion | None"] = relationship(
         foreign_keys=[current_version_id], post_update=True
     )

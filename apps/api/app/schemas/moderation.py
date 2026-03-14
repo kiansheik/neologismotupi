@@ -37,8 +37,12 @@ class ModerationActionRequest(BaseModel):
 class ReportOut(BaseModel):
     id: uuid.UUID
     reporter_user_id: uuid.UUID
+    reporter_display_name: str | None = None
+    reporter_profile_url: str | None = None
     target_type: ReportTargetType
     target_id: uuid.UUID
+    target_label: str | None = None
+    target_url: str | None = None
     reason_code: ReportReasonCode
     free_text: str | None
     status: ReportStatus

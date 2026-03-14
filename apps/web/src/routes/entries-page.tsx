@@ -6,12 +6,17 @@ import { StatusBadge } from "@/components/status-badge";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { listEntries } from "@/features/entries/api";
+import { partOfSpeechLabel, statusToKey } from "@/i18n/formatters";
+import { useI18n } from "@/i18n";
 
 export function EntriesPage() {
+  const { t } = useI18n();
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState("");
   const [partOfSpeech, setPartOfSpeech] = useState("");
-  const [sort, setSort] = useState<"newest" | "score" | "most_examples">("newest");
+  const [sort, setSort] = useState<"alphabetical" | "recent" | "score" | "most_examples">(
+    "alphabetical",
+  );
 
   const params = useMemo(
     () => ({
@@ -33,12 +38,12 @@ export function EntriesPage() {
   return (
     <section className="space-y-4">
       <Card>
-        <h1 className="text-xl font-semibold text-brand-900">Browse entries</h1>
+        <h1 className="text-xl font-semibold text-brand-900">{t("entries.title")}</h1>
         <div className="mt-3 grid gap-3 md:grid-cols-4">
           <Input
-            aria-label="Search entries"
+            aria-label={t("entries.searchAria")}
             value={search}
-            placeholder="Search headword or gloss"
+            placeholder={t("entries.searchPlaceholder")}
             onChange={(event) => setSearch(event.target.value)}
           />
           <select
@@ -46,44 +51,47 @@ export function EntriesPage() {
             value={status}
             onChange={(event) => setStatus(event.target.value)}
           >
-            <option value="">All statuses</option>
-            <option value="pending">pending</option>
-            <option value="approved">approved</option>
-            <option value="disputed">disputed</option>
-            <option value="rejected">rejected</option>
-            <option value="archived">archived</option>
+            <option value="">{t("entries.allStatuses")}</option>
+            <option value="pending">{t(statusToKey("pending"))}</option>
+            <option value="approved">{t(statusToKey("approved"))}</option>
+            <option value="disputed">{t(statusToKey("disputed"))}</option>
+            <option value="rejected">{t(statusToKey("rejected"))}</option>
+            <option value="archived">{t(statusToKey("archived"))}</option>
           </select>
           <select
             className="rounded-md border border-brand-300 bg-white px-3 py-2 text-sm"
             value={partOfSpeech}
             onChange={(event) => setPartOfSpeech(event.target.value)}
           >
-            <option value="">All parts of speech</option>
-            <option value="noun">noun</option>
-            <option value="verb">verb</option>
-            <option value="adjective">adjective</option>
-            <option value="adverb">adverb</option>
-            <option value="expression">expression</option>
-            <option value="other">other</option>
+            <option value="">{t("partOfSpeech.any")}</option>
+            <option value="noun">{partOfSpeechLabel("noun", t)}</option>
+            <option value="verb">{partOfSpeechLabel("verb", t)}</option>
+            <option value="adjective">{partOfSpeechLabel("adjective", t)}</option>
+            <option value="adverb">{partOfSpeechLabel("adverb", t)}</option>
+            <option value="expression">{partOfSpeechLabel("expression", t)}</option>
+            <option value="other">{partOfSpeechLabel("other", t)}</option>
           </select>
           <select
             className="rounded-md border border-brand-300 bg-white px-3 py-2 text-sm"
             value={sort}
-            onChange={(event) => setSort(event.target.value as "newest" | "score" | "most_examples")}
+            onChange={(event) =>
+              setSort(event.target.value as "alphabetical" | "recent" | "score" | "most_examples")
+            }
           >
-            <option value="newest">Newest</option>
-            <option value="score">Score</option>
-            <option value="most_examples">Most examples</option>
+            <option value="alphabetical">{t("entries.sort.alphabetical")}</option>
+            <option value="recent">{t("entries.sort.recent")}</option>
+            <option value="score">{t("entries.sort.score")}</option>
+            <option value="most_examples">{t("entries.sort.mostExamples")}</option>
           </select>
         </div>
       </Card>
 
       <Card>
-        <h2 className="text-base font-semibold text-brand-900">Results</h2>
+        <h2 className="text-base font-semibold text-brand-900">{t("entries.resultsTitle")}</h2>
         <div className="mt-4 space-y-3" data-testid="entry-list">
-          {isLoading ? <p className="text-sm text-slate-600">Loading entries...</p> : null}
+          {isLoading ? <p className="text-sm text-slate-600">{t("entries.loading")}</p> : null}
           {!isLoading && !data?.items.length ? (
-            <p className="text-sm text-slate-600">No matching entries.</p>
+            <p className="text-sm text-slate-600">{t("entries.noMatches")}</p>
           ) : null}
           {data?.items.map((entry) => (
             <article key={entry.id} className="rounded-md border border-brand-100 p-3">
@@ -95,7 +103,16 @@ export function EntriesPage() {
               </div>
               <p className="mt-1 text-sm text-slate-700">{entry.short_definition}</p>
               <p className="mt-2 text-xs text-slate-600">
-                Score: {entry.score_cache} · Examples: {entry.example_count_cache}
+                {t("entries.scoreExamples", {
+                  score: entry.score_cache,
+                  examples: entry.example_count_cache,
+                })}
+              </p>
+              <p className="mt-1 text-xs text-slate-600">
+                {t("entries.submittedBy")}{" "}
+                <Link className="text-brand-700 hover:underline" to={`/profiles/${entry.proposer.id}`}>
+                  {entry.proposer.display_name}
+                </Link>
               </p>
             </article>
           ))}

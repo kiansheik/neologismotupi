@@ -6,11 +6,11 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy import select
 
 from app.core.deps import SessionDep, require_moderator
-from app.core.enums import EntryStatus, ExampleStatus, ReportStatus
+from app.core.enums import EntryStatus, ExampleStatus, ReportStatus, ReportTargetType
 from app.core.errors import raise_api_error
 from app.models.entry import Entry, Example
 from app.models.moderation import Report
-from app.models.user import User
+from app.models.user import Profile, User
 from app.schemas.moderation import (
     ModerationActionRequest,
     ModerationEntryOut,
@@ -22,6 +22,13 @@ from app.schemas.moderation import (
 from app.services.moderation import record_moderation_action
 
 router = APIRouter(prefix="/mod", tags=["moderation"])
+
+
+def _truncate_text(value: str, limit: int = 120) -> str:
+    cleaned = " ".join(value.split())
+    if len(cleaned) <= limit:
+        return cleaned
+    return f"{cleaned[: limit - 3].rstrip()}..."
 
 
 @router.get("/queue", response_model=ModerationQueueOut)
@@ -82,7 +89,118 @@ async def list_reports(
     if status_filter:
         stmt = stmt.where(Report.status == status_filter)
     reports = (await db.execute(stmt)).scalars().all()
-    return [ReportOut.model_validate(report) for report in reports]
+    reporter_ids = {report.reporter_user_id for report in reports}
+
+    entry_ids = {
+        report.target_id for report in reports if report.target_type == ReportTargetType.entry
+    }
+    example_ids = {
+        report.target_id for report in reports if report.target_type == ReportTargetType.example
+    }
+    profile_ids = {
+        report.target_id for report in reports if report.target_type == ReportTargetType.profile
+    }
+
+    reporter_profiles: dict[uuid.UUID, str] = {}
+    if reporter_ids:
+        reporter_rows = (
+            await db.execute(
+                select(User.id, Profile.display_name)
+                .join(Profile, Profile.user_id == User.id)
+                .where(User.id.in_(reporter_ids))
+            )
+        ).all()
+        reporter_profiles = {
+            reporter_user_id: display_name
+            for reporter_user_id, display_name in reporter_rows
+        }
+
+    entry_targets: dict[uuid.UUID, tuple[str, str]] = {}
+    if entry_ids:
+        entry_rows = (
+            await db.execute(select(Entry.id, Entry.slug, Entry.headword).where(Entry.id.in_(entry_ids)))
+        ).all()
+        entry_targets = {
+            entry_id: (headword, f"/entries/{slug}") for entry_id, slug, headword in entry_rows
+        }
+
+    example_targets: dict[uuid.UUID, tuple[str, str]] = {}
+    if example_ids:
+        example_rows = (
+            await db.execute(
+                select(Example.id, Example.sentence_original, Entry.slug)
+                .join(Entry, Example.entry_id == Entry.id)
+                .where(Example.id.in_(example_ids))
+            )
+        ).all()
+        example_targets = {
+            example_id: (_truncate_text(sentence_original), f"/entries/{entry_slug}")
+            for example_id, sentence_original, entry_slug in example_rows
+        }
+
+    profile_targets: dict[uuid.UUID, tuple[str, str]] = {}
+    if profile_ids:
+        user_rows = (
+            await db.execute(
+                select(User.id, Profile.display_name)
+                .join(Profile, Profile.user_id == User.id)
+                .where(User.id.in_(profile_ids))
+            )
+        ).all()
+        for user_id, display_name in user_rows:
+            profile_targets[user_id] = (display_name, f"/profiles/{user_id}")
+
+        unresolved_profile_ids = [profile_id for profile_id in profile_ids if profile_id not in profile_targets]
+        if unresolved_profile_ids:
+            profile_rows = (
+                await db.execute(
+                    select(Profile.id, Profile.user_id, Profile.display_name).where(
+                        Profile.id.in_(unresolved_profile_ids)
+                    )
+                )
+            ).all()
+            for profile_id, user_id, display_name in profile_rows:
+                profile_targets[profile_id] = (display_name, f"/profiles/{user_id}")
+
+    response: list[ReportOut] = []
+    for report in reports:
+        target_label: str | None = None
+        target_url: str | None = None
+        reporter_display_name = reporter_profiles.get(report.reporter_user_id)
+        reporter_profile_url = f"/profiles/{report.reporter_user_id}"
+
+        if report.target_type == ReportTargetType.entry:
+            target = entry_targets.get(report.target_id)
+        elif report.target_type == ReportTargetType.example:
+            target = example_targets.get(report.target_id)
+        else:
+            target = profile_targets.get(report.target_id)
+            if target is None:
+                target = (f"user-{str(report.target_id)[:8]}", f"/profiles/{report.target_id}")
+
+        if target:
+            target_label, target_url = target
+
+        response.append(
+            ReportOut(
+                id=report.id,
+                reporter_user_id=report.reporter_user_id,
+                reporter_display_name=reporter_display_name,
+                reporter_profile_url=reporter_profile_url,
+                target_type=report.target_type,
+                target_id=report.target_id,
+                target_label=target_label,
+                target_url=target_url,
+                reason_code=report.reason_code,
+                free_text=report.free_text,
+                status=report.status,
+                created_at=report.created_at,
+                reviewed_at=report.reviewed_at,
+                reviewed_by_user_id=report.reviewed_by_user_id,
+            )
+        )
+
+    return response
 
 
 async def _set_entry_status(

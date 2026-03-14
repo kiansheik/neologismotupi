@@ -76,17 +76,22 @@ async def get_user_by_session_token(db: AsyncSession, raw_token: str) -> User | 
 
 def set_auth_cookie(response, token: str) -> None:
     settings = get_settings()
-    secure = settings.app_env == "production"
     response.set_cookie(
         key=settings.session_cookie_name,
         value=token,
         httponly=True,
-        secure=secure,
-        samesite="lax",
+        secure=settings.session_cookie_secure,
+        samesite=settings.session_cookie_samesite,
         max_age=settings.session_ttl_hours * 60 * 60,
-        path="/",
+        path=settings.session_cookie_path,
+        domain=settings.session_cookie_domain,
     )
 
 
 def clear_auth_cookie(response) -> None:
-    response.delete_cookie(key=get_settings().session_cookie_name, path="/")
+    settings = get_settings()
+    response.delete_cookie(
+        key=settings.session_cookie_name,
+        path=settings.session_cookie_path,
+        domain=settings.session_cookie_domain,
+    )

@@ -1,28 +1,28 @@
-import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { useNavigate } from "react-router-dom";
 import { z } from "zod";
 
 import { ApiError } from "@/lib/api";
+import { useI18n } from "@/i18n";
+import { getLocalizedApiErrorMessage } from "@/lib/localized-api-error";
+import { applyZodErrors } from "@/lib/zod-form";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { login } from "@/features/auth/api";
 
-const schema = z.object({
-  email: z.string().email(),
-  password: z.string().min(8),
-});
-
-type LoginForm = z.infer<typeof schema>;
+type LoginForm = {
+  email: string;
+  password: string;
+};
 
 export function LoginPage() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const { t } = useI18n();
 
   const form = useForm<LoginForm>({
-    resolver: zodResolver(schema),
     defaultValues: {
       email: "",
       password: "",
@@ -37,27 +37,53 @@ export function LoginPage() {
     },
   });
 
+  const onSubmit = form.handleSubmit((values) => {
+    form.clearErrors();
+    const schema = z.object({
+      email: z.string().trim().email(t("auth.error.invalidEmail")),
+      password: z.string().min(8, t("auth.error.passwordMin")),
+    });
+    const parsed = schema.safeParse(values);
+    if (!parsed.success) {
+      applyZodErrors(parsed.error, form.setError);
+      return;
+    }
+    loginMutation.mutate(parsed.data);
+  });
+
   return (
     <Card>
-      <h1 className="text-xl font-semibold text-brand-900">Login</h1>
-      <form className="mt-4 space-y-3" onSubmit={form.handleSubmit((values) => loginMutation.mutate(values))}>
+      <h1 className="text-xl font-semibold text-brand-900">{t("auth.loginTitle")}</h1>
+      <form
+        className="mt-4 space-y-3"
+        onSubmit={(event) => {
+          void onSubmit(event).catch(() => undefined);
+        }}
+      >
         <div>
           <label className="mb-1 block text-sm font-medium" htmlFor="email">
-            Email
+            {t("auth.email")}
           </label>
           <Input id="email" type="email" {...form.register("email")} />
+          {form.formState.errors.email?.message ? (
+            <p className="mt-1 text-xs text-red-700">{form.formState.errors.email.message}</p>
+          ) : null}
         </div>
         <div>
           <label className="mb-1 block text-sm font-medium" htmlFor="password">
-            Password
+            {t("auth.password")}
           </label>
           <Input id="password" type="password" {...form.register("password")} />
+          <p className="mt-1 text-xs text-slate-600">{t("auth.passwordHint")}</p>
+          {form.formState.errors.password?.message ? (
+            <p className="mt-1 text-xs text-red-700">{form.formState.errors.password.message}</p>
+          ) : null}
         </div>
         {loginMutation.error instanceof ApiError ? (
-          <p className="text-sm text-red-700">{loginMutation.error.message}</p>
+          <p className="text-sm text-red-700">{getLocalizedApiErrorMessage(loginMutation.error, t)}</p>
         ) : null}
         <Button type="submit" disabled={loginMutation.isPending}>
-          Sign in
+          {t("auth.loginButton")}
         </Button>
       </form>
     </Card>

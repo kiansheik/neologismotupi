@@ -5,23 +5,23 @@ import { StatusBadge } from "@/components/status-badge";
 import { Card } from "@/components/ui/card";
 import { useCurrentUser } from "@/features/auth/hooks";
 import { listEntries } from "@/features/entries/api";
+import { useI18n } from "@/i18n";
 
 export function MePage() {
+  const { t } = useI18n();
   const { data: currentUser } = useCurrentUser();
 
   const { data } = useQuery({
     queryKey: ["my-entries"],
-    queryFn: () => listEntries({ page: 1, page_size: 50, mine: true, sort: "newest" }),
+    queryFn: () => listEntries({ page: 1, page_size: 50, mine: true, sort: "recent" }),
     enabled: Boolean(currentUser),
   });
 
   if (!currentUser) {
     return (
       <Card>
-        <h1 className="text-xl font-semibold text-brand-900">My profile</h1>
-        <p className="mt-2 text-sm text-slate-700">
-          Sign in to see your submissions and moderation states.
-        </p>
+        <h1 className="text-xl font-semibold text-brand-900">{t("me.title")}</h1>
+        <p className="mt-2 text-sm text-slate-700">{t("me.signInPrompt")}</p>
       </Card>
     );
   }
@@ -29,14 +29,14 @@ export function MePage() {
   return (
     <section className="space-y-4">
       <Card>
-        <h1 className="text-xl font-semibold text-brand-900">My profile</h1>
+        <h1 className="text-xl font-semibold text-brand-900">{t("me.title")}</h1>
         <p className="mt-2 text-sm text-slate-700">
-          {currentUser.profile?.display_name ?? "User"} · {currentUser.email}
+          {currentUser.profile?.display_name ?? t("me.fallbackUser")} · {currentUser.email}
         </p>
       </Card>
 
       <Card>
-        <h2 className="text-lg font-semibold text-brand-900">My submissions</h2>
+        <h2 className="text-lg font-semibold text-brand-900">{t("me.submissionsTitle")}</h2>
         <div className="mt-3 space-y-2">
           {data?.items.length ? (
             data.items.map((entry) => (
@@ -50,7 +50,7 @@ export function MePage() {
               </article>
             ))
           ) : (
-            <p className="text-sm text-slate-600">No submissions yet.</p>
+            <p className="text-sm text-slate-600">{t("me.noSubmissions")}</p>
           )}
         </div>
       </Card>

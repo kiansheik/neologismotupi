@@ -1,22 +1,36 @@
+@import url("https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600;700&family=Poppins:wght@400;500;600;700&display=swap");
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 :root {
-  --surface: #f7f7f2;
-  --surface-alt: #eef2e8;
-  --text: #1f2a1f;
+  --surface: #f6ead7;
+  --surface-alt: #efe2c6;
+  --surface-soft: #f9f2e6;
+  --text: #2a231b;
+  --muted: #6b5e4c;
+  --line: #d8cbb4;
+  --accent: #14532d;
+  --accent-soft: #dff0e6;
 }
 
 body {
   margin: 0;
   min-height: 100vh;
-  font-family: "Source Sans 3", "IBM Plex Sans", sans-serif;
+  font-family: "Poppins", "Source Sans 3", "IBM Plex Sans", sans-serif;
   color: var(--text);
   background:
-    radial-gradient(circle at top right, #dbe6ce 0%, transparent 45%),
-    radial-gradient(circle at 20% 80%, #d8e6df 0%, transparent 35%),
+    radial-gradient(circle at top right, #dff0e6 0%, transparent 43%),
+    radial-gradient(circle at 18% 72%, #f2e3c9 0%, transparent 38%),
     var(--surface);
+}
+
+h1,
+h2,
+h3 {
+  font-family: "Cormorant Garamond", Georgia, serif;
+  letter-spacing: 0.01em;
 }
 
 * {

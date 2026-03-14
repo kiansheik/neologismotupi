@@ -1,7 +1,7 @@
 import uuid
 from datetime import UTC, datetime, timedelta
 
-from sqlalchemy import and_, func, or_, select
+from sqlalchemy import and_, delete, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import get_settings
@@ -57,6 +57,7 @@ async def find_possible_duplicates(
                 Entry.gloss_en.ilike(pattern),
             )
         )
+        .where(Entry.status != EntryStatus.rejected)
         .order_by(Entry.created_at.desc())
         .limit(limit)
     )
@@ -64,14 +65,21 @@ async def find_possible_duplicates(
 
 
 async def set_entry_tags(db: AsyncSession, entry: Entry, tag_ids: list[uuid.UUID]) -> None:
-    entry.tags.clear()
+    await db.execute(delete(EntryTag).where(EntryTag.entry_id == entry.id))
+
     if not tag_ids:
         return
 
-    stmt = select(Tag).where(Tag.id.in_(tag_ids))
-    tags = (await db.execute(stmt)).scalars().all()
-    for tag in tags:
-        entry.tags.append(EntryTag(entry_id=entry.id, tag_id=tag.id, tag=tag))
+    # Preserve input order while removing duplicates.
+    unique_tag_ids = list(dict.fromkeys(tag_ids))
+    stmt = select(Tag.id).where(Tag.id.in_(unique_tag_ids))
+    existing_tag_ids = {(row[0]) for row in (await db.execute(stmt)).all()}
+
+    for tag_id in unique_tag_ids:
+        if tag_id in existing_tag_ids:
+            db.add(EntryTag(entry_id=entry.id, tag_id=tag_id))
+
+    await db.flush()
 
 
 async def create_entry_version(

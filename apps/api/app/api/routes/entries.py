@@ -59,6 +59,7 @@ async def _load_entry_with_relations(db: SessionDep, entry_id: uuid.UUID) -> Ent
             selectinload(Entry.tags).selectinload(EntryTag.tag),
             selectinload(Entry.versions),
             selectinload(Entry.examples),
+            selectinload(Entry.proposer).selectinload(User.profile),
         )
     )
     return (await db.execute(stmt)).scalar_one_or_none()
@@ -75,10 +76,14 @@ async def list_entries(
     topic: str | None = None,
     part_of_speech: str | None = None,
     region: str | None = None,
+    proposer_user_id: uuid.UUID | None = None,
     mine: bool = False,
-    sort: Literal["newest", "score", "most_examples"] = "newest",
+    sort: Literal["alphabetical", "recent", "newest", "score", "most_examples"] = "alphabetical",
 ) -> EntryListOut:
-    stmt = select(Entry).options(selectinload(Entry.tags).selectinload(EntryTag.tag))
+    stmt = select(Entry).options(
+        selectinload(Entry.tags).selectinload(EntryTag.tag),
+        selectinload(Entry.proposer).selectinload(User.profile),
+    )
     count_stmt = select(func.count(func.distinct(Entry.id))).select_from(Entry)
 
     conditions = []
@@ -95,6 +100,8 @@ async def list_entries(
 
     if status_filter:
         conditions.append(Entry.status == status_filter)
+    else:
+        conditions.append(Entry.status != EntryStatus.rejected)
 
     if part_of_speech:
         conditions.append(Entry.part_of_speech == part_of_speech)
@@ -107,6 +114,8 @@ async def list_entries(
                 message="Authentication required for mine=true",
             )
         conditions.append(Entry.proposer_user_id == user.id)
+    elif proposer_user_id is not None:
+        conditions.append(Entry.proposer_user_id == proposer_user_id)
 
     if topic or region:
         stmt = stmt.join(EntryTag, EntryTag.entry_id == Entry.id).join(Tag, Tag.id == EntryTag.tag_id)
@@ -126,8 +135,10 @@ async def list_entries(
         stmt = stmt.order_by(Entry.score_cache.desc(), Entry.created_at.desc())
     elif sort == "most_examples":
         stmt = stmt.order_by(Entry.example_count_cache.desc(), Entry.created_at.desc())
-    else:
+    elif sort in ("newest", "recent"):
         stmt = stmt.order_by(Entry.created_at.desc())
+    else:
+        stmt = stmt.order_by(Entry.normalized_headword.asc(), Entry.created_at.desc())
 
     stmt = stmt.offset((page - 1) * page_size).limit(page_size)
 
@@ -155,6 +166,7 @@ async def get_entry(
             selectinload(Entry.tags).selectinload(EntryTag.tag),
             selectinload(Entry.versions),
             selectinload(Entry.examples),
+            selectinload(Entry.proposer).selectinload(User.profile),
         )
     )
     entry = (await db.execute(stmt)).scalar_one_or_none()

@@ -30,6 +30,9 @@ apps/api/.venv/
 apps/api/.env
 apps/web/.env
 
+# Local backups
+backups/
+
 # Alembic artifacts
 alembic.log
 

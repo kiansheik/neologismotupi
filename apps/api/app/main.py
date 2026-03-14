@@ -1,11 +1,21 @@
 from fastapi import FastAPI
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
+from sqlalchemy import text
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
-from app.api.routes import auth_router, entries_router, example_router, meta_router, moderation_router
+from app.api.routes import (
+    auth_router,
+    entries_router,
+    example_router,
+    meta_router,
+    moderation_router,
+    users_router,
+)
 from app.config import get_settings
 from app.core.errors import http_exception_handler, validation_exception_handler
+from app.db import AsyncSessionLocal
 
 
 def create_app() -> FastAPI:
@@ -33,10 +43,20 @@ def create_app() -> FastAPI:
     app.include_router(example_router, prefix="/api")
     app.include_router(moderation_router, prefix="/api")
     app.include_router(meta_router, prefix="/api")
+    app.include_router(users_router, prefix="/api")
+
+    @app.get("/healthz")
+    async def healthz():
+        try:
+            async with AsyncSessionLocal() as db:
+                await db.execute(text("SELECT 1"))
+            return {"ok": True, "database": "ok"}
+        except Exception:
+            return JSONResponse(status_code=503, content={"ok": False, "database": "error"})
 
     @app.get("/health")
-    async def health() -> dict:
-        return {"ok": True}
+    async def health():
+        return await healthz()
 
     return app
 

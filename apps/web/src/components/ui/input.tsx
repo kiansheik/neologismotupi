@@ -5,8 +5,8 @@ export function Input({ className, ...props }: InputHTMLAttributes<HTMLInputElem
   return (
     <input
       className={clsx(
-        "w-full rounded-md border border-brand-300 bg-white px-3 py-2 text-sm",
-        "focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-200",
+        "w-full rounded-md border border-[#d3c6b0] bg-[#fffaf2] px-3 py-2 text-sm",
+        "focus:border-[#8a7246] focus:outline-none focus:ring-2 focus:ring-[#efe2c6]",
         className,
       )}
       {...props}

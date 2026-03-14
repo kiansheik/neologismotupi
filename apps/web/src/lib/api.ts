@@ -14,9 +14,9 @@ export class ApiError extends Error {
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8000/api";
 
-interface RequestInitWithBody extends RequestInit {
+type RequestInitWithBody = Omit<RequestInit, "body"> & {
   body?: unknown;
-}
+};
 
 function buildUrl(path: string): string {
   if (path.startsWith("http://") || path.startsWith("https://")) {

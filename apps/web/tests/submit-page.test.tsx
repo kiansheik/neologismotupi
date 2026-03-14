@@ -44,6 +44,8 @@ vi.mock("@/features/entries/api", () => ({
         upvote_count_cache: 1,
         downvote_count_cache: 0,
         example_count_cache: 1,
+        proposer_user_id: "u1",
+        proposer: { id: "u1", display_name: "Existing User" },
         created_at: "2026-01-01T00:00:00Z",
         updated_at: "2026-01-01T00:00:00Z",
         tags: [],
@@ -61,7 +63,7 @@ describe("SubmitPage", () => {
     const user = userEvent.setup();
     renderWithProviders(<SubmitPage />);
 
-    const headwordInput = screen.getByLabelText("Headword");
+    const headwordInput = screen.getByLabelText("Verbete");
     await user.type(headwordInput, "new");
 
     await waitFor(() => {

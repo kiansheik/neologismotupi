@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { QueryClientProvider } from "@tanstack/react-query";
 
+import { I18nProvider } from "@/i18n";
 import { queryClient } from "@/lib/query-client";
 
 interface Props {
@@ -8,5 +9,9 @@ interface Props {
 }
 
 export function AppProviders({ children }: Props) {
-  return <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>;
+  return (
+    <I18nProvider>
+      <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+    </I18nProvider>
+  );
 }

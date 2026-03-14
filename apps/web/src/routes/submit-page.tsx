@@ -1,4 +1,3 @@
-import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
@@ -6,7 +5,11 @@ import { Link, useNavigate } from "react-router-dom";
 import { z } from "zod";
 
 import { ApiError } from "@/lib/api";
+import { useI18n } from "@/i18n";
+import { partOfSpeechLabel } from "@/i18n/formatters";
+import { getLocalizedApiErrorMessage } from "@/lib/localized-api-error";
 import type { DuplicateHint } from "@/lib/types";
+import { applyZodErrors } from "@/lib/zod-form";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -14,29 +17,25 @@ import { Textarea } from "@/components/ui/textarea";
 import { useCurrentUser } from "@/features/auth/hooks";
 import { createEntry, listEntries } from "@/features/entries/api";
 
-const schema = z.object({
-  headword: z.string().min(1),
-  gloss_pt: z.string().optional(),
-  gloss_en: z.string().optional(),
-  part_of_speech: z.string().optional(),
-  short_definition: z.string().min(3),
-  morphology_notes: z.string().optional(),
-  force_submit: z.boolean().default(false),
-});
-
-type SubmitForm = z.infer<typeof schema>;
+type SubmitForm = {
+  headword: string;
+  gloss_pt?: string;
+  part_of_speech?: string;
+  short_definition: string;
+  morphology_notes?: string;
+  force_submit: boolean;
+};
 
 export function SubmitPage() {
+  const { t } = useI18n();
   const navigate = useNavigate();
   const { data: currentUser } = useCurrentUser();
   const [possibleDuplicates, setPossibleDuplicates] = useState<DuplicateHint[]>([]);
 
   const form = useForm<SubmitForm>({
-    resolver: zodResolver(schema),
     defaultValues: {
       headword: "",
       gloss_pt: "",
-      gloss_en: "",
       part_of_speech: "",
       short_definition: "",
       morphology_notes: "",
@@ -72,12 +71,31 @@ export function SubmitPage() {
     },
   });
 
+  const onSubmit = form.handleSubmit((payload) => {
+    form.clearErrors();
+    const schema = z.object({
+      headword: z.string().trim().min(1, t("submit.error.headwordRequired")),
+      gloss_pt: z.string().optional(),
+      part_of_speech: z.string().optional(),
+      short_definition: z.string().trim().min(3, t("submit.error.definitionMin")),
+      morphology_notes: z.string().optional(),
+      force_submit: z.boolean().default(false),
+    });
+    const parsed = schema.safeParse(payload);
+    if (!parsed.success) {
+      applyZodErrors(parsed.error, form.setError);
+      return;
+    }
+    createMutation.mutate(parsed.data);
+  });
+
   if (!currentUser) {
     return (
       <Card>
-        <h1 className="text-xl font-semibold text-brand-900">Submit a new entry</h1>
+        <h1 className="text-xl font-semibold text-brand-900">{t("submit.title")}</h1>
         <p className="mt-2 text-sm text-slate-700">
-          You need an account to submit entries. <Link to="/login">Sign in</Link> or <Link to="/signup">create an account</Link>.
+          {t("submit.authRequiredPrefix")} <Link to="/login">{t("submit.authRequiredSignIn")}</Link>{" "}
+          {t("submit.authRequiredOr")} <Link to="/signup">{t("submit.authRequiredCreate")}</Link>.
         </p>
       </Card>
     );
@@ -85,18 +103,26 @@ export function SubmitPage() {
 
   return (
     <Card>
-      <h1 className="text-xl font-semibold text-brand-900">Submit a new entry</h1>
-      <form className="mt-4 space-y-3" onSubmit={form.handleSubmit((payload) => createMutation.mutate(payload))}>
+      <h1 className="text-xl font-semibold text-brand-900">{t("submit.title")}</h1>
+      <form
+        className="mt-4 space-y-3"
+        onSubmit={(event) => {
+          void onSubmit(event).catch(() => undefined);
+        }}
+      >
         <div>
           <label className="mb-1 block text-sm font-medium" htmlFor="headword">
-            Headword
+            {t("submit.headword")}
           </label>
           <Input id="headword" {...form.register("headword")} />
+          {form.formState.errors.headword?.message ? (
+            <p className="mt-1 text-xs text-red-700">{form.formState.errors.headword.message}</p>
+          ) : null}
         </div>
 
         {(candidateDuplicates.length > 0 || possibleDuplicates.length > 0) && (
           <div className="rounded-md border border-amber-300 bg-amber-50 p-3 text-sm" data-testid="duplicate-warning">
-            <p className="font-medium text-amber-900">Possible existing entries</p>
+            <p className="font-medium text-amber-900">{t("submit.duplicatesTitle")}</p>
             <ul className="mt-2 list-disc space-y-1 pl-5">
               {[...candidateDuplicates, ...possibleDuplicates].slice(0, 5).map((entry) => (
                 <li key={entry.id}>
@@ -109,52 +135,60 @@ export function SubmitPage() {
             </ul>
             <label className="mt-2 inline-flex items-center gap-2 text-amber-900">
               <input type="checkbox" {...form.register("force_submit")} />
-              I confirm this proposal is still distinct.
+              {t("submit.distinctCheckbox")}
             </label>
           </div>
         )}
 
         <div>
           <label className="mb-1 block text-sm font-medium" htmlFor="gloss_pt">
-            Gloss (PT)
+            {t("submit.glossPt")}
           </label>
           <Input id="gloss_pt" {...form.register("gloss_pt")} />
         </div>
 
         <div>
-          <label className="mb-1 block text-sm font-medium" htmlFor="gloss_en">
-            Gloss (EN)
-          </label>
-          <Input id="gloss_en" {...form.register("gloss_en")} />
-        </div>
-
-        <div>
           <label className="mb-1 block text-sm font-medium" htmlFor="part_of_speech">
-            Part of speech
+            {t("submit.partOfSpeech")}
           </label>
-          <Input id="part_of_speech" {...form.register("part_of_speech")} />
+          <select
+            id="part_of_speech"
+            className="w-full rounded-md border border-brand-300 bg-white px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-200"
+            {...form.register("part_of_speech")}
+          >
+            <option value="">{t("partOfSpeech.any")}</option>
+            <option value="noun">{partOfSpeechLabel("noun", t)}</option>
+            <option value="verb">{partOfSpeechLabel("verb", t)}</option>
+            <option value="adjective">{partOfSpeechLabel("adjective", t)}</option>
+            <option value="adverb">{partOfSpeechLabel("adverb", t)}</option>
+            <option value="expression">{partOfSpeechLabel("expression", t)}</option>
+            <option value="other">{partOfSpeechLabel("other", t)}</option>
+          </select>
         </div>
 
         <div>
           <label className="mb-1 block text-sm font-medium" htmlFor="short_definition">
-            Definition
+            {t("submit.definition")}
           </label>
           <Textarea id="short_definition" {...form.register("short_definition")} />
+          {form.formState.errors.short_definition?.message ? (
+            <p className="mt-1 text-xs text-red-700">{form.formState.errors.short_definition.message}</p>
+          ) : null}
         </div>
 
         <div>
           <label className="mb-1 block text-sm font-medium" htmlFor="morphology_notes">
-            Morphology notes
+            {t("submit.morphologyNotes")}
           </label>
           <Textarea id="morphology_notes" {...form.register("morphology_notes")} />
         </div>
 
         {createMutation.error instanceof ApiError ? (
-          <p className="text-sm text-red-700">{createMutation.error.message}</p>
+          <p className="text-sm text-red-700">{getLocalizedApiErrorMessage(createMutation.error, t)}</p>
         ) : null}
 
         <Button type="submit" disabled={createMutation.isPending}>
-          Submit entry
+          {t("submit.button")}
         </Button>
       </form>
     </Card>

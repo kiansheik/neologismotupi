@@ -8,6 +8,11 @@ export interface Tag {
   slug: string;
 }
 
+export interface EntryAuthor {
+  id: string;
+  display_name: string;
+}
+
 export interface EntrySummary {
   id: string;
   slug: string;
@@ -22,6 +27,8 @@ export interface EntrySummary {
   upvote_count_cache: number;
   downvote_count_cache: number;
   example_count_cache: number;
+  proposer_user_id: string;
+  proposer: EntryAuthor;
   created_at: string;
   updated_at: string;
   tags: Tag[];
@@ -88,6 +95,12 @@ export interface User {
   profile: Profile | null;
 }
 
+export interface PublicUser {
+  id: string;
+  created_at: string;
+  profile: Profile;
+}
+
 export interface DuplicateHint {
   id: string;
   slug: string;
@@ -122,8 +135,12 @@ export interface ModerationQueue {
 export interface ModerationReport {
   id: string;
   reporter_user_id: string;
+  reporter_display_name: string | null;
+  reporter_profile_url: string | null;
   target_type: "entry" | "example" | "profile";
   target_id: string;
+  target_label: string | null;
+  target_url: string | null;
   reason_code: string;
   free_text: string | null;
   status: "open" | "reviewed" | "resolved" | "dismissed";

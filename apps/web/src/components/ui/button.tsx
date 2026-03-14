@@ -12,10 +12,10 @@ export function Button({ children, className, variant = "primary", ...props }: P
       className={clsx(
         "rounded-md px-4 py-2 text-sm font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50",
         {
-          "bg-brand-700 text-white hover:bg-brand-800": variant === "primary",
-          "bg-white text-brand-800 ring-1 ring-brand-300 hover:bg-brand-50": variant === "secondary",
+          "bg-[#14532d] text-white hover:bg-[#0f3f22]": variant === "primary",
+          "bg-[#fffaf2] text-brand-800 ring-1 ring-[#d3c6b0] hover:bg-[#f5ebd9]": variant === "secondary",
           "bg-red-700 text-white hover:bg-red-800": variant === "danger",
-          "text-brand-700 hover:bg-brand-100": variant === "ghost",
+          "text-brand-700 hover:bg-[#f0e4cf]": variant === "ghost",
         },
         className,
       )}

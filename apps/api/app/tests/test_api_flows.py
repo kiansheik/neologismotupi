@@ -4,7 +4,8 @@ import pytest
 from sqlalchemy import func, select
 
 import app.db as db_module
-from app.models.entry import Entry, Example, Vote
+from app.core.enums import TagType
+from app.models.entry import Entry, Example, Tag, Vote
 from app.models.moderation import Report
 from app.models.user import User
 
@@ -20,6 +21,15 @@ async def register_user(client, email: str, display_name: str, password: str = "
     )
     assert response.status_code == 201, response.text
     return response.json()
+
+
+@pytest.mark.asyncio
+async def test_healthz(client):
+    response = await client.get("/healthz")
+    assert response.status_code == 200, response.text
+    payload = response.json()
+    assert payload["ok"] is True
+    assert payload["database"] == "ok"
 
 
 async def login_user(client, email: str, password: str = "password123"):
@@ -67,6 +77,79 @@ async def test_create_entry(client):
 
     assert entry["headword"] == "my-new-entry"
     assert entry["status"] == "pending"
+
+
+@pytest.mark.asyncio
+async def test_rejected_entries_only_show_with_rejected_filter(client):
+    owner = await register_user(client, "hidden-owner@example.com", "Hidden Owner")
+    entry = await create_entry(client, "hidden-rejected-entry")
+
+    await client.post("/api/auth/logout")
+    await register_user(client, "hidden-mod@example.com", "Hidden Mod")
+
+    async with db_module.AsyncSessionLocal() as session:
+        moderator = (await session.execute(select(User).where(User.email == "hidden-mod@example.com"))).scalar_one()
+        moderator.is_superuser = True
+        await session.commit()
+
+    reject_response = await client.post(
+        f"/api/mod/entries/{entry['id']}/reject",
+        json={"notes": "hidden from default", "reason": "rejected for test"},
+    )
+    assert reject_response.status_code == 200, reject_response.text
+
+    default_response = await client.get("/api/entries")
+    assert default_response.status_code == 200, default_response.text
+    default_ids = {item["id"] for item in default_response.json()["items"]}
+    assert entry["id"] not in default_ids
+
+    proposer_default_response = await client.get("/api/entries", params={"proposer_user_id": owner["id"]})
+    assert proposer_default_response.status_code == 200, proposer_default_response.text
+    proposer_default_ids = {item["id"] for item in proposer_default_response.json()["items"]}
+    assert entry["id"] not in proposer_default_ids
+
+    rejected_response = await client.get("/api/entries", params={"status": "rejected"})
+    assert rejected_response.status_code == 200, rejected_response.text
+    rejected_ids = {item["id"] for item in rejected_response.json()["items"]}
+    assert entry["id"] in rejected_ids
+
+    proposer_rejected_response = await client.get(
+        "/api/entries",
+        params={"status": "rejected", "proposer_user_id": owner["id"]},
+    )
+    assert proposer_rejected_response.status_code == 200, proposer_rejected_response.text
+    proposer_rejected_ids = {item["id"] for item in proposer_rejected_response.json()["items"]}
+    assert entry["id"] in proposer_rejected_ids
+
+
+@pytest.mark.asyncio
+async def test_create_entry_with_tags(client):
+    await register_user(client, "tagger@example.com", "Tagger")
+
+    async with db_module.AsyncSessionLocal() as session:
+        tag = Tag(name="Educação", type=TagType.domain, slug="educacao")
+        session.add(tag)
+        await session.commit()
+        await session.refresh(tag)
+        tag_id = str(tag.id)
+
+    response = await client.post(
+        "/api/entries",
+        json={
+            "headword": "tagged-entry",
+            "gloss_pt": "teste",
+            "gloss_en": "test",
+            "part_of_speech": "noun",
+            "short_definition": "Entry with tags.",
+            "morphology_notes": "tag note",
+            "force_submit": True,
+            "tag_ids": [tag_id],
+        },
+    )
+    assert response.status_code == 201, response.text
+    payload = response.json()
+    assert len(payload["tags"]) == 1
+    assert payload["tags"][0]["slug"] == "educacao"
 
 
 @pytest.mark.asyncio
@@ -216,6 +299,24 @@ async def test_report_flow(client):
     assert reports_response.status_code == 200, reports_response.text
     reports = reports_response.json()
     assert len(reports) >= 2
+    entry_report = next(report for report in reports if report["target_type"] == "entry")
+    example_report_payload = next(report for report in reports if report["target_type"] == "example")
+
+    assert entry_report["target_label"] == entry["headword"]
+    assert entry_report["target_url"] == f"/entries/{entry['slug']}"
+    assert entry_report["reason_code"] == "spam"
+    assert entry_report["free_text"] == "Looks like spam"
+    assert entry_report["reporter_display_name"] == "Reporter"
+    assert entry_report["reporter_profile_url"] == f"/profiles/{entry_report['reporter_user_id']}"
+    assert entry_report["created_at"]
+
+    assert example_report_payload["target_url"] == f"/entries/{entry['slug']}"
+    assert "Report me please" in example_report_payload["target_label"]
+    assert example_report_payload["reason_code"] == "incorrect"
+    assert example_report_payload["free_text"] == "Suspicious usage"
+    assert example_report_payload["reporter_display_name"] == "Reporter"
+    assert example_report_payload["reporter_profile_url"] == f"/profiles/{example_report_payload['reporter_user_id']}"
+    assert example_report_payload["created_at"]
 
     report_id = reports[0]["id"]
     resolve_response = await client.post(
@@ -232,3 +333,16 @@ async def test_report_flow(client):
     assert total_reports >= 2
     assert total_entries >= 1
     assert total_examples >= 1
+
+
+@pytest.mark.asyncio
+async def test_public_user_profile_endpoint(client):
+    created = await register_user(client, "profile-user@example.com", "Profile User")
+    user_id = created["id"]
+
+    response = await client.get(f"/api/users/{user_id}")
+    assert response.status_code == 200, response.text
+
+    payload = response.json()
+    assert payload["id"] == user_id
+    assert payload["profile"]["display_name"] == "Profile User"

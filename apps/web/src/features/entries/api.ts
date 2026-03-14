@@ -2,6 +2,7 @@ import { apiFetch, withQuery } from "@/lib/api";
 import type { EntryDetail, EntryListResponse } from "@/lib/types";
 
 export interface ListEntriesParams {
+  [key: string]: string | number | boolean | undefined;
   page?: number;
   page_size?: number;
   search?: string;
@@ -9,8 +10,9 @@ export interface ListEntriesParams {
   topic?: string;
   part_of_speech?: string;
   region?: string;
+  proposer_user_id?: string;
   mine?: boolean;
-  sort?: "newest" | "score" | "most_examples";
+  sort?: "alphabetical" | "recent" | "score" | "most_examples";
 }
 
 export interface CreateEntryPayload {

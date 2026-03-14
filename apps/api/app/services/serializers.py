@@ -1,5 +1,12 @@
 from app.models.entry import Entry, EntryTag, EntryVersion, Example, Tag
-from app.schemas.entries import EntryDetailOut, EntrySummaryOut, EntryVersionOut, ExampleOut, TagOut
+from app.schemas.entries import (
+    EntryAuthorOut,
+    EntryDetailOut,
+    EntrySummaryOut,
+    EntryVersionOut,
+    ExampleOut,
+    TagOut,
+)
 
 
 def serialize_tag(tag: Tag) -> TagOut:
@@ -22,6 +29,13 @@ def serialize_entry_version(version: EntryVersion) -> EntryVersionOut:
     return EntryVersionOut.model_validate(version)
 
 
+def serialize_entry_author(entry: Entry) -> EntryAuthorOut:
+    fallback_name = f"user-{str(entry.proposer_user_id)[:8]}"
+    if entry.proposer and entry.proposer.profile:
+        return EntryAuthorOut(id=entry.proposer.id, display_name=entry.proposer.profile.display_name)
+    return EntryAuthorOut(id=entry.proposer_user_id, display_name=fallback_name)
+
+
 def serialize_entry_summary(entry: Entry) -> EntrySummaryOut:
     payload = {
         "id": entry.id,
@@ -37,6 +51,8 @@ def serialize_entry_summary(entry: Entry) -> EntrySummaryOut:
         "upvote_count_cache": entry.upvote_count_cache,
         "downvote_count_cache": entry.downvote_count_cache,
         "example_count_cache": entry.example_count_cache,
+        "proposer_user_id": entry.proposer_user_id,
+        "proposer": serialize_entry_author(entry),
         "created_at": entry.created_at,
         "updated_at": entry.updated_at,
         "tags": serialize_entry_tags(entry.tags),

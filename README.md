@@ -81,10 +81,26 @@ make db-create
 make db-migrate
 ```
 
-7. Seed fake development data:
+7. Seed development data (CSV only):
 
 ```bash
 make seed
+```
+
+By default, the seed script checks:
+- `~/nhe-enga/neologisms.csv`
+- `~/code/nhe-enga/neologisms.csv`
+
+Override the CSV path when needed:
+
+```bash
+SEED_CSV_PATH=~/nhe-enga/neologisms.csv make seed
+```
+
+If you want to fully reset local DB data and reseed in one command:
+
+```bash
+make db-rebuild
 ```
 
 8. Start both apps:
@@ -126,8 +142,7 @@ cp apps/web/.env.example apps/web/.env
 ```bash
 make install
 make db-create
-make db-migrate
-make seed
+make db-rebuild
 ```
 
 6. Run development servers:
@@ -154,8 +169,7 @@ DATABASE_URL=postgresql+asyncpg://postgres:postgres@localhost:5432/nheenga_dev
 3. Run migrations and seed:
 
 ```bash
-make db-migrate
-make seed
+make db-rebuild
 ```
 
 ## Environment variables
@@ -164,6 +178,12 @@ make seed
 
 ```env
 APP_ENV=development
+```
+
+### Optional seed override
+
+```env
+SEED_CSV_PATH=~/nhe-enga/neologisms.csv
 ```
 
 ### `apps/api/.env`
@@ -175,7 +195,34 @@ SECRET_KEY=change-me
 CORS_ORIGINS=http://localhost:5173
 TURNSTILE_ENABLED=false
 TURNSTILE_SECRET_KEY=
+# Dev only. Must be false in production.
 FIRST_USER_IS_ADMIN=true
+REQUIRE_VERIFIED_EMAIL=false
+SESSION_COOKIE_NAME=nheenga_session
+SESSION_TTL_HOURS=168
+SESSION_COOKIE_SECURE=false
+SESSION_COOKIE_SAMESITE=lax
+SESSION_COOKIE_DOMAIN=
+SESSION_COOKIE_PATH=/
+```
+
+### `apps/api/.env.production.example`
+
+```env
+APP_ENV=production
+DATABASE_URL=postgresql+asyncpg://postgres:change-me@db.example.com:5432/nheenga_prod
+SECRET_KEY=replace-with-a-long-random-secret-key-at-least-32-chars
+CORS_ORIGINS=https://academiatupi.com,https://app.academiatupi.com
+TURNSTILE_ENABLED=true
+TURNSTILE_SECRET_KEY=replace-with-turnstile-secret
+FIRST_USER_IS_ADMIN=false
+REQUIRE_VERIFIED_EMAIL=true
+SESSION_COOKIE_NAME=nheenga_session
+SESSION_TTL_HOURS=168
+SESSION_COOKIE_SECURE=true
+SESSION_COOKIE_SAMESITE=lax
+SESSION_COOKIE_DOMAIN=
+SESSION_COOKIE_PATH=/
 ```
 
 ### `apps/web/.env`
@@ -193,12 +240,29 @@ make dev-api
 ```
 
 OpenAPI docs will be available at `http://localhost:8000/docs`.
+Health endpoints:
+- `GET /healthz` (includes DB ping)
+- `GET /health` (alias)
 
 ## Run frontend only
 
 ```bash
 make dev-web
 ```
+
+## Frontend localization
+- Default UI locale is `pt-BR`.
+- Available locales: `pt-BR`, `tupi-BR` (placeholder copy of Portuguese), `en-US`.
+- Locale dictionaries live in:
+  - `apps/web/src/i18n/messages.ts`
+- i18n provider and locale persistence live in:
+  - `apps/web/src/i18n/index.tsx`
+
+To add a new language:
+1. Copy the key set from `ptBR` in `messages.ts`.
+2. Add a new dictionary object with the same keys.
+3. Register it in `dictionaries` in `index.tsx`.
+4. Add the locale option in the header language selector (`AppShell`).
 
 ## Run tests
 
@@ -213,6 +277,42 @@ Or all together:
 ```bash
 make test
 ```
+
+## One-time admin bootstrap (production-safe)
+For production, keep `FIRST_USER_IS_ADMIN=false` and create the first admin explicitly:
+
+```bash
+make bootstrap-admin EMAIL=admin@example.com PASSWORD='change-this-now' DISPLAY_NAME='Admin'
+```
+
+You can rotate any user password later with:
+
+```bash
+make change-user-password admin@example.com 'new-password'
+```
+
+## PostgreSQL backups
+Create a compressed backup:
+
+```bash
+make db-backup
+```
+
+The backup script:
+- reads `DATABASE_URL` from `apps/api/.env` (or environment)
+- writes files to `backups/postgres/`
+- prunes backups older than `BACKUP_RETENTION_DAYS` (default `14`)
+
+Example cron (daily at 02:30 UTC):
+
+```cron
+30 2 * * * cd /path/to/neologismotupi && make db-backup >> /var/log/nheenga-backup.log 2>&1
+```
+
+## Cookie domain decision
+Current default is **API-host scoped cookie** (host-only behavior, `SESSION_COOKIE_DOMAIN=`).
+
+Use `.academiatupi.com` only if you intentionally need cross-subdomain cookie sharing and are ready for the stricter CSRF/session implications.
 
 ## Moderation in MVP
 - New user contributions enter moderation by threshold rules.

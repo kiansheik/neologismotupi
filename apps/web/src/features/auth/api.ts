@@ -1,5 +1,5 @@
-import { apiFetch } from "@/lib/api";
-import type { User } from "@/lib/types";
+import { ApiError, apiFetch } from "@/lib/api";
+import type { PublicUser, User } from "@/lib/types";
 
 export interface RegisterPayload {
   email: string;
@@ -24,6 +24,17 @@ export async function logout(): Promise<{ ok: boolean }> {
   return apiFetch<{ ok: boolean }>("/auth/logout", { method: "POST" });
 }
 
-export async function me(): Promise<User> {
-  return apiFetch<User>("/auth/me");
+export async function me(): Promise<User | null> {
+  try {
+    return await apiFetch<User>("/auth/me");
+  } catch (error) {
+    if (error instanceof ApiError && error.code === "unauthenticated") {
+      return null;
+    }
+    throw error;
+  }
+}
+
+export async function getPublicUser(userId: string): Promise<PublicUser> {
+  return apiFetch<PublicUser>(`/users/${userId}`);
 }

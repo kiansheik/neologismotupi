@@ -15,6 +15,11 @@ class TagOut(BaseModel):
     model_config = {"from_attributes": True}
 
 
+class EntryAuthorOut(BaseModel):
+    id: uuid.UUID
+    display_name: str
+
+
 class EntrySummaryOut(BaseModel):
     id: uuid.UUID
     slug: str
@@ -29,6 +34,8 @@ class EntrySummaryOut(BaseModel):
     upvote_count_cache: int
     downvote_count_cache: int
     example_count_cache: int
+    proposer_user_id: uuid.UUID
+    proposer: EntryAuthorOut
     created_at: datetime
     updated_at: datetime
     tags: list[TagOut] = Field(default_factory=list)
@@ -138,5 +145,5 @@ class VoteOut(BaseModel):
 
 class ReportCreate(BaseModel):
     reason_code: ReportReasonCode
-    free_text: str | None = None
+    free_text: str | None = Field(default=None, min_length=5, max_length=280)
     turnstile_token: str | None = None

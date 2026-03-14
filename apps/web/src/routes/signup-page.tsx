@@ -1,29 +1,29 @@
-import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { useNavigate } from "react-router-dom";
 import { z } from "zod";
 
 import { ApiError } from "@/lib/api";
+import { useI18n } from "@/i18n";
+import { getLocalizedApiErrorMessage } from "@/lib/localized-api-error";
+import { applyZodErrors } from "@/lib/zod-form";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { register } from "@/features/auth/api";
 
-const schema = z.object({
-  email: z.string().email(),
-  password: z.string().min(8),
-  display_name: z.string().min(2),
-});
-
-type SignupForm = z.infer<typeof schema>;
+type SignupForm = {
+  email: string;
+  password: string;
+  display_name: string;
+};
 
 export function SignupPage() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const { t } = useI18n();
 
   const form = useForm<SignupForm>({
-    resolver: zodResolver(schema),
     defaultValues: {
       email: "",
       password: "",
@@ -39,33 +39,63 @@ export function SignupPage() {
     },
   });
 
+  const onSubmit = form.handleSubmit((values) => {
+    form.clearErrors();
+    const schema = z.object({
+      email: z.string().trim().email(t("auth.error.invalidEmail")),
+      password: z.string().min(8, t("auth.error.passwordMin")),
+      display_name: z.string().trim().min(2, t("auth.error.displayNameMin")),
+    });
+    const parsed = schema.safeParse(values);
+    if (!parsed.success) {
+      applyZodErrors(parsed.error, form.setError);
+      return;
+    }
+    signupMutation.mutate(parsed.data);
+  });
+
   return (
     <Card>
-      <h1 className="text-xl font-semibold text-brand-900">Create account</h1>
-      <form className="mt-4 space-y-3" onSubmit={form.handleSubmit((values) => signupMutation.mutate(values))}>
+      <h1 className="text-xl font-semibold text-brand-900">{t("auth.signupTitle")}</h1>
+      <form
+        className="mt-4 space-y-3"
+        onSubmit={(event) => {
+          void onSubmit(event).catch(() => undefined);
+        }}
+      >
         <div>
           <label className="mb-1 block text-sm font-medium" htmlFor="display_name">
-            Display name
+            {t("auth.displayName")}
           </label>
           <Input id="display_name" {...form.register("display_name")} />
+          {form.formState.errors.display_name?.message ? (
+            <p className="mt-1 text-xs text-red-700">{form.formState.errors.display_name.message}</p>
+          ) : null}
         </div>
         <div>
           <label className="mb-1 block text-sm font-medium" htmlFor="email">
-            Email
+            {t("auth.email")}
           </label>
           <Input id="email" type="email" {...form.register("email")} />
+          {form.formState.errors.email?.message ? (
+            <p className="mt-1 text-xs text-red-700">{form.formState.errors.email.message}</p>
+          ) : null}
         </div>
         <div>
           <label className="mb-1 block text-sm font-medium" htmlFor="password">
-            Password
+            {t("auth.password")}
           </label>
           <Input id="password" type="password" {...form.register("password")} />
+          <p className="mt-1 text-xs text-slate-600">{t("auth.passwordHint")}</p>
+          {form.formState.errors.password?.message ? (
+            <p className="mt-1 text-xs text-red-700">{form.formState.errors.password.message}</p>
+          ) : null}
         </div>
         {signupMutation.error instanceof ApiError ? (
-          <p className="text-sm text-red-700">{signupMutation.error.message}</p>
+          <p className="text-sm text-red-700">{getLocalizedApiErrorMessage(signupMutation.error, t)}</p>
         ) : null}
         <Button type="submit" disabled={signupMutation.isPending}>
-          Create account
+          {t("auth.signupButton")}
         </Button>
       </form>
     </Card>
