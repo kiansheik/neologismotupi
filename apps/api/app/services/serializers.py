@@ -1,3 +1,6 @@
+import uuid
+from datetime import datetime
+
 from app.models.entry import Entry, EntryTag, EntryVersion, Example, Tag
 from app.schemas.entries import (
     EntryAuthorOut,
@@ -8,6 +11,8 @@ from app.schemas.entries import (
     TagOut,
 )
 from app.services.user_badges import UserBadgeLeaders, resolve_user_badges
+
+type ModerationContext = tuple[str | None, str | None, datetime | None]
 
 
 def serialize_tag(tag: Tag) -> TagOut:
@@ -22,8 +27,17 @@ def serialize_entry_tags(entry_tags: list[EntryTag]) -> list[TagOut]:
     return serialized
 
 
-def serialize_example(example: Example) -> ExampleOut:
-    return ExampleOut.model_validate(example)
+def serialize_example(
+    example: Example,
+    moderation_map: dict[uuid.UUID, ModerationContext] | None = None,
+) -> ExampleOut:
+    serialized = ExampleOut.model_validate(example)
+    if moderation_map and example.id in moderation_map:
+        reason, notes, moderated_at = moderation_map[example.id]
+        serialized.moderation_reason = reason
+        serialized.moderation_notes = notes
+        serialized.moderated_at = moderated_at
+    return serialized
 
 
 def serialize_entry_version(version: EntryVersion) -> EntryVersionOut:
@@ -83,13 +97,24 @@ def serialize_entry_detail(
     *,
     examples: list[Example],
     badge_leaders: UserBadgeLeaders | None = None,
+    entry_moderation: ModerationContext | None = None,
+    example_moderation: dict[uuid.UUID, ModerationContext] | None = None,
 ) -> EntryDetailOut:
+    moderation_reason: str | None = None
+    moderation_notes: str | None = None
+    moderated_at: datetime | None = None
+    if entry_moderation:
+        moderation_reason, moderation_notes, moderated_at = entry_moderation
+
     payload = {
         **serialize_entry_summary(entry, badge_leaders).model_dump(),
         "morphology_notes": entry.morphology_notes,
         "approved_at": entry.approved_at,
         "approved_by_user_id": entry.approved_by_user_id,
+        "moderation_reason": moderation_reason,
+        "moderation_notes": moderation_notes,
+        "moderated_at": moderated_at,
         "versions": [serialize_entry_version(version) for version in entry.versions],
-        "examples": [serialize_example(example) for example in examples],
+        "examples": [serialize_example(example, example_moderation) for example in examples],
     }
     return EntryDetailOut.model_validate(payload)

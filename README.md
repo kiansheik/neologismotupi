@@ -209,6 +209,7 @@ SESSION_COOKIE_SECURE=false
 SESSION_COOKIE_SAMESITE=lax
 SESSION_COOKIE_DOMAIN=
 SESSION_COOKIE_PATH=/
+ENFORCE_DOWNVOTE_ACCOUNT_AGE=true
 EMAIL_DELIVERY=log
 SMTP_HOST=
 SMTP_PORT=587
@@ -242,6 +243,7 @@ SESSION_COOKIE_SECURE=true
 SESSION_COOKIE_SAMESITE=lax
 SESSION_COOKIE_DOMAIN=
 SESSION_COOKIE_PATH=/
+ENFORCE_DOWNVOTE_ACCOUNT_AGE=true
 EMAIL_DELIVERY=smtp
 SMTP_HOST=mail.privateemail.com
 SMTP_PORT=587
@@ -280,6 +282,7 @@ Turnstile note:
 - `VITE_TURNSTILE_SITE_KEY` is compiled into the frontend at build time, so changing it requires a new frontend deploy.
 - `EMAIL_DELIVERY=log` is for local/dev troubleshooting only. Use `EMAIL_DELIVERY=smtp` in production.
 - `FOUNDER_EMAIL` controls who receives the `fundador/founder` badge.
+- `ENFORCE_DOWNVOTE_ACCOUNT_AGE=false` temporarily disables the 72h downvote restriction (useful for beta).
 
 ### `apps/web/.env.production.example`
 

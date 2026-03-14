@@ -14,8 +14,8 @@ import {
   getModerationDashboard,
   getModerationQueue,
   getModerationReports,
-  hideExample,
   rejectEntry,
+  rejectExample,
   resolveReport,
 } from "@/features/moderation/api";
 import { useI18n } from "@/i18n";
@@ -64,7 +64,8 @@ export function ModerationPage() {
     },
   });
   const rejectEntryMutation = useMutation({
-    mutationFn: (entryId: string) => rejectEntry(entryId),
+    mutationFn: (params: { entryId: string; reason: string }) =>
+      rejectEntry(params.entryId, { reason: params.reason }),
     onSuccess: () => {
       trackEvent("moderation_entry_rejected");
       return refreshModeration();
@@ -87,14 +88,15 @@ export function ModerationPage() {
       });
     },
   });
-  const hideExampleMutation = useMutation({
-    mutationFn: (exampleId: string) => hideExample(exampleId),
+  const rejectExampleMutation = useMutation({
+    mutationFn: (params: { exampleId: string; reason: string }) =>
+      rejectExample(params.exampleId, { reason: params.reason }),
     onSuccess: () => {
-      trackEvent("moderation_example_hidden");
+      trackEvent("moderation_example_rejected");
       return refreshModeration();
     },
     onError: (error) => {
-      trackEvent("moderation_example_hide_failed", {
+      trackEvent("moderation_example_reject_failed", {
         error_code: error instanceof ApiError ? error.code : "unknown",
       });
     },
@@ -111,6 +113,19 @@ export function ModerationPage() {
       });
     },
   });
+
+  const promptRequiredReason = (promptText: string): string | null => {
+    const response = window.prompt(promptText);
+    if (response === null) {
+      return null;
+    }
+    const reason = response.trim();
+    if (!reason) {
+      window.alert(t("moderation.reasonRequired"));
+      return null;
+    }
+    return reason;
+  };
 
   if (!currentUser) {
     return (
@@ -133,7 +148,12 @@ export function ModerationPage() {
   return (
     <section className="space-y-4">
       <Card>
-        <h1 className="text-xl font-semibold text-brand-900">{t("moderation.queueTitle")}</h1>
+        <h1 className="text-xl font-semibold text-brand-900">{t("moderation.title")}</h1>
+        <p className="mt-2 text-sm text-slate-700">{t("moderation.howto.short")}</p>
+      </Card>
+
+      <Card>
+        <h2 className="text-xl font-semibold text-brand-900">{t("moderation.queueTitle")}</h2>
         <div className="mt-3 grid gap-4 md:grid-cols-2">
           <div>
             <h2 className="text-sm font-semibold text-brand-800">{t("moderation.pendingEntries")}</h2>
@@ -144,13 +164,23 @@ export function ModerationPage() {
                     <Link className="font-medium text-brand-800 hover:underline" to={`/entries/${entry.slug}`}>
                       {entry.headword}
                     </Link>
-                    <StatusBadge status={entry.status} />
+                    <StatusBadge status={entry.status} showPending />
                   </div>
                   <div className="mt-2 flex gap-2">
                     <Button type="button" onClick={() => approveEntryMutation.mutate(entry.id)}>
                       {t("moderation.approve")}
                     </Button>
-                    <Button type="button" variant="danger" onClick={() => rejectEntryMutation.mutate(entry.id)}>
+                    <Button
+                      type="button"
+                      variant="danger"
+                      onClick={() => {
+                        const reason = promptRequiredReason(t("moderation.prompt.entryRejectReason"));
+                        if (!reason) {
+                          return;
+                        }
+                        rejectEntryMutation.mutate({ entryId: entry.id, reason });
+                      }}
+                    >
                       {t("moderation.reject")}
                     </Button>
                   </div>
@@ -178,8 +208,18 @@ export function ModerationPage() {
                     <Button type="button" onClick={() => approveExampleMutation.mutate(example.id)}>
                       {t("moderation.approve")}
                     </Button>
-                    <Button type="button" variant="danger" onClick={() => hideExampleMutation.mutate(example.id)}>
-                      {t("moderation.hide")}
+                    <Button
+                      type="button"
+                      variant="danger"
+                      onClick={() => {
+                        const reason = promptRequiredReason(t("moderation.prompt.exampleRejectReason"));
+                        if (!reason) {
+                          return;
+                        }
+                        rejectExampleMutation.mutate({ exampleId: example.id, reason });
+                      }}
+                    >
+                      {t("moderation.reject")}
                     </Button>
                   </div>
                 </article>

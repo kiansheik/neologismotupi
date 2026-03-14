@@ -69,6 +69,9 @@ class ExampleOut(BaseModel):
     score_cache: int
     upvote_count_cache: int
     downvote_count_cache: int
+    moderation_reason: str | None = None
+    moderation_notes: str | None = None
+    moderated_at: datetime | None = None
     created_at: datetime
     updated_at: datetime
 
@@ -79,6 +82,9 @@ class EntryDetailOut(EntrySummaryOut):
     morphology_notes: str | None
     approved_at: datetime | None
     approved_by_user_id: uuid.UUID | None
+    moderation_reason: str | None = None
+    moderation_notes: str | None = None
+    moderated_at: datetime | None = None
     versions: list[EntryVersionOut] = Field(default_factory=list)
     examples: list[ExampleOut] = Field(default_factory=list)
 

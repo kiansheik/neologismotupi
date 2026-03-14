@@ -1,6 +1,11 @@
 import { apiFetch, withQuery } from "@/lib/api";
 import type { ModerationDashboard, ModerationQueue, ModerationReport } from "@/lib/types";
 
+interface ModerationDecisionPayload {
+  reason?: string;
+  notes?: string;
+}
+
 export function getModerationQueue() {
   return apiFetch<ModerationQueue>("/mod/queue");
 }
@@ -13,17 +18,17 @@ export function getModerationReports(status = "open") {
   return apiFetch<ModerationReport[]>(withQuery("/mod/reports", { status }));
 }
 
-export function approveEntry(entryId: string, notes = "") {
+export function approveEntry(entryId: string, payload: ModerationDecisionPayload = {}) {
   return apiFetch(`/mod/entries/${entryId}/approve`, {
     method: "POST",
-    body: { notes, reason: "approved" },
+    body: { notes: payload.notes ?? "", reason: payload.reason ?? "approved" },
   });
 }
 
-export function rejectEntry(entryId: string, notes = "") {
+export function rejectEntry(entryId: string, payload: ModerationDecisionPayload = {}) {
   return apiFetch(`/mod/entries/${entryId}/reject`, {
     method: "POST",
-    body: { notes, reason: "rejected" },
+    body: { notes: payload.notes ?? "", reason: payload.reason ?? "rejected" },
   });
 }
 
@@ -34,17 +39,24 @@ export function disputeEntry(entryId: string, notes = "") {
   });
 }
 
-export function approveExample(exampleId: string, notes = "") {
+export function approveExample(exampleId: string, payload: ModerationDecisionPayload = {}) {
   return apiFetch(`/mod/examples/${exampleId}/approve`, {
     method: "POST",
-    body: { notes, reason: "approved" },
+    body: { notes: payload.notes ?? "", reason: payload.reason ?? "approved" },
   });
 }
 
-export function hideExample(exampleId: string, notes = "") {
+export function rejectExample(exampleId: string, payload: ModerationDecisionPayload = {}) {
+  return apiFetch(`/mod/examples/${exampleId}/reject`, {
+    method: "POST",
+    body: { notes: payload.notes ?? "", reason: payload.reason ?? "rejected" },
+  });
+}
+
+export function hideExample(exampleId: string, payload: ModerationDecisionPayload = {}) {
   return apiFetch(`/mod/examples/${exampleId}/hide`, {
     method: "POST",
-    body: { notes, reason: "hidden" },
+    body: { notes: payload.notes ?? "", reason: payload.reason ?? "hidden" },
   });
 }
 

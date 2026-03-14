@@ -1,4 +1,5 @@
 import uuid
+import logging
 from datetime import UTC, datetime
 from datetime import timedelta
 from typing import Annotated
@@ -22,9 +23,11 @@ from app.schemas.moderation import (
     ReportOut,
     ReportReviewRequest,
 )
+from app.services.email_delivery import send_entry_moderation_email
 from app.services.moderation import record_moderation_action
 
 router = APIRouter(prefix="/mod", tags=["moderation"])
+logger = logging.getLogger(__name__)
 
 
 def _truncate_text(value: str, limit: int = 120) -> str:
@@ -32,6 +35,13 @@ def _truncate_text(value: str, limit: int = 120) -> str:
     if len(cleaned) <= limit:
         return cleaned
     return f"{cleaned[: limit - 3].rstrip()}..."
+
+
+def _clean_reason(value: str | None) -> str | None:
+    if value is None:
+        return None
+    cleaned = value.strip()
+    return cleaned or None
 
 
 async def _count_rows(db: SessionDep, stmt) -> int:
@@ -330,10 +340,40 @@ async def _set_entry_status(
     if not entry:
         raise_api_error(status_code=404, code="entry_not_found", message="Entry not found")
 
+    cleaned_reason = _clean_reason(reason)
+    if new_status == EntryStatus.rejected:
+        if not cleaned_reason:
+            raise_api_error(
+                status_code=422,
+                code="moderation_reason_required",
+                message="Rejection reason is required",
+            )
+
+        report_count = int(
+            (
+                await db.execute(
+                    select(func.count())
+                    .select_from(Report)
+                    .where(Report.target_type == ReportTargetType.entry)
+                    .where(Report.target_id == entry.id)
+                    .where(Report.status.in_([ReportStatus.open, ReportStatus.reviewed]))
+                )
+            ).scalar_one()
+        )
+        if report_count == 0:
+            raise_api_error(
+                status_code=409,
+                code="report_required_for_rejection",
+                message="Rejecting an entry requires an existing report",
+            )
+
     entry.status = new_status
     if new_status == EntryStatus.approved:
         entry.approved_at = datetime.now(UTC)
         entry.approved_by_user_id = moderator.id
+    else:
+        entry.approved_at = None
+        entry.approved_by_user_id = None
 
     await record_moderation_action(
         db,
@@ -342,9 +382,23 @@ async def _set_entry_status(
         target_type="entry",
         target_id=entry.id,
         notes=notes,
-        metadata_json={"reason": reason, "status": new_status.value},
+        metadata_json={"reason": cleaned_reason, "status": new_status.value},
     )
     await db.commit()
+
+    proposer = (await db.execute(select(User).where(User.id == entry.proposer_user_id))).scalar_one_or_none()
+    should_notify_user = new_status in {EntryStatus.approved, EntryStatus.rejected}
+    if proposer and should_notify_user:
+        try:
+            await send_entry_moderation_email(
+                to_email=proposer.email,
+                headword=entry.headword,
+                slug=entry.slug,
+                approved=new_status == EntryStatus.approved,
+                reason=cleaned_reason or notes,
+            )
+        except Exception:
+            logger.exception("Failed to send entry moderation email entry_id=%s", entry.id)
 
     return {"ok": True, "entry_id": str(entry.id), "status": entry.status.value}
 
@@ -425,7 +479,35 @@ async def approve_example(
         target_type="example",
         target_id=example.id,
         notes=payload.notes,
-        metadata_json={"reason": payload.reason},
+        metadata_json={"reason": payload.reason, "status": example.status.value},
+    )
+    await db.commit()
+    return {"ok": True, "example_id": str(example.id), "status": example.status.value}
+
+
+@router.post("/examples/{example_id}/reject")
+async def reject_example(
+    example_id: uuid.UUID,
+    payload: ModerationActionRequest,
+    db: SessionDep,
+    moderator: Annotated[User, Depends(require_moderator)],
+) -> dict:
+    example = (await db.execute(select(Example).where(Example.id == example_id))).scalar_one_or_none()
+    if not example:
+        raise_api_error(status_code=404, code="example_not_found", message="Example not found")
+
+    example.status = ExampleStatus.rejected
+    example.approved_at = None
+    example.approved_by_user_id = None
+
+    await record_moderation_action(
+        db,
+        moderator_user_id=moderator.id,
+        action_type="example_rejected",
+        target_type="example",
+        target_id=example.id,
+        notes=payload.notes,
+        metadata_json={"reason": payload.reason, "status": example.status.value},
     )
     await db.commit()
     return {"ok": True, "example_id": str(example.id), "status": example.status.value}
@@ -451,7 +533,7 @@ async def hide_example(
         target_type="example",
         target_id=example.id,
         notes=payload.notes,
-        metadata_json={"reason": payload.reason},
+        metadata_json={"reason": payload.reason, "status": example.status.value},
     )
     await db.commit()
     return {"ok": True, "example_id": str(example.id), "status": example.status.value}

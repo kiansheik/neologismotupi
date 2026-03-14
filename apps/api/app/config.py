@@ -27,6 +27,7 @@ class Settings(BaseSettings):
     session_cookie_path: str = "/"
 
     downvote_min_account_age_hours: int = 72
+    enforce_downvote_account_age: bool = True
     pending_entry_threshold: int = 3
     pending_example_threshold: int = 5
 

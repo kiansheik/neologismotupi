@@ -5,16 +5,28 @@ import { useI18n } from "@/i18n";
 
 interface Props {
   status: EntryStatus | ExampleStatus;
+  showPending?: boolean;
 }
 
-export function StatusBadge({ status }: Props) {
+export function StatusBadge({ status, showPending = false }: Props) {
   const { t } = useI18n();
   const label = t(statusToKey(status));
 
   if (status === "approved") {
-    return <Badge tone="approved">{label}</Badge>;
+    return (
+      <span
+        className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-sky-600 text-sm font-bold text-white"
+        title={t("status.approvedTooltip")}
+        aria-label={t("status.approvedTooltip")}
+      >
+        ✓
+      </span>
+    );
   }
   if (status === "pending") {
+    if (!showPending) {
+      return null;
+    }
     return <Badge tone="pending">{label}</Badge>;
   }
   if (status === "disputed") {

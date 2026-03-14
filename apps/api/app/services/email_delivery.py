@@ -75,3 +75,39 @@ async def send_email_verification_email(*, to_email: str, token: str) -> None:
         "Se você não pediu esta verificação, ignore esta mensagem."
     )
     await send_email(to_email=to_email, subject=subject, body=body)
+
+
+def _entry_url(slug: str) -> str:
+    base = get_settings().app_public_url.rstrip("/")
+    return f"{base}/entries/{quote(slug)}"
+
+
+async def send_entry_moderation_email(
+    *,
+    to_email: str,
+    headword: str,
+    slug: str,
+    approved: bool,
+    reason: str | None = None,
+) -> None:
+    link = _entry_url(slug)
+    if approved:
+        subject = f"Seu verbete foi aprovado - {headword}"
+        body = (
+            "Seu verbete foi aprovado pela moderação.\n\n"
+            f"Verbete: {headword}\n"
+            f"Link: {link}\n\n"
+            "Obrigado por contribuir."
+        )
+    else:
+        subject = f"Seu verbete foi rejeitado - {headword}"
+        reason_line = reason.strip() if reason and reason.strip() else "Sem motivo informado."
+        body = (
+            "Seu verbete foi rejeitado pela moderação.\n\n"
+            f"Verbete: {headword}\n"
+            f"Link: {link}\n"
+            f"Motivo: {reason_line}\n\n"
+            "Você pode revisar a proposta e enviar uma nova versão."
+        )
+
+    await send_email(to_email=to_email, subject=subject, body=body)

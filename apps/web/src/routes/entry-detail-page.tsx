@@ -19,7 +19,7 @@ import { UserBadge } from "@/components/user-badge";
 import { useCurrentUser } from "@/features/auth/hooks";
 import { reportExample, voteExample } from "@/features/examples/api";
 import { createExample, getEntry, reportEntry, voteEntry } from "@/features/entries/api";
-import { approveEntry, rejectEntry } from "@/features/moderation/api";
+import { approveEntry, approveExample, rejectEntry, rejectExample } from "@/features/moderation/api";
 
 type ExampleForm = {
   sentence_original: string;
@@ -116,7 +116,7 @@ export function EntryDetailPage() {
     },
   });
   const rejectEntryMutation = useMutation({
-    mutationFn: () => rejectEntry(String(entry?.id)),
+    mutationFn: (reason: string) => rejectEntry(String(entry?.id), { reason }),
     onSuccess: () => {
       trackEvent("moderation_entry_rejected");
       queryClient.invalidateQueries({ queryKey: ["entry", slug] });
@@ -125,6 +125,35 @@ export function EntryDetailPage() {
     },
     onError: (error) => {
       trackEvent("moderation_entry_reject_failed", {
+        error_code: error instanceof ApiError ? error.code : "unknown",
+      });
+    },
+  });
+  const approveExampleMutation = useMutation({
+    mutationFn: (exampleId: string) => approveExample(exampleId),
+    onSuccess: () => {
+      trackEvent("moderation_example_approved");
+      queryClient.invalidateQueries({ queryKey: ["entry", slug] });
+      queryClient.invalidateQueries({ queryKey: ["entries"] });
+      queryClient.invalidateQueries({ queryKey: ["mod-queue"] });
+    },
+    onError: (error) => {
+      trackEvent("moderation_example_approve_failed", {
+        error_code: error instanceof ApiError ? error.code : "unknown",
+      });
+    },
+  });
+  const rejectExampleMutation = useMutation({
+    mutationFn: (params: { exampleId: string; reason: string }) =>
+      rejectExample(params.exampleId, { reason: params.reason }),
+    onSuccess: () => {
+      trackEvent("moderation_example_rejected");
+      queryClient.invalidateQueries({ queryKey: ["entry", slug] });
+      queryClient.invalidateQueries({ queryKey: ["entries"] });
+      queryClient.invalidateQueries({ queryKey: ["mod-queue"] });
+    },
+    onError: (error) => {
+      trackEvent("moderation_example_reject_failed", {
         error_code: error instanceof ApiError ? error.code : "unknown",
       });
     },
@@ -190,6 +219,18 @@ export function EntryDetailPage() {
 
   const canWrite = Boolean(currentUser);
   const isModerator = Boolean(currentUser?.is_superuser);
+  const promptRequiredReason = (promptText: string): string | null => {
+    const response = window.prompt(promptText);
+    if (response === null) {
+      return null;
+    }
+    const reason = response.trim();
+    if (!reason) {
+      window.alert(t("moderation.reasonRequired"));
+      return null;
+    }
+    return reason;
+  };
 
   if (isLoading) {
     return <p className="text-sm text-slate-700">{t("entry.loading")}</p>;
@@ -219,6 +260,12 @@ export function EntryDetailPage() {
           {t("reputation.label", { score: entry.proposer.reputation_score })}
         </p>
         <p className="mt-1 text-sm text-slate-600">{t("entry.firstRegistered", { date: formatDate(entry.created_at, locale) })}</p>
+        {(entry.status === "rejected" || entry.status === "disputed") &&
+        (entry.moderation_reason || entry.moderation_notes) ? (
+          <p className="mt-1 rounded-md border border-red-200 bg-red-50 px-2 py-1 text-sm text-red-800">
+            {t("entry.moderationReason")}: {entry.moderation_reason || entry.moderation_notes}
+          </p>
+        ) : null}
         {entry.morphology_notes ? (
           <p className="mt-2 text-sm text-slate-700">
             {t("entry.morphology")}: {entry.morphology_notes}
@@ -333,7 +380,13 @@ export function EntryDetailPage() {
             <Button
               type="button"
               variant="danger"
-              onClick={() => rejectEntryMutation.mutate()}
+              onClick={() => {
+                const reason = promptRequiredReason(t("moderation.prompt.entryRejectReason"));
+                if (!reason) {
+                  return;
+                }
+                rejectEntryMutation.mutate(reason);
+              }}
               disabled={rejectEntryMutation.isPending || entry.status === "rejected"}
             >
               {t("entry.reject")}
@@ -357,6 +410,16 @@ export function EntryDetailPage() {
             {getLocalizedApiErrorMessage(rejectEntryMutation.error, t)}
           </p>
         ) : null}
+        {approveExampleMutation.error instanceof ApiError ? (
+          <p className="mt-2 text-sm text-red-700">
+            {getLocalizedApiErrorMessage(approveExampleMutation.error, t)}
+          </p>
+        ) : null}
+        {rejectExampleMutation.error instanceof ApiError ? (
+          <p className="mt-2 text-sm text-red-700">
+            {getLocalizedApiErrorMessage(rejectExampleMutation.error, t)}
+          </p>
+        ) : null}
       </Card>
 
       <Card>
@@ -372,6 +435,12 @@ export function EntryDetailPage() {
                 {example.translation_pt ? (
                   <p className="mt-1 text-xs text-slate-600">
                     {t("entry.translationPt")}: {example.translation_pt}
+                  </p>
+                ) : null}
+                {(example.status === "rejected" || example.status === "hidden") &&
+                (example.moderation_reason || example.moderation_notes) ? (
+                  <p className="mt-1 rounded-md border border-red-200 bg-red-50 px-2 py-1 text-xs text-red-800">
+                    {t("entry.moderationReason")}: {example.moderation_reason || example.moderation_notes}
                   </p>
                 ) : null}
                 <div className="mt-2 flex flex-wrap items-center gap-2">
@@ -401,6 +470,31 @@ export function EntryDetailPage() {
                     {t("entry.exampleScore", { score: example.score_cache })}
                   </span>
                 </div>
+                {isModerator ? (
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    <Button
+                      type="button"
+                      onClick={() => approveExampleMutation.mutate(example.id)}
+                      disabled={approveExampleMutation.isPending || example.status === "approved"}
+                    >
+                      {t("moderation.approve")}
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="danger"
+                      onClick={() => {
+                        const reason = promptRequiredReason(t("moderation.prompt.exampleRejectReason"));
+                        if (!reason) {
+                          return;
+                        }
+                        rejectExampleMutation.mutate({ exampleId: example.id, reason });
+                      }}
+                      disabled={rejectExampleMutation.isPending || example.status === "rejected"}
+                    >
+                      {t("moderation.reject")}
+                    </Button>
+                  </div>
+                ) : null}
                 {canWrite ? (
                   <Button
                     type="button"

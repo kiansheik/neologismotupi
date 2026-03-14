@@ -157,7 +157,11 @@ def should_new_example_be_pending(user_example_count: int, is_superuser: bool) -
 
 
 def can_downvote(user: User) -> bool:
-    min_age = timedelta(hours=get_settings().downvote_min_account_age_hours)
+    settings = get_settings()
+    if not settings.enforce_downvote_account_age:
+        return True
+
+    min_age = timedelta(hours=settings.downvote_min_account_age_hours)
     created_at = user.created_at
     if created_at.tzinfo is None:
         created_at = created_at.replace(tzinfo=UTC)

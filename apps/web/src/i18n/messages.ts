@@ -14,6 +14,8 @@ export const ptBR = {
 
   "status.pending": "pendente",
   "status.approved": "aprovado",
+  "status.approvedTooltip":
+    "Verificado por moderador fluente: uso considerado bom e confiável. Sem check não significa que seja ruim, apenas ainda não revisado.",
   "status.disputed": "em disputa",
   "status.rejected": "rejeitado",
   "status.archived": "arquivado",
@@ -120,6 +122,7 @@ export const ptBR = {
   "entry.loadError": "Não foi possível carregar o verbete.",
   "entry.submittedBy": "Enviado por",
   "entry.firstRegistered": "Primeiro registro: {date}",
+  "entry.moderationReason": "Motivo da moderação",
   "entry.morphology": "Morfologia",
   "entry.upvote": "Voto positivo",
   "entry.downvote": "Voto negativo",
@@ -156,6 +159,8 @@ export const ptBR = {
   "entry.error.reportReasonMax": "O motivo deve ter no máximo 280 caracteres.",
 
   "moderation.title": "Moderação",
+  "moderation.howto.short":
+    "Objetivo da moderação: verificar contribuições em boa-fé. Um voto positivo de moderador já verifica o conteúdo; rejeição exige denúncia e motivo.",
   "moderation.signInPrompt": "Entre com uma conta moderadora para acessar esta página.",
   "moderation.noPermission": "Você não tem permissão de moderação.",
   "moderation.queueTitle": "Fila de moderação",
@@ -185,6 +190,9 @@ export const ptBR = {
   "moderation.approve": "Aprovar",
   "moderation.reject": "Rejeitar",
   "moderation.hide": "Ocultar",
+  "moderation.reasonRequired": "Informe um motivo para rejeição.",
+  "moderation.prompt.entryRejectReason": "Informe o motivo da rejeição do verbete:",
+  "moderation.prompt.exampleRejectReason": "Informe o motivo da rejeição do exemplo:",
   "moderation.noPendingEntries": "Nenhum verbete pendente.",
   "moderation.noPendingExamples": "Nenhum exemplo pendente.",
   "moderation.openReports": "Denúncias abertas",
@@ -241,6 +249,8 @@ export const ptBR = {
   "api.user_not_found": "Usuário não encontrado.",
   "api.downvote_blocked": "Novos usuários só podem votar negativamente após 72 horas de conta.",
   "api.self_vote_forbidden": "Você não pode votar no seu próprio conteúdo.",
+  "api.moderation_reason_required": "Informe um motivo para rejeição.",
+  "api.report_required_for_rejection": "Para rejeitar, primeiro denuncie o verbete.",
   "api.request_failed": "Não foi possível concluir a solicitação.",
 } as const;
 
@@ -262,6 +272,8 @@ export const enUS: Record<TranslationKey, string> = {
 
   "status.pending": "pending",
   "status.approved": "approved",
+  "status.approvedTooltip":
+    "Verified by a fluent moderator: considered good and reliable usage. No check does not mean bad, only not reviewed yet.",
   "status.disputed": "disputed",
   "status.rejected": "rejected",
   "status.archived": "archived",
@@ -368,6 +380,7 @@ export const enUS: Record<TranslationKey, string> = {
   "entry.loadError": "Unable to load entry.",
   "entry.submittedBy": "Submitted by",
   "entry.firstRegistered": "First registered: {date}",
+  "entry.moderationReason": "Moderation reason",
   "entry.morphology": "Morphology",
   "entry.upvote": "Upvote",
   "entry.downvote": "Downvote",
@@ -404,6 +417,8 @@ export const enUS: Record<TranslationKey, string> = {
   "entry.error.reportReasonMax": "Reason must be at most 280 characters.",
 
   "moderation.title": "Moderation",
+  "moderation.howto.short":
+    "Moderation verifies good-faith contributions. A moderator upvote already verifies content; rejection requires a report plus reason.",
   "moderation.signInPrompt": "Sign in as a moderator to access this page.",
   "moderation.noPermission": "You do not have moderator permissions.",
   "moderation.queueTitle": "Moderation queue",
@@ -433,6 +448,9 @@ export const enUS: Record<TranslationKey, string> = {
   "moderation.approve": "Approve",
   "moderation.reject": "Reject",
   "moderation.hide": "Hide",
+  "moderation.reasonRequired": "Please provide a rejection reason.",
+  "moderation.prompt.entryRejectReason": "Enter the reason for rejecting this entry:",
+  "moderation.prompt.exampleRejectReason": "Enter the reason for rejecting this example:",
   "moderation.noPendingEntries": "No pending entries.",
   "moderation.noPendingExamples": "No pending examples.",
   "moderation.openReports": "Open reports",
@@ -489,6 +507,8 @@ export const enUS: Record<TranslationKey, string> = {
   "api.user_not_found": "User not found.",
   "api.downvote_blocked": "New users cannot downvote until account age is at least 72 hours.",
   "api.self_vote_forbidden": "You cannot vote on your own content.",
+  "api.moderation_reason_required": "Please provide a rejection reason.",
+  "api.report_required_for_rejection": "Rejecting requires an existing report first.",
   "api.request_failed": "Request failed.",
 };
 

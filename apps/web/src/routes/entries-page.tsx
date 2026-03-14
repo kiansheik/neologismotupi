@@ -18,7 +18,7 @@ export function EntriesPage() {
   const [status, setStatus] = useState("");
   const [partOfSpeech, setPartOfSpeech] = useState("");
   const [sort, setSort] = useState<"alphabetical" | "recent" | "score" | "most_examples">(
-    "alphabetical",
+    "recent",
   );
 
   useEffect(() => {

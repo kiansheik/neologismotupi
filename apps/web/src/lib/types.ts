@@ -60,6 +60,9 @@ export interface Example {
   score_cache: number;
   upvote_count_cache: number;
   downvote_count_cache: number;
+  moderation_reason?: string | null;
+  moderation_notes?: string | null;
+  moderated_at?: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -68,6 +71,9 @@ export interface EntryDetail extends EntrySummary {
   morphology_notes: string | null;
   approved_at: string | null;
   approved_by_user_id: string | null;
+  moderation_reason?: string | null;
+  moderation_notes?: string | null;
+  moderated_at?: string | null;
   versions: EntryVersion[];
   examples: Example[];
 }

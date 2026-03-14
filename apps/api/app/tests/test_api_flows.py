@@ -5,7 +5,9 @@ import pytest
 from sqlalchemy import func, select
 
 import app.api.routes.auth as auth_routes
+import app.api.routes.moderation as moderation_routes
 import app.db as db_module
+from app.config import get_settings
 from app.core.enums import TagType
 from app.models.entry import Entry, Example, ExampleVote, Tag, Vote
 from app.models.moderation import Report
@@ -95,6 +97,12 @@ async def test_rejected_entries_only_show_with_rejected_filter(client):
         moderator = (await session.execute(select(User).where(User.email == "hidden-mod@example.com"))).scalar_one()
         moderator.is_superuser = True
         await session.commit()
+
+    report_response = await client.post(
+        f"/api/entries/{entry['id']}/reports",
+        json={"reason_code": "incorrect", "free_text": "Entrada de teste para rejeição"},
+    )
+    assert report_response.status_code == 201, report_response.text
 
     reject_response = await client.post(
         f"/api/mod/entries/{entry['id']}/reject",
@@ -299,6 +307,21 @@ async def test_new_user_cannot_downvote_before_threshold(client):
 
 
 @pytest.mark.asyncio
+async def test_new_user_can_downvote_when_account_age_gate_is_disabled(client, monkeypatch):
+    monkeypatch.setenv("ENFORCE_DOWNVOTE_ACCOUNT_AGE", "false")
+    get_settings.cache_clear()
+
+    await register_user(client, "entry-owner-beta@example.com", "Entry Owner Beta")
+    entry = await create_entry(client, "downvote-beta-target")
+
+    await client.post("/api/auth/logout")
+    await register_user(client, "beta-newbie@example.com", "Beta Newbie")
+
+    response = await client.post(f"/api/entries/{entry['id']}/vote", json={"value": -1})
+    assert response.status_code == 200, response.text
+
+
+@pytest.mark.asyncio
 async def test_cannot_vote_own_content(client):
     await register_user(client, "self-voter@example.com", "Self Voter")
     entry = await create_entry(client, "self-vote-entry")
@@ -336,6 +359,182 @@ async def test_moderator_can_approve_pending_entry(client):
     )
     assert response.status_code == 200, response.text
     assert response.json()["status"] == "approved"
+
+
+@pytest.mark.asyncio
+async def test_moderator_upvote_auto_verifies_entry(client):
+    await register_user(client, "entry-auto-owner@example.com", "Entry Auto Owner")
+    entry = await create_entry(client, "entry-auto-verify")
+
+    await client.post("/api/auth/logout")
+    await register_user(client, "entry-auto-mod@example.com", "Entry Auto Mod")
+
+    async with db_module.AsyncSessionLocal() as session:
+        moderator = (await session.execute(select(User).where(User.email == "entry-auto-mod@example.com"))).scalar_one()
+        moderator.is_superuser = True
+        moderator.created_at = datetime.now(UTC) - timedelta(days=7)
+        await session.commit()
+
+    vote_response = await client.post(f"/api/entries/{entry['id']}/vote", json={"value": 1})
+    assert vote_response.status_code == 200, vote_response.text
+
+    entry_response = await client.get(f"/api/entries/{entry['slug']}")
+    assert entry_response.status_code == 200, entry_response.text
+    assert entry_response.json()["status"] == "approved"
+
+
+@pytest.mark.asyncio
+async def test_moderator_upvote_auto_verifies_example(client):
+    await register_user(client, "example-auto-owner@example.com", "Example Auto Owner")
+    entry = await create_entry(client, "example-auto-verify-entry")
+
+    example_response = await client.post(
+        f"/api/entries/{entry['id']}/examples",
+        json={"sentence_original": "Exemplo para verificação automática."},
+    )
+    assert example_response.status_code == 201, example_response.text
+    example_id = example_response.json()["id"]
+
+    await client.post("/api/auth/logout")
+    await register_user(client, "example-auto-mod@example.com", "Example Auto Mod")
+
+    async with db_module.AsyncSessionLocal() as session:
+        moderator = (
+            await session.execute(select(User).where(User.email == "example-auto-mod@example.com"))
+        ).scalar_one()
+        moderator.is_superuser = True
+        moderator.created_at = datetime.now(UTC) - timedelta(days=7)
+        await session.commit()
+
+    vote_response = await client.post(f"/api/examples/{example_id}/vote", json={"value": 1})
+    assert vote_response.status_code == 200, vote_response.text
+
+    entry_response = await client.get(f"/api/entries/{entry['slug']}")
+    assert entry_response.status_code == 200, entry_response.text
+    payload = entry_response.json()
+    approved_example = next(example for example in payload["examples"] if example["id"] == example_id)
+    assert approved_example["status"] == "approved"
+
+
+@pytest.mark.asyncio
+async def test_reject_entry_requires_existing_report(client):
+    await register_user(client, "entry-reject-owner@example.com", "Entry Reject Owner")
+    entry = await create_entry(client, "entry-reject-needs-report")
+
+    await client.post("/api/auth/logout")
+    await register_user(client, "entry-reject-mod@example.com", "Entry Reject Mod")
+
+    async with db_module.AsyncSessionLocal() as session:
+        moderator = (await session.execute(select(User).where(User.email == "entry-reject-mod@example.com"))).scalar_one()
+        moderator.is_superuser = True
+        await session.commit()
+
+    reject_response = await client.post(
+        f"/api/mod/entries/{entry['id']}/reject",
+        json={"reason": "Sem fontes atestadas."},
+    )
+    assert reject_response.status_code == 409, reject_response.text
+    assert reject_response.json()["error"]["code"] == "report_required_for_rejection"
+
+
+@pytest.mark.asyncio
+async def test_entry_rejection_reason_is_visible_and_triggers_email(client, monkeypatch):
+    sent: dict[str, str | bool | None] = {}
+
+    async def fake_send_entry_moderation_email(
+        *,
+        to_email: str,
+        headword: str,
+        slug: str,
+        approved: bool,
+        reason: str | None = None,
+    ) -> None:
+        sent["to_email"] = to_email
+        sent["headword"] = headword
+        sent["slug"] = slug
+        sent["approved"] = approved
+        sent["reason"] = reason
+
+    monkeypatch.setattr(moderation_routes, "send_entry_moderation_email", fake_send_entry_moderation_email)
+
+    await register_user(client, "entry-owner-email@example.com", "Entry Owner Email")
+    entry = await create_entry(client, "moderation-reason-target")
+
+    await client.post("/api/auth/logout")
+    await register_user(client, "entry-mod-email@example.com", "Entry Mod Email")
+
+    async with db_module.AsyncSessionLocal() as session:
+        moderator = (await session.execute(select(User).where(User.email == "entry-mod-email@example.com"))).scalar_one()
+        moderator.is_superuser = True
+        await session.commit()
+
+    report_response = await client.post(
+        f"/api/entries/{entry['id']}/reports",
+        json={"reason_code": "incorrect", "free_text": "Termo sem atestação suficiente"},
+    )
+    assert report_response.status_code == 201, report_response.text
+
+    reason = "Duplicado de outro verbete já aprovado."
+    reject_response = await client.post(
+        f"/api/mod/entries/{entry['id']}/reject",
+        json={"reason": reason, "notes": "Revisado pela moderação"},
+    )
+    assert reject_response.status_code == 200, reject_response.text
+
+    entry_response = await client.get(f"/api/entries/{entry['slug']}")
+    assert entry_response.status_code == 200, entry_response.text
+    payload = entry_response.json()
+    assert payload["status"] == "rejected"
+    assert payload["moderation_reason"] == reason
+
+    assert sent["to_email"] == "entry-owner-email@example.com"
+    assert sent["headword"] == "moderation-reason-target"
+    assert sent["slug"] == entry["slug"]
+    assert sent["approved"] is False
+    assert sent["reason"] == reason
+
+
+@pytest.mark.asyncio
+async def test_example_rejection_reason_is_visible_on_entry_page(client):
+    await register_user(client, "example-owner-reason@example.com", "Example Owner Reason")
+    entry = await create_entry(client, "example-reason-entry")
+
+    example_response = await client.post(
+        f"/api/entries/{entry['id']}/examples",
+        json={
+            "sentence_original": "Exemplo para rejeição.",
+            "translation_pt": "Exemplo de teste.",
+        },
+    )
+    assert example_response.status_code == 201, example_response.text
+    example_id = example_response.json()["id"]
+
+    await client.post("/api/auth/logout")
+    await register_user(client, "example-mod-reason@example.com", "Example Mod Reason")
+
+    async with db_module.AsyncSessionLocal() as session:
+        moderator = (
+            await session.execute(select(User).where(User.email == "example-mod-reason@example.com"))
+        ).scalar_one()
+        moderator.is_superuser = True
+        await session.commit()
+
+    reason = "Exemplo sem contexto suficiente."
+    reject_response = await client.post(
+        f"/api/mod/examples/{example_id}/reject",
+        json={"reason": reason, "notes": "Favor enviar com contexto cultural"},
+    )
+    assert reject_response.status_code == 200, reject_response.text
+
+    await client.post("/api/auth/logout")
+    await login_user(client, "example-owner-reason@example.com")
+
+    entry_response = await client.get(f"/api/entries/{entry['slug']}")
+    assert entry_response.status_code == 200, entry_response.text
+    payload = entry_response.json()
+    rejected_example = next(example for example in payload["examples"] if example["id"] == example_id)
+    assert rejected_example["status"] == "rejected"
+    assert rejected_example["moderation_reason"] == reason
 
 
 @pytest.mark.asyncio

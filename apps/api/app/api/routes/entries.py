@@ -1,4 +1,5 @@
 import uuid
+import logging
 from datetime import UTC, datetime
 from typing import Annotated, Literal
 
@@ -14,7 +15,7 @@ from app.core.errors import raise_api_error
 from app.core.permissions import can_edit_entry, can_edit_example, is_moderator
 from app.core.utils import collapse_whitespace, slugify
 from app.models.entry import Entry, EntryTag, EntryVersion, Example, ExampleVote, Tag, Vote
-from app.models.moderation import Report
+from app.models.moderation import ModerationAction, Report
 from app.models.user import User
 from app.schemas.entries import (
     DuplicateHintOut,
@@ -47,12 +48,17 @@ from app.services.entries import (
     refresh_vote_and_example_caches,
     set_entry_tags,
 )
+from app.services.email_delivery import send_entry_moderation_email
+from app.services.moderation import record_moderation_action
 from app.services.reputation import recompute_user_reputation
 from app.services.rate_limit import enforce_rate_limit
 from app.services.serializers import serialize_entry_detail, serialize_entry_summary
 from app.services.user_badges import get_user_badge_leaders
 
 router = APIRouter(prefix="/entries", tags=["entries"])
+logger = logging.getLogger(__name__)
+
+type ModerationContext = tuple[str | None, str | None, datetime | None]
 
 
 async def _load_entry_with_relations(db: SessionDep, entry_id: uuid.UUID) -> Entry | None:
@@ -69,6 +75,90 @@ async def _load_entry_with_relations(db: SessionDep, entry_id: uuid.UUID) -> Ent
     return (await db.execute(stmt)).scalar_one_or_none()
 
 
+def _extract_moderation_context(action: ModerationAction | None) -> ModerationContext | None:
+    if action is None:
+        return None
+
+    reason: str | None = None
+    if isinstance(action.metadata_json, dict):
+        raw_reason = action.metadata_json.get("reason")
+        if isinstance(raw_reason, str):
+            cleaned_reason = raw_reason.strip()
+            reason = cleaned_reason or None
+
+    notes = action.notes.strip() if action.notes and action.notes.strip() else None
+    return (reason, notes, action.created_at)
+
+
+async def _load_entry_moderation_context(
+    db: SessionDep,
+    *,
+    entry: Entry,
+) -> ModerationContext | None:
+    action_types: list[str] = []
+    if entry.status == EntryStatus.rejected:
+        action_types = ["entry_rejected"]
+    elif entry.status == EntryStatus.disputed:
+        action_types = ["entry_disputed"]
+    elif entry.status == EntryStatus.approved:
+        action_types = ["entry_approved", "entry_verified_by_vote"]
+
+    if not action_types:
+        return None
+
+    action = (
+        await db.execute(
+            select(ModerationAction)
+            .where(ModerationAction.target_type == "entry")
+            .where(ModerationAction.target_id == entry.id)
+            .where(ModerationAction.action_type.in_(action_types))
+            .order_by(ModerationAction.created_at.desc())
+            .limit(1)
+        )
+    ).scalars().first()
+    return _extract_moderation_context(action)
+
+
+async def _load_example_moderation_context(
+    db: SessionDep,
+    *,
+    examples: list[Example],
+) -> dict[uuid.UUID, ModerationContext]:
+    target_examples = [example for example in examples if example.status in {ExampleStatus.rejected, ExampleStatus.hidden}]
+    if not target_examples:
+        return {}
+
+    target_ids = [example.id for example in target_examples]
+    actions = (
+        await db.execute(
+            select(ModerationAction)
+            .where(ModerationAction.target_type == "example")
+            .where(ModerationAction.target_id.in_(target_ids))
+            .where(ModerationAction.action_type.in_(["example_rejected", "example_hidden"]))
+            .order_by(ModerationAction.created_at.desc())
+        )
+    ).scalars().all()
+
+    expected_action_by_status = {
+        ExampleStatus.rejected: {"example_rejected", "example_hidden"},
+        ExampleStatus.hidden: {"example_hidden", "example_rejected"},
+    }
+    status_by_id = {example.id: example.status for example in target_examples}
+
+    moderation_by_example: dict[uuid.UUID, ModerationContext] = {}
+    for action in actions:
+        if action.target_id in moderation_by_example:
+            continue
+        expected_actions = expected_action_by_status.get(status_by_id.get(action.target_id, ExampleStatus.hidden), set())
+        if action.action_type not in expected_actions:
+            continue
+        context = _extract_moderation_context(action)
+        if context is not None:
+            moderation_by_example[action.target_id] = context
+
+    return moderation_by_example
+
+
 @router.get("", response_model=EntryListOut)
 async def list_entries(
     db: SessionDep,
@@ -82,7 +172,7 @@ async def list_entries(
     region: str | None = None,
     proposer_user_id: uuid.UUID | None = None,
     mine: bool = False,
-    sort: Literal["alphabetical", "recent", "newest", "score", "most_examples"] = "alphabetical",
+    sort: Literal["alphabetical", "recent", "newest", "score", "most_examples"] = "recent",
 ) -> EntryListOut:
     stmt = select(Entry).options(
         selectinload(Entry.tags).selectinload(EntryTag.tag),
@@ -187,7 +277,16 @@ async def get_entry(
         ]
 
     badge_leaders = await get_user_badge_leaders(db)
-    return serialize_entry_detail(entry, examples=visible_examples, badge_leaders=badge_leaders)
+    entry_moderation = await _load_entry_moderation_context(db, entry=entry)
+    example_moderation = await _load_example_moderation_context(db, examples=visible_examples)
+
+    return serialize_entry_detail(
+        entry,
+        examples=visible_examples,
+        badge_leaders=badge_leaders,
+        entry_moderation=entry_moderation,
+        example_moderation=example_moderation,
+    )
 
 
 @router.post("", response_model=EntryDetailOut, status_code=status.HTTP_201_CREATED)
@@ -406,10 +505,45 @@ async def vote_entry(
         vote = Vote(entry_id=entry_id, user_id=user.id, value=payload.value)
         db.add(vote)
 
+    was_verified_by_vote = False
+
     await db.flush()
     await refresh_vote_and_example_caches(db, entry)
+    if user.is_superuser and payload.value == 1 and entry.status != EntryStatus.approved:
+        entry.status = EntryStatus.approved
+        entry.approved_at = datetime.now(UTC)
+        entry.approved_by_user_id = user.id
+        was_verified_by_vote = True
+        await record_moderation_action(
+            db,
+            moderator_user_id=user.id,
+            action_type="entry_verified_by_vote",
+            target_type="entry",
+            target_id=entry.id,
+            notes="Verified via moderator upvote",
+            metadata_json={"status": entry.status.value, "reason": "moderator_upvote"},
+        )
+
     await recompute_user_reputation(db, entry.proposer_user_id)
     await db.commit()
+
+    if was_verified_by_vote:
+        proposer = (
+            await db.execute(select(User).where(User.id == entry.proposer_user_id))
+        ).scalar_one_or_none()
+        if proposer:
+            try:
+                await send_entry_moderation_email(
+                    to_email=proposer.email,
+                    headword=entry.headword,
+                    slug=entry.slug,
+                    approved=True,
+                )
+            except Exception:
+                logger.exception(
+                    "Failed to send vote-based approval email for entry_id=%s",
+                    entry.id,
+                )
 
     return VoteOut(entry_id=entry_id, user_id=user.id, value=vote.value, score_cache=entry.score_cache)
 
@@ -644,6 +778,25 @@ async def vote_example(
 
     await db.flush()
     await refresh_example_vote_caches(db, example)
+    if user.is_superuser and payload.value == 1 and example.status != ExampleStatus.approved:
+        example.status = ExampleStatus.approved
+        example.approved_at = datetime.now(UTC)
+        example.approved_by_user_id = user.id
+        await record_moderation_action(
+            db,
+            moderator_user_id=user.id,
+            action_type="example_verified_by_vote",
+            target_type="example",
+            target_id=example.id,
+            notes="Verified via moderator upvote",
+            metadata_json={"status": example.status.value, "reason": "moderator_upvote"},
+        )
+        parent_entry = (
+            await db.execute(select(Entry).where(Entry.id == example.entry_id))
+        ).scalar_one_or_none()
+        if parent_entry:
+            await refresh_vote_and_example_caches(db, parent_entry)
+
     await recompute_user_reputation(db, example.user_id)
     await db.commit()
 
