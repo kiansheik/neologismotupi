@@ -26,3 +26,14 @@ class PublicUserOut(BaseModel):
     profile: PublicProfileOut
 
     model_config = {"from_attributes": True}
+
+
+class MentionUserOut(BaseModel):
+    id: uuid.UUID
+    display_name: str
+    mention_handle: str
+    profile_url: str
+
+
+class MentionResolveRequest(BaseModel):
+    handles: list[str] = Field(default_factory=list, max_length=50)

@@ -1,15 +1,25 @@
-import { screen } from "@testing-library/react";
+import { screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 import { EntryDetailPage } from "@/routes/entry-detail-page";
 import { renderWithRoute } from "./test-utils";
 
-const { voteEntryMock, updateEntryMock, getEntryMock, createCommentMock, voteCommentMock, authState } = vi.hoisted(
-  () => ({
+const {
+  voteEntryMock,
+  updateEntryMock,
+  getEntryMock,
+  createCommentMock,
+  voteCommentMock,
+  listMentionUsersMock,
+  resolveMentionUsersMock,
+  authState,
+} = vi.hoisted(() => ({
   voteEntryMock: vi.fn().mockResolvedValue({ score_cache: 1 }),
   updateEntryMock: vi.fn().mockResolvedValue({}),
   createCommentMock: vi.fn().mockResolvedValue({}),
   voteCommentMock: vi.fn().mockResolvedValue({ score_cache: 1 }),
+  listMentionUsersMock: vi.fn().mockResolvedValue([]),
+  resolveMentionUsersMock: vi.fn().mockResolvedValue([]),
   getEntryMock: vi.fn().mockResolvedValue({
     id: "entry-1",
     slug: "entry-one",
@@ -57,8 +67,17 @@ vi.mock("@/features/comments/api", () => ({
 vi.mock("@/features/auth/hooks", () => ({
   useCurrentUser: () => ({ data: authState.currentUser }),
 }));
+vi.mock("@/features/users/api", () => ({
+  listMentionUsers: listMentionUsersMock,
+  resolveMentionUsers: resolveMentionUsersMock,
+}));
 
 describe("EntryDetailPage", () => {
+  beforeEach(() => {
+    listMentionUsersMock.mockResolvedValue([]);
+    resolveMentionUsersMock.mockResolvedValue([]);
+  });
+
   it("shows sign-in prompt for logged-out users", async () => {
     authState.currentUser = undefined;
 
@@ -217,5 +236,99 @@ describe("EntryDetailPage", () => {
     expect(historyItems.some((item) => item.textContent?.includes("Verbete aprovado"))).toBe(true);
     expect(historyItems.some((item) => item.textContent?.includes("good-faith"))).toBe(true);
     expect(historyItems.some((item) => item.textContent?.includes("por Moderator"))).toBe(true);
+  });
+
+  it("autocompletes mentions when typing @ and pressing tab", async () => {
+    authState.currentUser = {
+      id: "u1",
+      email: "u@example.com",
+      is_active: true,
+      is_verified: true,
+      is_superuser: false,
+      created_at: "2026-01-01T00:00:00Z",
+      updated_at: "2026-01-01T00:00:00Z",
+      profile: null,
+    };
+    listMentionUsersMock.mockResolvedValue([
+      {
+        id: "u-mention-1",
+        display_name: "Mosco Monteiro",
+        mention_handle: "moscomonteiro",
+        profile_url: "/profiles/u-mention-1",
+      },
+    ]);
+
+    const user = userEvent.setup();
+    renderWithRoute(<EntryDetailPage />, "/entries/:slug", "/entries/entry-one");
+
+    const textarea = await screen.findByPlaceholderText("Escreva seu comentário aqui...");
+    await user.type(textarea, "@mos");
+
+    await screen.findByRole("button", { name: /@moscomonteiro/i });
+    await user.keyboard("{Tab}");
+
+    await waitFor(() => {
+      expect(listMentionUsersMock).toHaveBeenCalledWith("mos");
+    });
+    await waitFor(() => {
+      expect(textarea).toHaveValue("@moscomonteiro ");
+    });
+  });
+
+  it("renders @mentions in comments as profile links", async () => {
+    authState.currentUser = undefined;
+    resolveMentionUsersMock.mockResolvedValueOnce([
+      {
+        id: "u-mention-1",
+        display_name: "Mosco Monteiro",
+        mention_handle: "moscomonteiro",
+        profile_url: "/profiles/u-mention-1",
+      },
+    ]);
+    getEntryMock.mockResolvedValueOnce({
+      id: "entry-mention",
+      slug: "entry-mention",
+      headword: "entry mention",
+      normalized_headword: "entry mention",
+      gloss_pt: "pt",
+      gloss_en: null,
+      part_of_speech: "noun",
+      short_definition: "definition",
+      status: "approved",
+      score_cache: 0,
+      upvote_count_cache: 0,
+      downvote_count_cache: 0,
+      example_count_cache: 0,
+      proposer_user_id: "u1",
+      proposer: { id: "u1", display_name: "Author", reputation_score: 0 },
+      created_at: "2026-01-01T00:00:00Z",
+      updated_at: "2026-01-01T00:00:00Z",
+      morphology_notes: null,
+      approved_at: null,
+      approved_by_user_id: null,
+      tags: [],
+      versions: [],
+      examples: [],
+      comments: [
+        {
+          id: "comment-1",
+          entry_id: "entry-mention",
+          user_id: "u2",
+          parent_comment_id: null,
+          body: "Vale revisar com @moscomonteiro.",
+          score_cache: 0,
+          upvote_count_cache: 0,
+          downvote_count_cache: 0,
+          created_at: "2026-01-01T00:00:00Z",
+          updated_at: "2026-01-01T00:00:00Z",
+          author: { id: "u2", display_name: "Comentador", reputation_score: 0 },
+        },
+      ],
+    });
+
+    renderWithRoute(<EntryDetailPage />, "/entries/:slug", "/entries/entry-mention");
+
+    const mentionLink = await screen.findByRole("link", { name: "@moscomonteiro" });
+    expect(mentionLink).toHaveAttribute("href", "/profiles/u-mention-1");
   });
 });

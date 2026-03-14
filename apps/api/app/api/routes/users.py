@@ -1,4 +1,5 @@
 import uuid
+from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Annotated
 
@@ -10,7 +11,7 @@ from app.core.deps import SessionDep, get_current_user
 from app.core.errors import raise_api_error
 from app.models.discussion import Notification, NotificationPreference
 from app.models.entry import Entry
-from app.models.user import User
+from app.models.user import Profile, User
 from app.schemas.notifications import (
     NotificationListOut,
     NotificationOut,
@@ -18,11 +19,71 @@ from app.schemas.notifications import (
     NotificationPreferenceUpdate,
     NotificationReadResponse,
 )
-from app.schemas.users import PublicProfileOut, PublicUserOut
-from app.services.notifications import get_or_create_notification_preferences
+from app.schemas.users import (
+    MentionResolveRequest,
+    MentionUserOut,
+    PublicProfileOut,
+    PublicUserOut,
+)
+from app.services.notifications import (
+    get_or_create_notification_preferences,
+    normalize_mention_key,
+)
 from app.services.user_badges import get_user_badge_leaders, resolve_user_badges
 
 router = APIRouter(prefix="/users", tags=["users"])
+
+
+@dataclass(frozen=True)
+class MentionCandidate:
+    user_id: uuid.UUID
+    display_name: str
+    mention_handle: str
+    profile_url: str
+    reputation_score: int
+    created_at: datetime
+    email_local_key: str
+
+
+def _iter_mention_candidates(
+    rows: list[tuple[uuid.UUID, datetime, str, str, int]],
+) -> list[MentionCandidate]:
+    candidates: list[MentionCandidate] = []
+    for user_id, created_at, email, display_name, reputation_score in rows:
+        cleaned_name = (display_name or "").strip()
+        if not cleaned_name:
+            continue
+        mention_handle = normalize_mention_key(cleaned_name)
+        if not mention_handle:
+            continue
+        local_part = email.split("@", maxsplit=1)[0] if email else ""
+        candidates.append(
+            MentionCandidate(
+                user_id=user_id,
+                display_name=cleaned_name,
+                mention_handle=mention_handle,
+                profile_url=f"/profiles/{user_id}",
+                reputation_score=int(reputation_score or 0),
+                created_at=created_at,
+                email_local_key=normalize_mention_key(local_part),
+            )
+        )
+    return candidates
+
+
+def _match_priority(candidate: MentionCandidate, query_key: str) -> int:
+    if not query_key:
+        return 0
+    handle = candidate.mention_handle
+    if handle == query_key:
+        return 0
+    if handle.startswith(query_key):
+        return 1
+    if query_key in handle:
+        return 2
+    if candidate.email_local_key.startswith(query_key):
+        return 3
+    return 4
 
 
 @router.get("/me/notification-preferences", response_model=NotificationPreferenceOut)
@@ -96,7 +157,11 @@ async def list_my_notifications(
     total = int((await db.execute(count_stmt)).scalar_one())
     unread_count = int((await db.execute(unread_count_stmt)).scalar_one())
 
-    actor_ids = {notification.actor_user_id for notification in notifications if notification.actor_user_id}
+    actor_ids = {
+        notification.actor_user_id
+        for notification in notifications
+        if notification.actor_user_id
+    }
     actor_rows = (
         await db.execute(
             select(User).where(User.id.in_(list(actor_ids))).options(selectinload(User.profile))
@@ -104,9 +169,17 @@ async def list_my_notifications(
     ).scalars().all() if actor_ids else []
     actors_by_id = {actor.id: actor for actor in actor_rows}
 
-    entry_ids = {notification.entry_id for notification in notifications if notification.entry_id}
+    entry_ids = {
+        notification.entry_id
+        for notification in notifications
+        if notification.entry_id
+    }
     entry_rows = (
-        await db.execute(select(Entry.id, Entry.slug, Entry.headword).where(Entry.id.in_(list(entry_ids))))
+        await db.execute(
+            select(Entry.id, Entry.slug, Entry.headword).where(
+                Entry.id.in_(list(entry_ids))
+            )
+        )
     ).all() if entry_ids else []
     entries_by_id = {entry_id: (slug, headword) for entry_id, slug, headword in entry_rows}
 
@@ -172,7 +245,11 @@ async def mark_notification_read(
         )
     ).scalar_one_or_none()
     if notification is None:
-        raise_api_error(status_code=404, code="notification_not_found", message="Notification not found")
+        raise_api_error(
+            status_code=404,
+            code="notification_not_found",
+            message="Notification not found",
+        )
 
     if not notification.is_read:
         notification.is_read = True
@@ -196,6 +273,124 @@ async def mark_all_notifications_read(
     )
     await db.commit()
     return NotificationReadResponse(ok=True)
+
+
+@router.get("/mentions", response_model=list[MentionUserOut])
+async def list_mention_candidates(
+    db: SessionDep,
+    _user: Annotated[User, Depends(get_current_user)],
+    q: str = Query(default="", max_length=120),
+    limit: int = Query(default=8, ge=1, le=20),
+) -> list[MentionUserOut]:
+    query_key = normalize_mention_key(q.strip())
+    rows = (
+        await db.execute(
+            select(
+                User.id,
+                User.created_at,
+                User.email,
+                Profile.display_name,
+                Profile.reputation_score,
+            )
+            .join(Profile, Profile.user_id == User.id)
+            .where(User.is_active.is_(True))
+        )
+    ).all()
+    candidates = _iter_mention_candidates(rows)
+    if query_key:
+        candidates = [
+            candidate
+            for candidate in candidates
+            if query_key in candidate.mention_handle or query_key in candidate.email_local_key
+        ]
+
+    candidates.sort(
+        key=lambda candidate: (
+            _match_priority(candidate, query_key),
+            -candidate.reputation_score,
+            candidate.display_name.lower(),
+            str(candidate.user_id),
+        )
+    )
+    selected = candidates[:limit]
+    return [
+        MentionUserOut(
+            id=candidate.user_id,
+            display_name=candidate.display_name,
+            mention_handle=candidate.mention_handle,
+            profile_url=candidate.profile_url,
+        )
+        for candidate in selected
+    ]
+
+
+@router.post("/mentions/resolve", response_model=list[MentionUserOut])
+async def resolve_mentions(
+    payload: MentionResolveRequest,
+    db: SessionDep,
+) -> list[MentionUserOut]:
+    ordered_keys: list[str] = []
+    seen_keys: set[str] = set()
+    for raw_handle in payload.handles:
+        cleaned = raw_handle.strip()
+        if cleaned.startswith("@"):
+            cleaned = cleaned[1:]
+        key = normalize_mention_key(cleaned)
+        if not key or key in seen_keys:
+            continue
+        seen_keys.add(key)
+        ordered_keys.append(key)
+
+    if not ordered_keys:
+        return []
+
+    rows = (
+        await db.execute(
+            select(
+                User.id,
+                User.created_at,
+                User.email,
+                Profile.display_name,
+                Profile.reputation_score,
+            )
+            .join(Profile, Profile.user_id == User.id)
+            .where(User.is_active.is_(True))
+        )
+    ).all()
+    candidates = _iter_mention_candidates(rows)
+
+    best_by_key: dict[str, MentionCandidate] = {}
+    for candidate in candidates:
+        key = candidate.mention_handle
+        if key not in seen_keys:
+            continue
+        current_best = best_by_key.get(key)
+        if current_best is None:
+            best_by_key[key] = candidate
+            continue
+        if candidate.reputation_score > current_best.reputation_score:
+            best_by_key[key] = candidate
+            continue
+        if (
+            candidate.reputation_score == current_best.reputation_score
+            and candidate.created_at < current_best.created_at
+        ):
+            best_by_key[key] = candidate
+
+    out: list[MentionUserOut] = []
+    for key in ordered_keys:
+        candidate = best_by_key.get(key)
+        if candidate is None:
+            continue
+        out.append(
+            MentionUserOut(
+                id=candidate.user_id,
+                display_name=candidate.display_name,
+                mention_handle=candidate.mention_handle,
+                profile_url=candidate.profile_url,
+            )
+        )
+    return out
 
 
 @router.get("/{user_id}", response_model=PublicUserOut)

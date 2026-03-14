@@ -1,10 +1,12 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import type { KeyboardEvent, ReactNode } from "react";
 import { Link, useParams } from "react-router-dom";
 import { z } from "zod";
 
 import { ApiError } from "@/lib/api";
+import type { MentionUser } from "@/lib/types";
 import { applyZodErrors } from "@/lib/zod-form";
 import { type TranslateFn, useI18n } from "@/i18n";
 import { trackEvent } from "@/lib/analytics";
@@ -22,6 +24,7 @@ import { createComment, voteComment } from "@/features/comments/api";
 import { reportExample, voteExample } from "@/features/examples/api";
 import { createExample, getEntry, reportEntry, updateEntry, voteEntry } from "@/features/entries/api";
 import { approveEntry, approveExample, rejectEntry, rejectExample } from "@/features/moderation/api";
+import { listMentionUsers, resolveMentionUsers } from "@/features/users/api";
 
 type ExampleForm = {
   sentence_original: string;
@@ -47,6 +50,14 @@ type EntryEditForm = {
 };
 
 const REPORT_REASON_MAX = 280;
+const MENTION_TOKEN_PATTERN = /@([A-Za-z0-9._-]{2,50})/g;
+const MENTION_CONTEXT_PATTERN = /(?:^|[\s(])@([A-Za-z0-9._-]{0,50})$/;
+
+type MentionContext = {
+  start: number;
+  end: number;
+  query: string;
+};
 
 function normalizeComparableText(value: string | null | undefined): string {
   if (!value) {
@@ -59,6 +70,106 @@ function normalizeComparableText(value: string | null | undefined): string {
     .replace(/\s+/g, " ")
     .trim()
     .toLowerCase();
+}
+
+function normalizeMentionHandle(value: string): string {
+  return value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, "");
+}
+
+function splitMentionToken(raw: string): { handle: string; trailing: string } {
+  const handle = raw.replace(/[.?!,:;]+$/g, "");
+  if (handle.length < 2) {
+    return { handle: raw, trailing: "" };
+  }
+  return {
+    handle,
+    trailing: raw.slice(handle.length),
+  };
+}
+
+function extractMentionHandles(text: string): string[] {
+  const handles = new Set<string>();
+  for (const match of text.matchAll(MENTION_TOKEN_PATTERN)) {
+    const raw = match[1] ?? "";
+    const start = match.index ?? -1;
+    if (start > 0 && /[\w@]/.test(text[start - 1] ?? "")) {
+      continue;
+    }
+    const normalized = normalizeMentionHandle(splitMentionToken(raw).handle);
+    if (normalized) {
+      handles.add(normalized);
+    }
+  }
+  return [...handles];
+}
+
+function detectMentionContext(value: string, caret: number | null): MentionContext | null {
+  if (caret === null || caret < 0) {
+    return null;
+  }
+  const left = value.slice(0, caret);
+  const match = left.match(MENTION_CONTEXT_PATTERN);
+  if (!match) {
+    return null;
+  }
+  const query = match[1] ?? "";
+  const start = caret - query.length - 1;
+  if (start < 0) {
+    return null;
+  }
+  return { start, end: caret, query };
+}
+
+function renderCommentBody(text: string, mentionByHandle: Record<string, MentionUser>): ReactNode {
+  const nodes: ReactNode[] = [];
+  let cursor = 0;
+  let tokenIndex = 0;
+
+  for (const match of text.matchAll(MENTION_TOKEN_PATTERN)) {
+    const raw = match[1] ?? "";
+    const start = match.index ?? -1;
+    if (start < 0) {
+      continue;
+    }
+    if (start > 0 && /[\w@]/.test(text[start - 1] ?? "")) {
+      continue;
+    }
+    const end = start + match[0].length;
+    if (start > cursor) {
+      nodes.push(text.slice(cursor, start));
+    }
+
+    const { handle, trailing } = splitMentionToken(raw);
+    const mention = mentionByHandle[normalizeMentionHandle(handle)];
+    if (mention) {
+      nodes.push(
+        <Link
+          key={`mention-${tokenIndex}-${start}`}
+          to={mention.profile_url}
+          className="font-medium text-brand-700 hover:underline"
+        >
+          @{handle}
+        </Link>,
+      );
+      if (trailing) {
+        nodes.push(trailing);
+      }
+    } else {
+      nodes.push(match[0]);
+    }
+
+    tokenIndex += 1;
+    cursor = end;
+  }
+
+  if (cursor < text.length) {
+    nodes.push(text.slice(cursor));
+  }
+  return nodes.length ? nodes : text;
 }
 
 function historyActionLabel(actionType: string | null, t: TranslateFn): string {
@@ -234,6 +345,53 @@ export function EntryDetailPage() {
       edit_summary: "",
     },
   });
+  const commentTextareaRef = useRef<HTMLTextAreaElement | null>(null);
+  const [mentionContext, setMentionContext] = useState<MentionContext | null>(null);
+  const [mentionSelectionIndex, setMentionSelectionIndex] = useState(0);
+  const commentBodyValue = commentForm.watch("body");
+  const canWrite = Boolean(currentUser);
+  const isModerator = Boolean(currentUser?.is_superuser);
+
+  const commentMentionHandles = useMemo(() => {
+    if (!entry?.comments?.length) {
+      return [];
+    }
+    const handles = new Set<string>();
+    for (const comment of entry.comments) {
+      for (const handle of extractMentionHandles(comment.body)) {
+        handles.add(handle);
+      }
+    }
+    return [...handles];
+  }, [entry?.comments]);
+
+  const resolvedMentionsQuery = useQuery({
+    queryKey: ["mentions", "resolve", commentMentionHandles],
+    queryFn: () => resolveMentionUsers(commentMentionHandles),
+    enabled: commentMentionHandles.length > 0,
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const mentionByHandle = useMemo(() => {
+    const out: Record<string, MentionUser> = {};
+    for (const mention of resolvedMentionsQuery.data ?? []) {
+      const key = normalizeMentionHandle(mention.mention_handle);
+      if (!key) {
+        continue;
+      }
+      out[key] = mention;
+    }
+    return out;
+  }, [resolvedMentionsQuery.data]);
+
+  const mentionSuggestionsQuery = useQuery({
+    queryKey: ["mentions", "search", mentionContext?.query ?? ""],
+    queryFn: () => listMentionUsers(mentionContext?.query ?? ""),
+    enabled: canWrite && mentionContext !== null,
+    staleTime: 30 * 1000,
+  });
+
+  const mentionSuggestions = mentionSuggestionsQuery.data ?? [];
 
   useEffect(() => {
     if (!entry) {
@@ -249,6 +407,17 @@ export function EntryDetailPage() {
       edit_summary: "",
     });
   }, [entry, entryEditForm]);
+
+  useEffect(() => {
+    setMentionSelectionIndex(0);
+  }, [mentionContext?.query]);
+
+  useEffect(() => {
+    if (mentionSelectionIndex < mentionSuggestions.length) {
+      return;
+    }
+    setMentionSelectionIndex(0);
+  }, [mentionSelectionIndex, mentionSuggestions.length]);
 
   const createExampleMutation = useMutation({
     mutationFn: (payload: ExampleForm) => createExample(String(entry?.id), payload),
@@ -269,6 +438,8 @@ export function EntryDetailPage() {
     onSuccess: () => {
       trackEvent("comment_submitted");
       commentForm.reset();
+      setMentionContext(null);
+      setMentionSelectionIndex(0);
       queryClient.invalidateQueries({ queryKey: ["entry", slug] });
       queryClient.invalidateQueries({ queryKey: ["entries"] });
       queryClient.invalidateQueries({ queryKey: ["notifications"] });
@@ -376,8 +547,63 @@ export function EntryDetailPage() {
     updateEntryMutation.mutate(parsed.data);
   });
 
-  const canWrite = Boolean(currentUser);
-  const isModerator = Boolean(currentUser?.is_superuser);
+  const updateMentionContextFromInput = (value: string, caret: number | null) => {
+    setMentionContext(detectMentionContext(value, caret));
+  };
+
+  const insertMentionSuggestion = (mention: MentionUser) => {
+    if (!mentionContext) {
+      return;
+    }
+    const current = commentForm.getValues("body") ?? "";
+    const insertText = `@${mention.mention_handle} `;
+    const cursorAfterInsert = mentionContext.start + insertText.length;
+    const nextBody =
+      current.slice(0, mentionContext.start) + insertText + current.slice(mentionContext.end);
+    commentForm.setValue("body", nextBody, { shouldDirty: true, shouldTouch: true });
+    setMentionContext(null);
+    setMentionSelectionIndex(0);
+    window.requestAnimationFrame(() => {
+      const textarea = commentTextareaRef.current;
+      if (!textarea) {
+        return;
+      }
+      textarea.focus();
+      textarea.setSelectionRange(cursorAfterInsert, cursorAfterInsert);
+    });
+  };
+
+  const onCommentTextareaKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
+    if (!mentionContext) {
+      return;
+    }
+    if (event.key === "Escape") {
+      event.preventDefault();
+      setMentionContext(null);
+      return;
+    }
+    if (!mentionSuggestions.length) {
+      return;
+    }
+    if (event.key === "ArrowDown") {
+      event.preventDefault();
+      setMentionSelectionIndex((current) => (current + 1) % mentionSuggestions.length);
+      return;
+    }
+    if (event.key === "ArrowUp") {
+      event.preventDefault();
+      setMentionSelectionIndex((current) =>
+        current === 0 ? mentionSuggestions.length - 1 : current - 1,
+      );
+      return;
+    }
+    if (event.key === "Tab" || event.key === "Enter") {
+      event.preventDefault();
+      insertMentionSuggestion(mentionSuggestions[mentionSelectionIndex] ?? mentionSuggestions[0]);
+    }
+  };
+  const showMentionSuggestions = mentionContext !== null;
+
   const promptRequiredReason = (promptText: string): string | null => {
     const response = window.prompt(promptText);
     if (response === null) {
@@ -844,7 +1070,9 @@ export function EntryDetailPage() {
                   </p>
                   <span className="text-xs text-slate-600">{formatRelativeOrDate(comment.created_at, locale)}</span>
                 </div>
-                <p className="mt-2 whitespace-pre-wrap text-sm text-slate-800">{comment.body}</p>
+                <p className="mt-2 whitespace-pre-wrap text-sm text-slate-800">
+                  {renderCommentBody(comment.body, mentionByHandle)}
+                </p>
                 <div className="mt-2 flex flex-wrap items-center gap-2">
                   <Button
                     type="button"
@@ -891,12 +1119,64 @@ export function EntryDetailPage() {
               void onCommentSubmit(event).catch(() => undefined);
             }}
           >
-            <Textarea
-              id="comment_body"
-              rows={4}
-              placeholder={t("entry.commentPlaceholder")}
-              {...commentForm.register("body")}
-            />
+            <div className="relative">
+              <Textarea
+                id="comment_body"
+                rows={4}
+                ref={commentTextareaRef}
+                placeholder={t("entry.commentPlaceholder")}
+                value={commentBodyValue ?? ""}
+                onChange={(event) => {
+                  commentForm.setValue("body", event.target.value, { shouldDirty: true, shouldTouch: true });
+                  updateMentionContextFromInput(event.target.value, event.target.selectionStart);
+                }}
+                onClick={(event) => {
+                  updateMentionContextFromInput(event.currentTarget.value, event.currentTarget.selectionStart);
+                }}
+                onKeyUp={(event) => {
+                  updateMentionContextFromInput(event.currentTarget.value, event.currentTarget.selectionStart);
+                }}
+                onKeyDown={onCommentTextareaKeyDown}
+                onBlur={() => {
+                  window.setTimeout(() => {
+                    setMentionContext(null);
+                  }, 120);
+                }}
+              />
+              {showMentionSuggestions ? (
+                <div className="absolute left-0 right-0 z-20 mt-1 rounded-md border border-[#d3c6b0] bg-[#fffaf2] shadow-lg">
+                  {mentionSuggestionsQuery.isLoading ? (
+                    <p className="px-3 py-2 text-xs text-slate-600">{t("entry.mentionLoading")}</p>
+                  ) : mentionSuggestions.length ? (
+                    <ul className="max-h-52 overflow-y-auto py-1">
+                      {mentionSuggestions.map((mention, index) => (
+                        <li key={mention.id}>
+                          <button
+                            type="button"
+                            className={`flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-sm ${
+                              index === mentionSelectionIndex
+                                ? "bg-[#efe2c6] text-brand-900"
+                                : "text-slate-700 hover:bg-[#f7ecd5]"
+                            }`}
+                            onMouseDown={(event) => {
+                              event.preventDefault();
+                            }}
+                            onClick={() => {
+                              insertMentionSuggestion(mention);
+                            }}
+                          >
+                            <span className="font-medium">@{mention.mention_handle}</span>
+                            <span className="truncate text-xs text-slate-600">{mention.display_name}</span>
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p className="px-3 py-2 text-xs text-slate-600">{t("entry.mentionNoResults")}</p>
+                  )}
+                </div>
+              ) : null}
+            </div>
             <p className="text-xs text-slate-600">{t("entry.commentHelpMention")}</p>
             {commentForm.formState.errors.body?.message ? (
               <p className="text-xs text-red-700">{commentForm.formState.errors.body.message}</p>

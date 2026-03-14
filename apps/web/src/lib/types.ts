@@ -142,6 +142,13 @@ export interface PublicUser {
   profile: Profile;
 }
 
+export interface MentionUser {
+  id: string;
+  display_name: string;
+  mention_handle: string;
+  profile_url: string;
+}
+
 export interface DuplicateHint {
   id: string;
   slug: string;

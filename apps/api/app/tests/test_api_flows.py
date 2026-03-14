@@ -805,6 +805,32 @@ async def test_comment_creation_notifies_entry_author_and_mentions(client):
 
 
 @pytest.mark.asyncio
+async def test_user_mentions_search_and_resolve(client):
+    await register_user(client, "mosco@example.com", "Mosco Monteiro")
+    await client.post("/api/auth/logout")
+    await register_user(client, "marina@example.com", "Marina")
+
+    suggestions_response = await client.get("/api/users/mentions", params={"q": "mosco"})
+    assert suggestions_response.status_code == 200, suggestions_response.text
+    suggestions = suggestions_response.json()
+    assert len(suggestions) >= 1
+    assert suggestions[0]["display_name"] == "Mosco Monteiro"
+    assert suggestions[0]["mention_handle"] == "moscomonteiro"
+    assert suggestions[0]["profile_url"].startswith("/profiles/")
+
+    await client.post("/api/auth/logout")
+    resolve_response = await client.post(
+        "/api/users/mentions/resolve",
+        json={"handles": ["@moscomonteiro", "missing_handle"]},
+    )
+    assert resolve_response.status_code == 200, resolve_response.text
+    resolved = resolve_response.json()
+    assert len(resolved) == 1
+    assert resolved[0]["display_name"] == "Mosco Monteiro"
+    assert resolved[0]["mention_handle"] == "moscomonteiro"
+
+
+@pytest.mark.asyncio
 async def test_comment_vote_updates_reputation(client):
     await register_user(client, "comment-author@example.com", "Comment Author")
     entry = await create_entry(client, "comment-vote-entry")

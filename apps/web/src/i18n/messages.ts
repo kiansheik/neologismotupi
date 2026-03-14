@@ -195,7 +195,9 @@ export const ptBR = {
   "entry.commentsTitle": "Comentários",
   "entry.commentPlaceholder": "Escreva seu comentário aqui...",
   "entry.commentHelpMention":
-    "Use @nome para mencionar alguém (exemplo: @moscomonteiro).",
+    "Digite @ para buscar usuários e mencionar no comentário.",
+  "entry.mentionLoading": "Buscando usuários...",
+  "entry.mentionNoResults": "Nenhum usuário encontrado para essa menção.",
   "entry.postComment": "Comentar",
   "entry.commentPosted": "Comentário publicado.",
   "entry.noComments": "Ainda não há comentários.",
@@ -509,7 +511,9 @@ export const enUS: Record<TranslationKey, string> = {
   "entry.commentsTitle": "Comments",
   "entry.commentPlaceholder": "Write your comment here...",
   "entry.commentHelpMention":
-    "Use @name to mention someone (example: @moscomonteiro).",
+    "Type @ to search users and mention them in your comment.",
+  "entry.mentionLoading": "Searching users...",
+  "entry.mentionNoResults": "No users found for this mention.",
   "entry.postComment": "Post comment",
   "entry.commentPosted": "Comment posted.",
   "entry.noComments": "No comments yet.",
