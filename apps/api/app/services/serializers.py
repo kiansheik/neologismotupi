@@ -1,10 +1,13 @@
 import uuid
 from datetime import datetime
 
+from app.models.discussion import EntryComment
 from app.models.entry import Entry, EntryTag, EntryVersion, Example, Tag
 from app.schemas.entries import (
+    EntryCommentOut,
     EntryAuthorOut,
     EntryDetailOut,
+    EntryHistoryEventOut,
     EntrySummaryOut,
     EntryVersionOut,
     ExampleOut,
@@ -65,6 +68,46 @@ def serialize_entry_author(
     )
 
 
+def serialize_comment_author(
+    comment: EntryComment,
+    badge_leaders: UserBadgeLeaders | None = None,
+) -> EntryAuthorOut:
+    fallback_name = f"user-{str(comment.user_id)[:8]}"
+    badges = resolve_user_badges(comment.user_id, badge_leaders)
+    if comment.author and comment.author.profile:
+        return EntryAuthorOut(
+            id=comment.author.id,
+            display_name=comment.author.profile.display_name,
+            reputation_score=comment.author.profile.reputation_score,
+            badges=badges,
+        )
+    return EntryAuthorOut(
+        id=comment.user_id,
+        display_name=fallback_name,
+        reputation_score=0,
+        badges=badges,
+    )
+
+
+def serialize_entry_comment(
+    comment: EntryComment,
+    badge_leaders: UserBadgeLeaders | None = None,
+) -> EntryCommentOut:
+    return EntryCommentOut(
+        id=comment.id,
+        entry_id=comment.entry_id,
+        user_id=comment.user_id,
+        parent_comment_id=comment.parent_comment_id,
+        body=comment.body,
+        score_cache=comment.score_cache,
+        upvote_count_cache=comment.upvote_count_cache,
+        downvote_count_cache=comment.downvote_count_cache,
+        created_at=comment.created_at,
+        updated_at=comment.updated_at,
+        author=serialize_comment_author(comment, badge_leaders),
+    )
+
+
 def serialize_entry_summary(
     entry: Entry,
     badge_leaders: UserBadgeLeaders | None = None,
@@ -96,9 +139,11 @@ def serialize_entry_detail(
     entry: Entry,
     *,
     examples: list[Example],
+    comments: list[EntryComment] | None = None,
     badge_leaders: UserBadgeLeaders | None = None,
     entry_moderation: ModerationContext | None = None,
     example_moderation: dict[uuid.UUID, ModerationContext] | None = None,
+    history_events: list[EntryHistoryEventOut] | None = None,
 ) -> EntryDetailOut:
     moderation_reason: str | None = None
     moderation_notes: str | None = None
@@ -115,6 +160,8 @@ def serialize_entry_detail(
         "moderation_notes": moderation_notes,
         "moderated_at": moderated_at,
         "versions": [serialize_entry_version(version) for version in entry.versions],
+        "history_events": history_events or [],
         "examples": [serialize_example(example, example_moderation) for example in examples],
+        "comments": [serialize_entry_comment(comment, badge_leaders) for comment in comments or []],
     }
     return EntryDetailOut.model_validate(payload)

@@ -10,6 +10,7 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from app.api.routes import (
     auth_router,
+    comment_router,
     entries_router,
     example_router,
     meta_router,
@@ -72,6 +73,7 @@ def create_app() -> FastAPI:
     app.include_router(auth_router, prefix="/api")
     app.include_router(entries_router, prefix="/api")
     app.include_router(example_router, prefix="/api")
+    app.include_router(comment_router, prefix="/api")
     app.include_router(moderation_router, prefix="/api")
     app.include_router(meta_router, prefix="/api")
     app.include_router(users_router, prefix="/api")

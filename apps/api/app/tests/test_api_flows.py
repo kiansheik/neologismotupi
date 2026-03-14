@@ -9,6 +9,7 @@ import app.api.routes.moderation as moderation_routes
 import app.db as db_module
 from app.config import get_settings
 from app.core.enums import TagType
+from app.models.discussion import CommentVote, EntryComment, Notification, NotificationPreference
 from app.models.entry import Entry, Example, ExampleVote, Tag, Vote
 from app.models.moderation import Report
 from app.models.user import Profile, User
@@ -408,6 +409,15 @@ async def test_moderator_can_approve_pending_entry(client):
         json={"notes": "looks fine", "reason": "good-faith"},
     )
     assert response.status_code == 200, response.text
+
+    detail = await client.get(f"/api/entries/{entry['slug']}")
+    assert detail.status_code == 200, detail.text
+    history_events = detail.json()["history_events"]
+    assert any(event["kind"] == "version" for event in history_events)
+    approval_event = next((event for event in history_events if event["action_type"] == "entry_approved"), None)
+    assert approval_event is not None
+    assert approval_event["actor_display_name"] == "Moderator"
+    assert approval_event["created_at"]
     assert response.json()["status"] == "approved"
 
 
@@ -467,7 +477,7 @@ async def test_moderator_upvote_auto_verifies_example(client):
 
 
 @pytest.mark.asyncio
-async def test_reject_entry_requires_existing_report(client):
+async def test_reject_entry_does_not_require_existing_report(client):
     await register_user(client, "entry-reject-owner@example.com", "Entry Reject Owner")
     entry = await create_entry(client, "entry-reject-needs-report")
 
@@ -483,8 +493,7 @@ async def test_reject_entry_requires_existing_report(client):
         f"/api/mod/entries/{entry['id']}/reject",
         json={"reason": "Sem fontes atestadas."},
     )
-    assert reject_response.status_code == 409, reject_response.text
-    assert reject_response.json()["error"]["code"] == "report_required_for_rejection"
+    assert reject_response.status_code == 200, reject_response.text
 
 
 @pytest.mark.asyncio
@@ -757,6 +766,175 @@ async def test_user_badges_include_founder_top_contributor_and_karma_leader(clie
     items = entries_response.json()["items"]
     assert len(items) >= 1
     assert "founder" in items[0]["proposer"]["badges"]
+
+
+@pytest.mark.asyncio
+async def test_comment_creation_notifies_entry_author_and_mentions(client):
+    await register_user(client, "entry-owner@example.com", "Entry Owner")
+    entry = await create_entry(client, "comment-thread-entry")
+
+    await client.post("/api/auth/logout")
+    mention_user = await register_user(client, "mention-user@example.com", "Mention Me")
+
+    await client.post("/api/auth/logout")
+    await register_user(client, "commenter@example.com", "Commenter")
+
+    response = await client.post(
+        f"/api/entries/{entry['id']}/comments",
+        json={"body": "Comentando e chamando @mentionme para revisar."},
+    )
+    assert response.status_code == 201, response.text
+
+    async with db_module.AsyncSessionLocal() as session:
+        owner = (await session.execute(select(User).where(User.email == "entry-owner@example.com"))).scalar_one()
+        mention_target = (
+            await session.execute(select(User).where(User.id == uuid.UUID(mention_user["id"])))
+        ).scalar_one()
+
+        owner_notifications = (
+            await session.execute(select(Notification).where(Notification.recipient_user_id == owner.id))
+        ).scalars().all()
+        mention_notifications = (
+            await session.execute(select(Notification).where(Notification.recipient_user_id == mention_target.id))
+        ).scalars().all()
+
+    assert len(owner_notifications) == 1
+    assert owner_notifications[0].kind == "entry_comment"
+    assert len(mention_notifications) == 1
+    assert mention_notifications[0].kind == "comment_mention"
+
+
+@pytest.mark.asyncio
+async def test_comment_vote_updates_reputation(client):
+    await register_user(client, "comment-author@example.com", "Comment Author")
+    entry = await create_entry(client, "comment-vote-entry")
+
+    comment_response = await client.post(
+        f"/api/entries/{entry['id']}/comments",
+        json={"body": "Comentário para votação."},
+    )
+    assert comment_response.status_code == 201, comment_response.text
+    comment_id = comment_response.json()["id"]
+
+    await client.post("/api/auth/logout")
+    await register_user(client, "comment-voter@example.com", "Comment Voter")
+
+    async with db_module.AsyncSessionLocal() as session:
+        voter = (await session.execute(select(User).where(User.email == "comment-voter@example.com"))).scalar_one()
+        voter.created_at = datetime.now(UTC) - timedelta(days=4)
+        await session.commit()
+
+    upvote = await client.post(f"/api/comments/{comment_id}/vote", json={"value": 1})
+    assert upvote.status_code == 200, upvote.text
+
+    downvote = await client.post(f"/api/comments/{comment_id}/vote", json={"value": -1})
+    assert downvote.status_code == 200, downvote.text
+
+    async with db_module.AsyncSessionLocal() as session:
+        total_comment_votes = int(
+            (
+                await session.execute(select(func.count()).select_from(CommentVote))
+            ).scalar_one()
+        )
+        assert total_comment_votes == 1
+
+        vote = (await session.execute(select(CommentVote))).scalar_one()
+        assert vote.value == -1
+
+        author = (await session.execute(select(User).where(User.email == "comment-author@example.com"))).scalar_one()
+        author_profile = (
+            await session.execute(select(Profile).where(Profile.user_id == author.id))
+        ).scalar_one()
+        assert author_profile.reputation_score == -1
+
+
+@pytest.mark.asyncio
+async def test_notification_preferences_and_read_flow(client):
+    created = await register_user(client, "notify-user@example.com", "Notify User")
+    user_id = uuid.UUID(created["id"])
+
+    initial_pref = await client.get("/api/users/me/notification-preferences")
+    assert initial_pref.status_code == 200, initial_pref.text
+    initial_payload = initial_pref.json()
+    assert initial_payload["in_app_enabled"] is True
+    assert initial_payload["email_enabled"] is True
+    assert initial_payload["push_enabled"] is True
+    assert initial_payload["notify_on_entry_comments"] is True
+    assert initial_payload["notify_on_mentions"] is True
+
+    update_pref = await client.patch(
+        "/api/users/me/notification-preferences",
+        json={
+            "in_app_enabled": False,
+            "email_enabled": False,
+            "push_enabled": False,
+            "notify_on_entry_comments": False,
+            "notify_on_mentions": False,
+        },
+    )
+    assert update_pref.status_code == 200, update_pref.text
+    updated_payload = update_pref.json()
+    assert updated_payload["in_app_enabled"] is False
+    assert updated_payload["email_enabled"] is False
+    assert updated_payload["push_enabled"] is False
+    assert updated_payload["notify_on_entry_comments"] is False
+    assert updated_payload["notify_on_mentions"] is False
+
+    async with db_module.AsyncSessionLocal() as session:
+        pref = (
+            await session.execute(select(NotificationPreference).where(NotificationPreference.user_id == user_id))
+        ).scalar_one()
+        assert pref.in_app_enabled is False
+
+        first_notification = Notification(
+            recipient_user_id=user_id,
+            actor_user_id=None,
+            entry_id=None,
+            comment_id=None,
+            kind="entry_comment",
+            title="Teste de notificação",
+            body="Corpo de teste",
+        )
+        second_notification = Notification(
+            recipient_user_id=user_id,
+            actor_user_id=None,
+            entry_id=None,
+            comment_id=None,
+            kind="entry_comment",
+            title="Teste de notificação 2",
+            body="Corpo de teste 2",
+        )
+        session.add(first_notification)
+        session.add(second_notification)
+        await session.commit()
+        first_id = str(first_notification.id)
+
+    list_response = await client.get("/api/users/me/notifications")
+    assert list_response.status_code == 200, list_response.text
+    list_payload = list_response.json()
+    assert list_payload["total"] >= 2
+    assert list_payload["unread_count"] >= 2
+
+    read_one = await client.post(f"/api/users/me/notifications/{first_id}/read")
+    assert read_one.status_code == 200, read_one.text
+    assert read_one.json()["ok"] is True
+
+    read_all = await client.post("/api/users/me/notifications/read-all")
+    assert read_all.status_code == 200, read_all.text
+    assert read_all.json()["ok"] is True
+
+    async with db_module.AsyncSessionLocal() as session:
+        unread_total = int(
+            (
+                await session.execute(
+                    select(func.count())
+                    .select_from(Notification)
+                    .where(Notification.recipient_user_id == user_id)
+                    .where(Notification.is_read.is_(False))
+                )
+            ).scalar_one()
+        )
+    assert unread_total == 0
 
 
 @pytest.mark.asyncio

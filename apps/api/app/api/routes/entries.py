@@ -14,13 +14,18 @@ from app.core.enums import EntryStatus, ExampleStatus, ReportStatus, ReportTarge
 from app.core.errors import raise_api_error
 from app.core.permissions import can_edit_entry, can_edit_example, is_moderator
 from app.core.utils import collapse_whitespace, slugify
+from app.models.discussion import CommentVote, EntryComment
 from app.models.entry import Entry, EntryTag, EntryVersion, Example, ExampleVote, Tag, Vote
 from app.models.moderation import ModerationAction, Report
-from app.models.user import User
+from app.models.user import Profile, User
 from app.schemas.entries import (
+    CommentCreate,
+    CommentVoteOut,
     DuplicateHintOut,
     EntryCreate,
+    EntryCommentOut,
     EntryDetailOut,
+    EntryHistoryEventOut,
     EntryListOut,
     EntryUpdate,
     EntryVersionOut,
@@ -44,21 +49,40 @@ from app.services.entries import (
     is_effectively_empty,
     load_entry_for_update,
     normalize_headword,
+    refresh_comment_vote_caches,
     refresh_example_vote_caches,
     refresh_vote_and_example_caches,
     set_entry_tags,
 )
-from app.services.email_delivery import send_entry_moderation_email
+from app.services.email_delivery import send_comment_notification_email, send_entry_moderation_email
 from app.services.moderation import record_moderation_action
+from app.services.notifications import (
+    create_notification,
+    extract_mention_keys,
+    get_notification_preferences_map,
+    normalize_mention_key,
+    truncate_for_notification,
+)
 from app.services.reputation import recompute_user_reputation
 from app.services.rate_limit import enforce_rate_limit
-from app.services.serializers import serialize_entry_detail, serialize_entry_summary
+from app.services.serializers import (
+    serialize_entry_comment,
+    serialize_entry_detail,
+    serialize_entry_summary,
+)
 from app.services.user_badges import get_user_badge_leaders
 
 router = APIRouter(prefix="/entries", tags=["entries"])
 logger = logging.getLogger(__name__)
 
 type ModerationContext = tuple[str | None, str | None, datetime | None]
+
+ENTRY_HISTORY_ACTION_TYPES = {
+    "entry_approved",
+    "entry_rejected",
+    "entry_disputed",
+    "entry_verified_by_vote",
+}
 
 
 async def _load_entry_with_relations(db: SessionDep, entry_id: uuid.UUID) -> Entry | None:
@@ -69,6 +93,7 @@ async def _load_entry_with_relations(db: SessionDep, entry_id: uuid.UUID) -> Ent
             selectinload(Entry.tags).selectinload(EntryTag.tag),
             selectinload(Entry.versions),
             selectinload(Entry.examples),
+            selectinload(Entry.comments).selectinload(EntryComment.author).selectinload(User.profile),
             selectinload(Entry.proposer).selectinload(User.profile),
         )
     )
@@ -157,6 +182,213 @@ async def _load_example_moderation_context(
             moderation_by_example[action.target_id] = context
 
     return moderation_by_example
+
+
+def _fallback_actor_name(user_id: uuid.UUID) -> str:
+    return f"user-{str(user_id)[:8]}"
+
+
+async def _load_actor_names(
+    db: SessionDep,
+    *,
+    actor_ids: set[uuid.UUID],
+) -> dict[uuid.UUID, str]:
+    if not actor_ids:
+        return {}
+
+    rows = (
+        await db.execute(
+            select(User.id, Profile.display_name, User.email)
+            .outerjoin(Profile, Profile.user_id == User.id)
+            .where(User.id.in_(list(actor_ids)))
+        )
+    ).all()
+
+    names: dict[uuid.UUID, str] = {}
+    for user_id, display_name, email in rows:
+        if display_name and display_name.strip():
+            names[user_id] = display_name.strip()
+            continue
+        if email and email.strip():
+            names[user_id] = email.split("@", 1)[0]
+    return names
+
+
+def _extract_action_reason(action: ModerationAction) -> str | None:
+    if not isinstance(action.metadata_json, dict):
+        return None
+    raw_reason = action.metadata_json.get("reason")
+    if not isinstance(raw_reason, str):
+        return None
+    cleaned = raw_reason.strip()
+    return cleaned or None
+
+
+def _display_name_for_user(user: User) -> str:
+    if user.profile and user.profile.display_name and user.profile.display_name.strip():
+        return user.profile.display_name.strip()
+    if user.email and user.email.strip():
+        return user.email.split("@", maxsplit=1)[0]
+    return f"user-{str(user.id)[:8]}"
+
+
+async def _resolve_mentioned_user_ids(
+    db: SessionDep,
+    *,
+    mention_keys: set[str],
+) -> set[uuid.UUID]:
+    if not mention_keys:
+        return set()
+
+    profile_rows = (await db.execute(select(Profile.user_id, Profile.display_name))).all()
+    mentioned_user_ids: set[uuid.UUID] = set()
+    for user_id, display_name in profile_rows:
+        if not display_name:
+            continue
+        key = normalize_mention_key(display_name)
+        if key in mention_keys:
+            mentioned_user_ids.add(user_id)
+    return mentioned_user_ids
+
+
+type CommentEmailJob = tuple[str, bool]
+
+
+async def _create_comment_notifications(
+    db: SessionDep,
+    *,
+    entry: Entry,
+    comment: EntryComment,
+    actor: User,
+    mentioned_user_ids: set[uuid.UUID],
+) -> list[CommentEmailJob]:
+    watcher_user_ids: set[uuid.UUID] = {entry.proposer_user_id}
+    previous_commenter_ids = (
+        await db.execute(
+            select(EntryComment.user_id).where(EntryComment.entry_id == entry.id).distinct()
+        )
+    ).scalars().all()
+    watcher_user_ids.update(previous_commenter_ids)
+
+    recipient_sources: dict[uuid.UUID, set[str]] = {}
+    for user_id in watcher_user_ids:
+        recipient_sources.setdefault(user_id, set()).add("watch")
+    for user_id in mentioned_user_ids:
+        recipient_sources.setdefault(user_id, set()).add("mention")
+    recipient_sources.pop(actor.id, None)
+
+    recipient_ids = set(recipient_sources)
+    if not recipient_ids:
+        return []
+
+    preferences_by_user = await get_notification_preferences_map(db, user_ids=recipient_ids)
+    recipient_rows = (
+        await db.execute(
+            select(User.id, User.email, Profile.display_name)
+            .outerjoin(Profile, Profile.user_id == User.id)
+            .where(User.id.in_(list(recipient_ids)))
+        )
+    ).all()
+
+    actor_display_name = _display_name_for_user(actor)
+    comment_snippet = truncate_for_notification(comment.body, limit=280)
+    email_jobs: list[CommentEmailJob] = []
+
+    for recipient_user_id, recipient_email, _recipient_display_name in recipient_rows:
+        sources = recipient_sources.get(recipient_user_id, set())
+        prefs = preferences_by_user[recipient_user_id]
+
+        send_as_mention = False
+        if "mention" in sources and (prefs.allows_in_app(is_mention=True) or prefs.allows_email(is_mention=True)):
+            send_as_mention = True
+        elif "watch" in sources and not (
+            prefs.allows_in_app(is_mention=False) or prefs.allows_email(is_mention=False)
+        ):
+            continue
+        elif "watch" not in sources:
+            continue
+
+        is_mention = send_as_mention
+        title = (
+            f"{actor_display_name} mencionou você em {entry.headword}"
+            if is_mention
+            else f"Novo comentário em {entry.headword}"
+        )
+        notification_kind = "comment_mention" if is_mention else "entry_comment"
+
+        if prefs.allows_in_app(is_mention=is_mention):
+            await create_notification(
+                db,
+                recipient_user_id=recipient_user_id,
+                actor_user_id=actor.id,
+                entry_id=entry.id,
+                comment_id=comment.id,
+                kind=notification_kind,
+                title=title,
+                body=comment_snippet,
+                metadata_json={"entry_slug": entry.slug},
+            )
+
+        if prefs.allows_email(is_mention=is_mention):
+            email_jobs.append((recipient_email, is_mention))
+
+    return email_jobs
+
+
+async def _load_entry_history_events(
+    db: SessionDep,
+    *,
+    entry: Entry,
+) -> list[EntryHistoryEventOut]:
+    actions = (
+        await db.execute(
+            select(ModerationAction)
+            .where(ModerationAction.target_type == "entry")
+            .where(ModerationAction.target_id == entry.id)
+            .where(ModerationAction.action_type.in_(ENTRY_HISTORY_ACTION_TYPES))
+            .order_by(ModerationAction.created_at.asc())
+        )
+    ).scalars().all()
+
+    actor_ids: set[uuid.UUID] = {version.edited_by_user_id for version in entry.versions}
+    actor_ids.update(action.moderator_user_id for action in actions)
+    actor_names = await _load_actor_names(db, actor_ids=actor_ids)
+
+    events: list[EntryHistoryEventOut] = []
+    for version in entry.versions:
+        actor_display_name = actor_names.get(version.edited_by_user_id, _fallback_actor_name(version.edited_by_user_id))
+        events.append(
+            EntryHistoryEventOut(
+                id=version.id,
+                kind="version",
+                version_number=version.version_number,
+                action_type=None,
+                summary=version.edit_summary,
+                actor_user_id=version.edited_by_user_id,
+                actor_display_name=actor_display_name,
+                created_at=version.created_at,
+            )
+        )
+
+    for action in actions:
+        reason = _extract_action_reason(action)
+        notes = action.notes.strip() if action.notes and action.notes.strip() else None
+        actor_display_name = actor_names.get(action.moderator_user_id, _fallback_actor_name(action.moderator_user_id))
+        events.append(
+            EntryHistoryEventOut(
+                id=action.id,
+                kind="moderation",
+                version_number=None,
+                action_type=action.action_type,
+                summary=reason or notes,
+                actor_user_id=action.moderator_user_id,
+                actor_display_name=actor_display_name,
+                created_at=action.created_at,
+            )
+        )
+
+    events.sort(key=lambda event: event.created_at, reverse=True)
+    return events
 
 
 @router.get("", response_model=EntryListOut)
@@ -261,6 +493,7 @@ async def get_entry(
             selectinload(Entry.tags).selectinload(EntryTag.tag),
             selectinload(Entry.versions),
             selectinload(Entry.examples),
+            selectinload(Entry.comments).selectinload(EntryComment.author).selectinload(User.profile),
             selectinload(Entry.proposer).selectinload(User.profile),
         )
     )
@@ -275,17 +508,21 @@ async def get_entry(
         visible_examples = [
             example for example in entry.examples if example.status == ExampleStatus.approved
         ]
+    visible_comments = sorted(entry.comments, key=lambda comment: comment.created_at)
 
     badge_leaders = await get_user_badge_leaders(db)
     entry_moderation = await _load_entry_moderation_context(db, entry=entry)
     example_moderation = await _load_example_moderation_context(db, examples=visible_examples)
+    history_events = await _load_entry_history_events(db, entry=entry)
 
     return serialize_entry_detail(
         entry,
         examples=visible_examples,
+        comments=visible_comments,
         badge_leaders=badge_leaders,
         entry_moderation=entry_moderation,
         example_moderation=example_moderation,
+        history_events=history_events,
     )
 
 
@@ -378,7 +615,14 @@ async def create_entry(
     if not hydrated:
         raise_api_error(status_code=500, code="entry_create_failed", message="Could not load new entry")
     badge_leaders = await get_user_badge_leaders(db)
-    return serialize_entry_detail(hydrated, examples=[], badge_leaders=badge_leaders)
+    history_events = await _load_entry_history_events(db, entry=hydrated)
+    return serialize_entry_detail(
+        hydrated,
+        examples=[],
+        comments=[],
+        badge_leaders=badge_leaders,
+        history_events=history_events,
+    )
 
 
 @router.patch("/{entry_id}", response_model=EntryDetailOut)
@@ -466,8 +710,20 @@ async def update_entry(
         if can_view_all_examples
         else [ex for ex in hydrated.examples if ex.status == ExampleStatus.approved]
     )
+    comments = sorted(hydrated.comments, key=lambda comment: comment.created_at)
     badge_leaders = await get_user_badge_leaders(db)
-    return serialize_entry_detail(hydrated, examples=examples, badge_leaders=badge_leaders)
+    entry_moderation = await _load_entry_moderation_context(db, entry=hydrated)
+    example_moderation = await _load_example_moderation_context(db, examples=examples)
+    history_events = await _load_entry_history_events(db, entry=hydrated)
+    return serialize_entry_detail(
+        hydrated,
+        examples=examples,
+        comments=comments,
+        badge_leaders=badge_leaders,
+        entry_moderation=entry_moderation,
+        example_moderation=example_moderation,
+        history_events=history_events,
+    )
 
 
 @router.get("/{entry_id}/versions", response_model=list[EntryVersionOut])
@@ -697,7 +953,98 @@ async def create_example(
     return ExampleOut.model_validate(example)
 
 
+@router.post("/{entry_id}/comments", response_model=EntryCommentOut, status_code=status.HTTP_201_CREATED)
+async def create_comment(
+    entry_id: uuid.UUID,
+    payload: CommentCreate,
+    request: Request,
+    db: SessionDep,
+    user: Annotated[User, Depends(get_current_user)],
+) -> EntryCommentOut:
+    settings = get_settings()
+    client_ip = request.client.host if request.client else "unknown"
+
+    await enforce_rate_limit(
+        db,
+        action="comment_submission",
+        scope_key=f"comment_submission:{user.id}:{client_ip}",
+        limit=settings.comment_submission_rate_limit_count,
+        window_seconds=settings.comment_submission_rate_limit_window_seconds,
+    )
+
+    verifier = get_bot_verifier()
+    is_human = await verifier.verify(payload.turnstile_token, client_ip)
+    if not is_human:
+        raise_api_error(status_code=400, code="bot_check_failed", message="Bot verification failed")
+
+    if is_effectively_empty(payload.body):
+        raise_api_error(status_code=400, code="empty_submission", message="Comment cannot be empty")
+
+    entry = (await db.execute(select(Entry).where(Entry.id == entry_id))).scalar_one_or_none()
+    if not entry:
+        raise_api_error(status_code=404, code="entry_not_found", message="Entry not found")
+
+    if payload.parent_comment_id:
+        parent_comment = (
+            await db.execute(select(EntryComment).where(EntryComment.id == payload.parent_comment_id))
+        ).scalar_one_or_none()
+        if not parent_comment or parent_comment.entry_id != entry_id:
+            raise_api_error(status_code=404, code="comment_not_found", message="Parent comment not found")
+
+    comment = EntryComment(
+        entry_id=entry_id,
+        user_id=user.id,
+        parent_comment_id=payload.parent_comment_id,
+        body=collapse_whitespace(payload.body),
+    )
+    db.add(comment)
+    await db.flush()
+
+    mention_keys = extract_mention_keys(comment.body)
+    mentioned_user_ids = await _resolve_mentioned_user_ids(db, mention_keys=mention_keys)
+    email_jobs = await _create_comment_notifications(
+        db,
+        entry=entry,
+        comment=comment,
+        actor=user,
+        mentioned_user_ids=mentioned_user_ids,
+    )
+
+    await db.commit()
+
+    for recipient_email, is_mention in email_jobs:
+        try:
+            await send_comment_notification_email(
+                to_email=recipient_email,
+                actor_display_name=_display_name_for_user(user),
+                entry_headword=entry.headword,
+                entry_slug=entry.slug,
+                comment_body=comment.body,
+                is_mention=is_mention,
+            )
+        except Exception:
+            logger.exception(
+                "Failed to send comment notification entry_id=%s recipient=%s",
+                entry.id,
+                recipient_email,
+            )
+
+    comment_with_author = (
+        await db.execute(
+            select(EntryComment)
+            .where(EntryComment.id == comment.id)
+            .options(selectinload(EntryComment.author).selectinload(User.profile))
+        )
+    ).scalar_one_or_none()
+    if comment_with_author is None:
+        raise_api_error(status_code=500, code="comment_create_failed", message="Could not load comment")
+
+    badge_leaders = await get_user_badge_leaders(db)
+    return serialize_entry_comment(comment_with_author, badge_leaders)
+
+
 example_router = APIRouter(prefix="/examples", tags=["examples"])
+comment_router = APIRouter(prefix="/comments", tags=["comments"])
 
 
 @example_router.patch("/{example_id}", response_model=ExampleOut)
@@ -890,3 +1237,81 @@ async def report_example(
     await db.commit()
 
     return {"ok": True, "report_id": str(report.id)}
+
+
+@comment_router.post("/{comment_id}/vote", response_model=CommentVoteOut)
+async def vote_comment(
+    comment_id: uuid.UUID,
+    payload: VoteRequest,
+    db: SessionDep,
+    user: Annotated[User, Depends(get_current_user)],
+) -> CommentVoteOut:
+    if payload.value not in (-1, 1):
+        raise_api_error(status_code=422, code="invalid_vote", message="Vote must be -1 or 1")
+
+    if payload.value == -1 and not can_downvote(user):
+        raise_api_error(
+            status_code=403,
+            code="downvote_blocked",
+            message="New users cannot downvote until account age is at least 72 hours",
+        )
+
+    comment = (await db.execute(select(EntryComment).where(EntryComment.id == comment_id))).scalar_one_or_none()
+    if not comment:
+        raise_api_error(status_code=404, code="comment_not_found", message="Comment not found")
+
+    if comment.user_id == user.id:
+        raise_api_error(
+            status_code=403,
+            code="self_vote_forbidden",
+            message="You cannot vote on your own comment",
+        )
+
+    existing_vote = (
+        await db.execute(
+            select(CommentVote).where(
+                and_(CommentVote.comment_id == comment_id, CommentVote.user_id == user.id)
+            )
+        )
+    ).scalar_one_or_none()
+
+    if existing_vote:
+        existing_vote.value = payload.value
+        vote = existing_vote
+    else:
+        vote = CommentVote(comment_id=comment_id, user_id=user.id, value=payload.value)
+        db.add(vote)
+
+    await db.flush()
+    await refresh_comment_vote_caches(db, comment)
+    await recompute_user_reputation(db, comment.user_id)
+    await db.commit()
+
+    return CommentVoteOut(comment_id=comment_id, user_id=user.id, value=vote.value, score_cache=comment.score_cache)
+
+
+@comment_router.delete("/{comment_id}/vote", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_comment_vote(
+    comment_id: uuid.UUID,
+    db: SessionDep,
+    user: Annotated[User, Depends(get_current_user)],
+) -> Response:
+    comment = (await db.execute(select(EntryComment).where(EntryComment.id == comment_id))).scalar_one_or_none()
+    if not comment:
+        raise_api_error(status_code=404, code="comment_not_found", message="Comment not found")
+
+    existing_vote = (
+        await db.execute(
+            select(CommentVote).where(
+                and_(CommentVote.comment_id == comment_id, CommentVote.user_id == user.id)
+            )
+        )
+    ).scalar_one_or_none()
+    if existing_vote:
+        await db.delete(existing_vote)
+        await db.flush()
+        await refresh_comment_vote_caches(db, comment)
+        await recompute_user_reputation(db, comment.user_id)
+
+    await db.commit()
+    return Response(status_code=status.HTTP_204_NO_CONTENT)

@@ -68,6 +68,10 @@ class Entry(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     )
     examples: Mapped[list["Example"]] = relationship(back_populates="entry", cascade="all, delete-orphan")
     votes: Mapped[list["Vote"]] = relationship(back_populates="entry", cascade="all, delete-orphan")
+    comments: Mapped[list["EntryComment"]] = relationship(
+        back_populates="entry",
+        cascade="all, delete-orphan",
+    )
     tags: Mapped[list["EntryTag"]] = relationship(back_populates="entry", cascade="all, delete-orphan")
 
 

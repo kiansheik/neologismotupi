@@ -4,6 +4,7 @@ from datetime import UTC, datetime, timedelta
 from sqlalchemy import and_, delete, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.models.discussion import CommentVote, EntryComment
 from app.config import get_settings
 from app.core.enums import EntryStatus, ExampleStatus
 from app.core.utils import collapse_whitespace, normalize_text
@@ -142,6 +143,22 @@ async def refresh_example_vote_caches(db: AsyncSession, example: Example) -> Non
     example.upvote_count_cache = upvotes
     example.downvote_count_cache = downvotes
     example.score_cache = upvotes - downvotes
+
+
+async def refresh_comment_vote_caches(db: AsyncSession, comment: EntryComment) -> None:
+    upvote_stmt = select(func.count()).where(
+        and_(CommentVote.comment_id == comment.id, CommentVote.value == 1)
+    )
+    downvote_stmt = select(func.count()).where(
+        and_(CommentVote.comment_id == comment.id, CommentVote.value == -1)
+    )
+
+    upvotes = int((await db.execute(upvote_stmt)).scalar_one())
+    downvotes = int((await db.execute(downvote_stmt)).scalar_one())
+
+    comment.upvote_count_cache = upvotes
+    comment.downvote_count_cache = downvotes
+    comment.score_cache = upvotes - downvotes
 
 
 def should_new_entry_be_pending(user_entry_count: int, is_superuser: bool) -> bool:

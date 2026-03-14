@@ -39,6 +39,8 @@ class Settings(BaseSettings):
     entry_submission_rate_limit_window_seconds: int = 60 * 60
     example_submission_rate_limit_count: int = 30
     example_submission_rate_limit_window_seconds: int = 60 * 60
+    comment_submission_rate_limit_count: int = 60
+    comment_submission_rate_limit_window_seconds: int = 60 * 60
     report_rate_limit_count: int = 20
     report_rate_limit_window_seconds: int = 60 * 60
     password_reset_request_rate_limit_count: int = 10

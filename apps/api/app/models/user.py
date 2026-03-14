@@ -1,11 +1,15 @@
 import uuid
 from datetime import datetime
+from typing import TYPE_CHECKING
 
 from sqlalchemy import Boolean, DateTime, ForeignKey, String, Uuid
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db import Base
 from app.models.mixins import TimestampMixin, UUIDPrimaryKeyMixin
+
+if TYPE_CHECKING:
+    from app.models.discussion import EntryComment, Notification, NotificationPreference
 
 
 class User(Base, UUIDPrimaryKeyMixin, TimestampMixin):
@@ -24,6 +28,20 @@ class User(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     )
     email_action_tokens: Mapped[list["EmailActionToken"]] = relationship(
         back_populates="user",
+        cascade="all, delete-orphan",
+    )
+    comments: Mapped[list["EntryComment"]] = relationship(
+        back_populates="author",
+        cascade="all, delete-orphan",
+    )
+    notification_preferences: Mapped["NotificationPreference | None"] = relationship(
+        back_populates="user",
+        uselist=False,
+        cascade="all, delete-orphan",
+    )
+    received_notifications: Mapped[list["Notification"]] = relationship(
+        back_populates="recipient",
+        foreign_keys="Notification.recipient_user_id",
         cascade="all, delete-orphan",
     )
 

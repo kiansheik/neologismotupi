@@ -6,10 +6,10 @@ import { z } from "zod";
 
 import { ApiError } from "@/lib/api";
 import { applyZodErrors } from "@/lib/zod-form";
-import { useI18n } from "@/i18n";
+import { type TranslateFn, useI18n } from "@/i18n";
 import { trackEvent } from "@/lib/analytics";
 import { splitEntryDefinition } from "@/lib/entry-definition";
-import { formatDate } from "@/i18n/formatters";
+import { formatDate, formatDateTime, formatRelativeOrDate } from "@/i18n/formatters";
 import { getLocalizedApiErrorMessage } from "@/lib/localized-api-error";
 import { StatusBadge } from "@/components/status-badge";
 import { Card } from "@/components/ui/card";
@@ -18,6 +18,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { UserBadge } from "@/components/user-badge";
 import { useCurrentUser } from "@/features/auth/hooks";
+import { createComment, voteComment } from "@/features/comments/api";
 import { reportExample, voteExample } from "@/features/examples/api";
 import { createExample, getEntry, reportEntry, updateEntry, voteEntry } from "@/features/entries/api";
 import { approveEntry, approveExample, rejectEntry, rejectExample } from "@/features/moderation/api";
@@ -25,6 +26,10 @@ import { approveEntry, approveExample, rejectEntry, rejectExample } from "@/feat
 type ExampleForm = {
   sentence_original: string;
   translation_pt?: string;
+};
+
+type CommentForm = {
+  body: string;
 };
 
 type ReportForm = {
@@ -42,6 +47,34 @@ type EntryEditForm = {
 };
 
 const REPORT_REASON_MAX = 280;
+
+function normalizeComparableText(value: string | null | undefined): string {
+  if (!value) {
+    return "";
+  }
+  return value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[.?!,:;]+$/g, "")
+    .replace(/\s+/g, " ")
+    .trim()
+    .toLowerCase();
+}
+
+function historyActionLabel(actionType: string | null, t: TranslateFn): string {
+  switch (actionType) {
+    case "entry_approved":
+      return t("entry.history.approved");
+    case "entry_rejected":
+      return t("entry.history.rejected");
+    case "entry_disputed":
+      return t("entry.history.disputed");
+    case "entry_verified_by_vote":
+      return t("entry.history.verifiedByVote");
+    default:
+      return actionType || t("entry.history.moderationAction");
+  }
+}
 
 export function EntryDetailPage() {
   const { slug } = useParams();
@@ -184,6 +217,12 @@ export function EntryDetailPage() {
     },
   });
 
+  const commentForm = useForm<CommentForm>({
+    defaultValues: {
+      body: "",
+    },
+  });
+
   const entryEditForm = useForm<EntryEditForm>({
     defaultValues: {
       headword: "",
@@ -225,6 +264,38 @@ export function EntryDetailPage() {
     },
   });
 
+  const createCommentMutation = useMutation({
+    mutationFn: (payload: CommentForm) => createComment(String(entry?.id), payload),
+    onSuccess: () => {
+      trackEvent("comment_submitted");
+      commentForm.reset();
+      queryClient.invalidateQueries({ queryKey: ["entry", slug] });
+      queryClient.invalidateQueries({ queryKey: ["entries"] });
+      queryClient.invalidateQueries({ queryKey: ["notifications"] });
+    },
+    onError: (error) => {
+      trackEvent("comment_submit_failed", {
+        error_code: error instanceof ApiError ? error.code : "unknown",
+      });
+    },
+  });
+
+  const voteCommentMutation = useMutation({
+    mutationFn: (params: { commentId: string; value: -1 | 1 }) =>
+      voteComment(params.commentId, { value: params.value }),
+    onSuccess: (_, params) => {
+      trackEvent("comment_voted", { direction: params.value === 1 ? "up" : "down" });
+      queryClient.invalidateQueries({ queryKey: ["entry", slug] });
+      queryClient.invalidateQueries({ queryKey: ["entries"] });
+    },
+    onError: (error, params) => {
+      trackEvent("comment_vote_failed", {
+        direction: params.value === 1 ? "up" : "down",
+        error_code: error instanceof ApiError ? error.code : "unknown",
+      });
+    },
+  });
+
   const updateEntryMutation = useMutation({
     mutationFn: (payload: Parameters<typeof updateEntry>[1]) => updateEntry(String(entry?.id), payload),
     onSuccess: () => {
@@ -254,6 +325,19 @@ export function EntryDetailPage() {
       return;
     }
     createExampleMutation.mutate(parsed.data);
+  });
+
+  const onCommentSubmit = commentForm.handleSubmit((payload) => {
+    commentForm.clearErrors();
+    const commentSchema = z.object({
+      body: z.string().trim().min(1, t("entry.error.commentMin")),
+    });
+    const parsed = commentSchema.safeParse(payload);
+    if (!parsed.success) {
+      applyZodErrors(parsed.error, commentForm.setError);
+      return;
+    }
+    createCommentMutation.mutate(parsed.data);
   });
 
   const onEntryReportSubmit = entryReportForm.handleSubmit((payload) => {
@@ -316,6 +400,22 @@ export function EntryDetailPage() {
   }
 
   const definitionParts = splitEntryDefinition(entry.short_definition);
+  const shouldShowGloss =
+    Boolean(entry.gloss_pt?.trim()) &&
+    normalizeComparableText(entry.gloss_pt) !== normalizeComparableText(entry.short_definition);
+  const historyEvents =
+    entry.history_events && entry.history_events.length > 0
+      ? entry.history_events
+      : entry.versions.map((version) => ({
+          id: version.id,
+          kind: "version" as const,
+          version_number: version.version_number,
+          action_type: null,
+          summary: version.edit_summary,
+          actor_user_id: version.edited_by_user_id,
+          actor_display_name: version.edited_by_display_name ?? null,
+          created_at: version.created_at,
+        }));
 
   return (
     <section className="space-y-4">
@@ -336,7 +436,7 @@ export function EntryDetailPage() {
             ))}
           </ul>
         )}
-        <p className="mt-1 text-sm text-slate-600">{entry.gloss_pt || "-"}</p>
+        {shouldShowGloss ? <p className="mt-1 text-sm text-slate-600">{entry.gloss_pt}</p> : null}
         <p className="mt-1 text-sm text-slate-600">
           {t("entry.submittedBy")}{" "}
           <span className="inline-flex flex-wrap items-center gap-1">
@@ -726,13 +826,120 @@ export function EntryDetailPage() {
       </Card>
 
       <Card>
+        <h2 className="text-lg font-semibold text-brand-900">{t("entry.commentsTitle")}</h2>
+        <div className="mt-3 space-y-3">
+          {entry.comments.length ? (
+            entry.comments.map((comment) => (
+              <article key={comment.id} className="rounded-md border border-brand-100 p-3">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <p className="text-sm text-slate-700">
+                    {t("entry.commentBy")}{" "}
+                    <span className="inline-flex flex-wrap items-center gap-1">
+                      <Link className="text-brand-700 hover:underline" to={`/profiles/${comment.author.id}`}>
+                        {comment.author.display_name}
+                      </Link>
+                      <UserBadge displayName={comment.author.display_name} badges={comment.author.badges} />
+                      <span>· {t("reputation.label", { score: comment.author.reputation_score })}</span>
+                    </span>
+                  </p>
+                  <span className="text-xs text-slate-600">{formatRelativeOrDate(comment.created_at, locale)}</span>
+                </div>
+                <p className="mt-2 whitespace-pre-wrap text-sm text-slate-800">{comment.body}</p>
+                <div className="mt-2 flex flex-wrap items-center gap-2">
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-[#d3c6b0] bg-[#fffaf2] p-0 text-base leading-none shadow-sm hover:border-brand-500 hover:bg-brand-50"
+                    onClick={() => voteCommentMutation.mutate({ commentId: comment.id, value: 1 })}
+                    disabled={!canWrite || voteCommentMutation.isPending}
+                    title={t("entry.upvote")}
+                    aria-label={t("entry.upvote")}
+                  >
+                    <span aria-hidden>{t("entry.upvoteEmoji")}</span>
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-[#d3c6b0] bg-[#fffaf2] p-0 text-base leading-none shadow-sm hover:border-red-500 hover:bg-red-100"
+                    onClick={() => voteCommentMutation.mutate({ commentId: comment.id, value: -1 })}
+                    disabled={!canWrite || voteCommentMutation.isPending}
+                    title={t("entry.downvote")}
+                    aria-label={t("entry.downvote")}
+                  >
+                    <span aria-hidden>{t("entry.downvoteEmoji")}</span>
+                  </Button>
+                  <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-xs text-slate-700">
+                    {t("entry.commentScore", { score: comment.score_cache })}
+                  </span>
+                </div>
+              </article>
+            ))
+          ) : (
+            <p className="text-sm text-slate-600">{t("entry.noComments")}</p>
+          )}
+        </div>
+        {voteCommentMutation.error instanceof ApiError ? (
+          <p className="mt-2 text-sm text-red-700">
+            {getLocalizedApiErrorMessage(voteCommentMutation.error, t)}
+          </p>
+        ) : null}
+
+        {canWrite ? (
+          <form
+            className="mt-4 space-y-2"
+            onSubmit={(event) => {
+              void onCommentSubmit(event).catch(() => undefined);
+            }}
+          >
+            <Textarea
+              id="comment_body"
+              rows={4}
+              placeholder={t("entry.commentPlaceholder")}
+              {...commentForm.register("body")}
+            />
+            <p className="text-xs text-slate-600">{t("entry.commentHelpMention")}</p>
+            {commentForm.formState.errors.body?.message ? (
+              <p className="text-xs text-red-700">{commentForm.formState.errors.body.message}</p>
+            ) : null}
+            {createCommentMutation.error instanceof ApiError ? (
+              <p className="text-sm text-red-700">
+                {getLocalizedApiErrorMessage(createCommentMutation.error, t)}
+              </p>
+            ) : null}
+            {createCommentMutation.isSuccess ? (
+              <p className="text-sm text-green-700">{t("entry.commentPosted")}</p>
+            ) : null}
+            <Button type="submit" disabled={createCommentMutation.isPending}>
+              {t("entry.postComment")}
+            </Button>
+          </form>
+        ) : (
+          <p className="mt-3 text-sm text-amber-800">
+            {t("entry.signInPrompt")} <Link to="/login">{t("entry.goToLogin")}</Link>.
+          </p>
+        )}
+      </Card>
+
+      <Card>
         <h2 className="text-lg font-semibold text-brand-900">{t("entry.versionHistory")}</h2>
         <details className="mt-2">
           <summary className="cursor-pointer text-sm text-brand-700">{t("entry.showVersions")}</summary>
           <ul className="mt-3 space-y-2 text-sm text-slate-700">
-            {entry.versions.map((version) => (
-              <li key={version.id}>
-                v{version.version_number} · {version.edit_summary || t("entry.noSummary")}
+            {historyEvents.map((event) => (
+              <li key={event.id}>
+                <span className="font-medium">
+                  {event.kind === "version"
+                    ? t("entry.history.versionPrefix", { version: event.version_number ?? "?" })
+                    : historyActionLabel(event.action_type, t)}
+                </span>
+                {" · "}
+                {event.summary || t("entry.noSummary")}
+                {" · "}
+                {t("entry.history.by", {
+                  name: event.actor_display_name || t("entry.history.unknownActor"),
+                })}
+                {" · "}
+                {formatDateTime(event.created_at, locale)}
               </li>
             ))}
           </ul>

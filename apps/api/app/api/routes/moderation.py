@@ -367,24 +367,6 @@ async def _set_entry_status(
                 message="Rejection reason is required",
             )
 
-        report_count = int(
-            (
-                await db.execute(
-                    select(func.count())
-                    .select_from(Report)
-                    .where(Report.target_type == ReportTargetType.entry)
-                    .where(Report.target_id == entry.id)
-                    .where(Report.status.in_([ReportStatus.open, ReportStatus.reviewed]))
-                )
-            ).scalar_one()
-        )
-        if report_count == 0:
-            raise_api_error(
-                status_code=409,
-                code="report_required_for_rejection",
-                message="Rejecting an entry requires an existing report",
-            )
-
     entry.status = new_status
     if new_status == EntryStatus.approved:
         entry.approved_at = datetime.now(UTC)

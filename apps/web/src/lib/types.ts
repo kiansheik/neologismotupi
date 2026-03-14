@@ -41,9 +41,21 @@ export interface EntryVersion {
   id: string;
   entry_id: string;
   edited_by_user_id: string;
+  edited_by_display_name?: string | null;
   version_number: number;
   snapshot_json: Record<string, unknown>;
   edit_summary: string | null;
+  created_at: string;
+}
+
+export interface EntryHistoryEvent {
+  id: string;
+  kind: "version" | "moderation";
+  version_number: number | null;
+  action_type: string | null;
+  summary: string | null;
+  actor_user_id: string | null;
+  actor_display_name: string | null;
   created_at: string;
 }
 
@@ -67,6 +79,20 @@ export interface Example {
   updated_at: string;
 }
 
+export interface EntryComment {
+  id: string;
+  entry_id: string;
+  user_id: string;
+  parent_comment_id: string | null;
+  body: string;
+  score_cache: number;
+  upvote_count_cache: number;
+  downvote_count_cache: number;
+  created_at: string;
+  updated_at: string;
+  author: EntryAuthor;
+}
+
 export interface EntryDetail extends EntrySummary {
   morphology_notes: string | null;
   approved_at: string | null;
@@ -75,7 +101,9 @@ export interface EntryDetail extends EntrySummary {
   moderation_notes?: string | null;
   moderated_at?: string | null;
   versions: EntryVersion[];
+  history_events?: EntryHistoryEvent[];
   examples: Example[];
+  comments: EntryComment[];
 }
 
 export interface EntryListResponse {
@@ -193,6 +221,40 @@ export interface ModerationReport {
   created_at: string;
   reviewed_at: string | null;
   reviewed_by_user_id: string | null;
+}
+
+export interface NotificationPreferences {
+  in_app_enabled: boolean;
+  email_enabled: boolean;
+  push_enabled: boolean;
+  notify_on_entry_comments: boolean;
+  notify_on_mentions: boolean;
+}
+
+export interface NotificationItem {
+  id: string;
+  kind: "entry_comment" | "comment_mention" | string;
+  title: string;
+  body: string | null;
+  is_read: boolean;
+  read_at: string | null;
+  created_at: string;
+  actor_user_id: string | null;
+  actor_display_name: string | null;
+  actor_profile_url: string | null;
+  entry_id: string | null;
+  entry_slug: string | null;
+  entry_headword: string | null;
+  entry_url: string | null;
+  comment_id: string | null;
+}
+
+export interface NotificationListResponse {
+  items: NotificationItem[];
+  page: number;
+  page_size: number;
+  total: number;
+  unread_count: number;
 }
 
 export interface ApiErrorShape {

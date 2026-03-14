@@ -30,6 +30,13 @@ from app.schemas.moderation import (
     ReportOut,
     ReportReviewRequest,
 )
+from app.schemas.notifications import (
+    NotificationListOut,
+    NotificationOut,
+    NotificationPreferenceOut,
+    NotificationPreferenceUpdate,
+    NotificationReadResponse,
+)
 
 __all__ = [
     "ActionAcceptedResponse",
@@ -48,6 +55,11 @@ __all__ = [
     "LogoutResponse",
     "ModerationActionRequest",
     "ModerationQueueOut",
+    "NotificationListOut",
+    "NotificationOut",
+    "NotificationPreferenceOut",
+    "NotificationPreferenceUpdate",
+    "NotificationReadResponse",
     "PasswordResetConfirmRequest",
     "PasswordResetRequest",
     "RegisterRequest",

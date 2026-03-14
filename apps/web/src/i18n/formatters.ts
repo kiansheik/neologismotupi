@@ -126,3 +126,33 @@ export function formatBytes(bytes: number, locale: Locale): string {
   }
   return `${new Intl.NumberFormat(locale, { maximumFractionDigits: 1 }).format(value)} ${units[unitIndex]}`;
 }
+
+export function formatRelativeOrDate(iso: string, locale: Locale): string {
+  const parsed = new Date(iso);
+  if (Number.isNaN(parsed.valueOf())) {
+    return iso;
+  }
+
+  const now = new Date();
+  const diffMs = parsed.getTime() - now.getTime();
+  const absMs = Math.abs(diffMs);
+  const oneMinuteMs = 60 * 1000;
+  const oneHourMs = 60 * oneMinuteMs;
+  const oneDayMs = 24 * oneHourMs;
+
+  if (absMs >= oneDayMs) {
+    return formatDate(iso, locale);
+  }
+
+  const rtf = new Intl.RelativeTimeFormat(locale, { numeric: "auto" });
+  if (absMs < oneMinuteMs) {
+    const seconds = Math.round(diffMs / 1000);
+    return rtf.format(seconds, "second");
+  }
+  if (absMs < oneHourMs) {
+    const minutes = Math.round(diffMs / oneMinuteMs);
+    return rtf.format(minutes, "minute");
+  }
+  const hours = Math.round(diffMs / oneHourMs);
+  return rtf.format(hours, "hour");
+}

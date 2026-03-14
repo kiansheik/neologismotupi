@@ -111,3 +111,27 @@ async def send_entry_moderation_email(
         )
 
     await send_email(to_email=to_email, subject=subject, body=body)
+
+
+async def send_comment_notification_email(
+    *,
+    to_email: str,
+    actor_display_name: str,
+    entry_headword: str,
+    entry_slug: str,
+    comment_body: str,
+    is_mention: bool,
+) -> None:
+    link = _entry_url(entry_slug)
+    subject = (
+        f"{actor_display_name} mencionou você em {entry_headword}"
+        if is_mention
+        else f"Novo comentário em {entry_headword}"
+    )
+    body = (
+        f"Verbete: {entry_headword}\n"
+        f"Link: {link}\n\n"
+        f"Comentário:\n{comment_body}\n\n"
+        "Acesse o verbete para continuar a conversa."
+    )
+    await send_email(to_email=to_email, subject=subject, body=body)

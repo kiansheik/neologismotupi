@@ -41,6 +41,10 @@ function pathRequiresTurnstile(path: string, method: string): boolean {
     return true;
   }
 
+  if (/^\/entries\/[^/]+\/comments$/.test(normalizedPath)) {
+    return true;
+  }
+
   if (/^\/entries\/[^/]+\/reports$/.test(normalizedPath)) {
     return true;
   }

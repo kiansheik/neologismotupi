@@ -56,8 +56,10 @@ export function SubmitPage() {
   });
 
   const candidateDuplicates = useMemo(() => {
-    return duplicateQuery.data?.filter((entry) => entry.headword !== watchedHeadword) ?? [];
-  }, [duplicateQuery.data, watchedHeadword]);
+    const merged = [...(duplicateQuery.data ?? []), ...possibleDuplicates];
+    const dedupedById = new Map(merged.map((entry) => [entry.id, entry]));
+    return Array.from(dedupedById.values());
+  }, [duplicateQuery.data, possibleDuplicates]);
 
   const createMutation = useMutation({
     mutationFn: (payload: SubmitForm) => createEntry(payload),
@@ -127,6 +129,10 @@ export function SubmitPage() {
             <span className="font-semibold">{t("submit.exampleGloss")}:</span> Física
           </p>
           <p>
+            <span className="font-semibold">{t("submit.examplePartOfSpeech")}:</span>{" "}
+            {partOfSpeechLabel("noun", t)}
+          </p>
+          <p>
             <span className="font-semibold">{t("submit.exampleDefinition")}:</span> Física.
           </p>
           <p>
@@ -153,11 +159,11 @@ export function SubmitPage() {
           ) : null}
         </div>
 
-        {(candidateDuplicates.length > 0 || possibleDuplicates.length > 0) && (
+        {candidateDuplicates.length > 0 && (
           <div className="rounded-md border border-amber-300 bg-amber-50 p-3 text-sm" data-testid="duplicate-warning">
             <p className="font-medium text-amber-900">{t("submit.duplicatesTitle")}</p>
             <ul className="mt-2 list-disc space-y-1 pl-5">
-              {[...candidateDuplicates, ...possibleDuplicates].slice(0, 5).map((entry) => (
+              {candidateDuplicates.slice(0, 5).map((entry) => (
                 <li key={entry.id}>
                   <Link
                     className="text-brand-800 underline"

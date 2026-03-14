@@ -1,5 +1,6 @@
 import uuid
 from datetime import datetime
+from typing import Literal
 
 from pydantic import BaseModel, Field
 
@@ -48,12 +49,24 @@ class EntryVersionOut(BaseModel):
     id: uuid.UUID
     entry_id: uuid.UUID
     edited_by_user_id: uuid.UUID
+    edited_by_display_name: str | None = None
     version_number: int
     snapshot_json: dict
     edit_summary: str | None
     created_at: datetime
 
     model_config = {"from_attributes": True}
+
+
+class EntryHistoryEventOut(BaseModel):
+    id: uuid.UUID
+    kind: Literal["version", "moderation"]
+    version_number: int | None = None
+    action_type: str | None = None
+    summary: str | None = None
+    actor_user_id: uuid.UUID | None = None
+    actor_display_name: str | None = None
+    created_at: datetime
 
 
 class ExampleOut(BaseModel):
@@ -78,6 +91,20 @@ class ExampleOut(BaseModel):
     model_config = {"from_attributes": True}
 
 
+class EntryCommentOut(BaseModel):
+    id: uuid.UUID
+    entry_id: uuid.UUID
+    user_id: uuid.UUID
+    parent_comment_id: uuid.UUID | None
+    body: str
+    score_cache: int
+    upvote_count_cache: int
+    downvote_count_cache: int
+    created_at: datetime
+    updated_at: datetime
+    author: EntryAuthorOut
+
+
 class EntryDetailOut(EntrySummaryOut):
     morphology_notes: str | None
     approved_at: datetime | None
@@ -86,7 +113,9 @@ class EntryDetailOut(EntrySummaryOut):
     moderation_notes: str | None = None
     moderated_at: datetime | None = None
     versions: list[EntryVersionOut] = Field(default_factory=list)
+    history_events: list[EntryHistoryEventOut] = Field(default_factory=list)
     examples: list[ExampleOut] = Field(default_factory=list)
+    comments: list[EntryCommentOut] = Field(default_factory=list)
 
 
 class DuplicateHintOut(BaseModel):
@@ -144,6 +173,12 @@ class ExampleUpdate(BaseModel):
     context_tag: str | None = Field(default=None, max_length=120)
 
 
+class CommentCreate(BaseModel):
+    body: str = Field(min_length=1, max_length=2000)
+    parent_comment_id: uuid.UUID | None = None
+    turnstile_token: str | None = None
+
+
 class VoteRequest(BaseModel):
     value: int = Field(description="-1 or 1")
 
@@ -157,6 +192,13 @@ class VoteOut(BaseModel):
 
 class ExampleVoteOut(BaseModel):
     example_id: uuid.UUID
+    user_id: uuid.UUID
+    value: int
+    score_cache: int
+
+
+class CommentVoteOut(BaseModel):
+    comment_id: uuid.UUID
     user_id: uuid.UUID
     value: int
     score_cache: int
