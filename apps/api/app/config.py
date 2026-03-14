@@ -55,6 +55,7 @@ class Settings(BaseSettings):
     smtp_from_email: str | None = None
     smtp_from_name: str = "Nheenga Neologismos"
     smtp_use_tls: bool = True
+    host_disk_usage_path: str = "/"
 
     model_config = SettingsConfigDict(
         env_file=".env",

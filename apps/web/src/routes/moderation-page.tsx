@@ -20,7 +20,13 @@ import {
 } from "@/features/moderation/api";
 import { useI18n } from "@/i18n";
 import { trackEvent } from "@/lib/analytics";
-import { formatDateTime, reportReasonLabel, reportStatusLabel, reportTargetLabel } from "@/i18n/formatters";
+import {
+  formatBytes,
+  formatDateTime,
+  reportReasonLabel,
+  reportStatusLabel,
+  reportTargetLabel,
+} from "@/i18n/formatters";
 
 export function ModerationPage() {
   const queryClient = useQueryClient();
@@ -126,6 +132,17 @@ export function ModerationPage() {
     }
     return reason;
   };
+
+  const hostDisk = dashboardQuery.data?.host_disk ?? null;
+  const hostDiskPercent = hostDisk ? Math.max(0, Math.min(100, hostDisk.used_percent)) : null;
+  const hostDiskToneClass =
+    hostDiskPercent === null
+      ? "bg-slate-400"
+      : hostDiskPercent >= 90
+        ? "bg-red-600"
+        : hostDiskPercent >= 75
+          ? "bg-amber-500"
+          : "bg-emerald-600";
 
   if (!currentUser) {
     return (
@@ -356,6 +373,44 @@ export function ModerationPage() {
                 <p className="mt-1 text-2xl font-semibold text-brand-900">
                   {dashboardQuery.data.pending_examples_total}
                 </p>
+              </article>
+              <article className="rounded-md border border-brand-100 bg-brand-50/20 p-3 sm:col-span-2 lg:col-span-3">
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-xs font-medium uppercase tracking-wide text-slate-600">
+                    {t("moderation.metric.hostDisk")}
+                  </p>
+                  {hostDiskPercent !== null ? (
+                    <p className="text-sm font-semibold text-brand-900">{hostDiskPercent.toFixed(1)}%</p>
+                  ) : null}
+                </div>
+                {hostDisk ? (
+                  <>
+                    <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-slate-200">
+                      <div
+                        className={`h-full rounded-full transition-all ${hostDiskToneClass}`}
+                        style={{ width: `${hostDiskPercent ?? 0}%` }}
+                      />
+                    </div>
+                    <p className="mt-2 text-sm text-slate-700">
+                      {t("moderation.disk.usedOf", {
+                        used: formatBytes(hostDisk.used_bytes, locale),
+                        total: formatBytes(hostDisk.total_bytes, locale),
+                      })}
+                    </p>
+                    <p className="mt-1 text-sm text-slate-700">
+                      {t("moderation.disk.free", {
+                        free: formatBytes(hostDisk.free_bytes, locale),
+                      })}
+                    </p>
+                    <p className="mt-1 text-xs text-slate-500">
+                      {t("moderation.disk.path", {
+                        path: hostDisk.path,
+                      })}
+                    </p>
+                  </>
+                ) : (
+                  <p className="mt-2 text-sm text-slate-600">{t("moderation.disk.unavailable")}</p>
+                )}
               </article>
             </div>
 

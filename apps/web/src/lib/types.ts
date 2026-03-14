@@ -153,6 +153,14 @@ export interface PeriodCount {
   month: number;
 }
 
+export interface HostDiskUsage {
+  path: string;
+  total_bytes: number;
+  used_bytes: number;
+  free_bytes: number;
+  used_percent: number;
+}
+
 export interface ModerationDashboard {
   users_total: number;
   entries_total: number;
@@ -167,6 +175,7 @@ export interface ModerationDashboard {
   votes: PeriodCount;
   reports: PeriodCount;
   approved_entries: PeriodCount;
+  host_disk: HostDiskUsage | null;
 }
 
 export interface ModerationReport {

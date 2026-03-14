@@ -37,6 +37,14 @@ class PeriodCountOut(BaseModel):
     month: int
 
 
+class HostDiskUsageOut(BaseModel):
+    path: str
+    total_bytes: int
+    used_bytes: int
+    free_bytes: int
+    used_percent: float
+
+
 class ModerationDashboardOut(BaseModel):
     users_total: int
     entries_total: int
@@ -51,6 +59,7 @@ class ModerationDashboardOut(BaseModel):
     votes: PeriodCountOut
     reports: PeriodCountOut
     approved_entries: PeriodCountOut
+    host_disk: HostDiskUsageOut | None = None
 
 
 class ModerationActionRequest(BaseModel):

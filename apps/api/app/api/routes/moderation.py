@@ -1,5 +1,6 @@
 import uuid
 import logging
+import shutil
 from datetime import UTC, datetime
 from datetime import timedelta
 from typing import Annotated
@@ -7,6 +8,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy import func, select, union_all
 
+from app.config import get_settings
 from app.core.deps import SessionDep, require_moderator
 from app.core.enums import EntryStatus, ExampleStatus, ReportStatus, ReportTargetType
 from app.core.errors import raise_api_error
@@ -14,8 +16,9 @@ from app.models.entry import Entry, Example, ExampleVote, Vote
 from app.models.moderation import Report
 from app.models.user import Profile, User
 from app.schemas.moderation import (
-    ModerationDashboardOut,
+    HostDiskUsageOut,
     ModerationActionRequest,
+    ModerationDashboardOut,
     ModerationEntryOut,
     ModerationExampleOut,
     ModerationQueueOut,
@@ -134,6 +137,20 @@ async def moderation_dashboard(
         week=await count_votes(start_week),
         month=await count_votes(start_month),
     )
+    settings = get_settings()
+    host_disk: HostDiskUsageOut | None = None
+    try:
+        disk = shutil.disk_usage(settings.host_disk_usage_path)
+        used_percent = (disk.used / disk.total * 100.0) if disk.total else 0.0
+        host_disk = HostDiskUsageOut(
+            path=settings.host_disk_usage_path,
+            total_bytes=disk.total,
+            used_bytes=disk.used,
+            free_bytes=disk.free,
+            used_percent=round(used_percent, 1),
+        )
+    except OSError:
+        logger.warning("Could not collect host disk usage for path=%s", settings.host_disk_usage_path)
 
     return ModerationDashboardOut(
         users_total=users_total,
@@ -149,6 +166,7 @@ async def moderation_dashboard(
         votes=votes,
         reports=reports,
         approved_entries=approved_entries,
+        host_disk=host_disk,
     )
 
 

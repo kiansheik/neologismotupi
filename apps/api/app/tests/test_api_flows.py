@@ -675,6 +675,14 @@ async def test_moderation_dashboard(client):
         assert isinstance(payload[key]["week"], int)
         assert isinstance(payload[key]["month"], int)
 
+    assert "host_disk" in payload
+    if payload["host_disk"] is not None:
+        assert isinstance(payload["host_disk"]["path"], str)
+        assert payload["host_disk"]["total_bytes"] >= 0
+        assert payload["host_disk"]["used_bytes"] >= 0
+        assert payload["host_disk"]["free_bytes"] >= 0
+        assert 0 <= payload["host_disk"]["used_percent"] <= 100
+
 
 @pytest.mark.asyncio
 async def test_public_user_profile_endpoint(client):
