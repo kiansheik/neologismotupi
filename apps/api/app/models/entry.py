@@ -22,6 +22,7 @@ from app.db import Base
 from app.models.mixins import TimestampMixin, UUIDPrimaryKeyMixin
 
 if TYPE_CHECKING:
+    from app.models.discussion import EntryComment
     from app.models.user import User
 
 
@@ -113,6 +114,36 @@ class Example(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     votes: Mapped[list["ExampleVote"]] = relationship(
         back_populates="example", cascade="all, delete-orphan"
     )
+    versions: Mapped[list["ExampleVersion"]] = relationship(
+        back_populates="example",
+        cascade="all, delete-orphan",
+        order_by="ExampleVersion.version_number",
+    )
+
+
+class ExampleVersion(Base, UUIDPrimaryKeyMixin):
+    __tablename__ = "example_versions"
+    __table_args__ = (
+        UniqueConstraint(
+            "example_id",
+            "version_number",
+            name="uq_example_versions_example_id_version_number",
+        ),
+    )
+
+    example_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid,
+        ForeignKey("examples.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    edited_by_user_id: Mapped[uuid.UUID] = mapped_column(Uuid, ForeignKey("users.id"), nullable=False)
+    version_number: Mapped[int] = mapped_column(Integer, nullable=False)
+    snapshot_json: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False)
+    edit_summary: Mapped[str | None] = mapped_column(String(280), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    example: Mapped[Example] = relationship(back_populates="versions", foreign_keys=[example_id])
 
 
 class Vote(Base, UUIDPrimaryKeyMixin, TimestampMixin):

@@ -8,7 +8,7 @@ from app.models.discussion import CommentVote, EntryComment
 from app.config import get_settings
 from app.core.enums import EntryStatus, ExampleStatus
 from app.core.utils import collapse_whitespace, normalize_text
-from app.models.entry import Entry, EntryTag, EntryVersion, Example, ExampleVote, Tag, Vote
+from app.models.entry import Entry, EntryTag, EntryVersion, Example, ExampleVersion, ExampleVote, Tag, Vote
 from app.models.user import User
 
 
@@ -36,6 +36,20 @@ def snapshot_entry(entry: Entry) -> dict:
         "short_definition": entry.short_definition,
         "morphology_notes": entry.morphology_notes,
         "status": entry.status.value,
+        "updated_at": datetime.now(UTC).isoformat(),
+    }
+
+
+def snapshot_example(example: Example) -> dict:
+    return {
+        "entry_id": str(example.entry_id),
+        "sentence_original": example.sentence_original,
+        "translation_pt": example.translation_pt,
+        "translation_en": example.translation_en,
+        "source_citation": example.source_citation,
+        "usage_note": example.usage_note,
+        "context_tag": example.context_tag,
+        "status": example.status.value,
         "updated_at": datetime.now(UTC).isoformat(),
     }
 
@@ -106,6 +120,30 @@ async def create_entry_version(
     await db.flush()
 
     entry.current_version_id = version.id
+    return version
+
+
+async def create_example_version(
+    db: AsyncSession,
+    *,
+    example: Example,
+    edited_by_user_id: uuid.UUID,
+    edit_summary: str | None,
+) -> ExampleVersion:
+    next_version_stmt = select(func.coalesce(func.max(ExampleVersion.version_number), 0)).where(
+        ExampleVersion.example_id == example.id
+    )
+    next_version_number = int((await db.execute(next_version_stmt)).scalar_one()) + 1
+
+    version = ExampleVersion(
+        example_id=example.id,
+        edited_by_user_id=edited_by_user_id,
+        version_number=next_version_number,
+        snapshot_json=snapshot_example(example),
+        edit_summary=edit_summary,
+    )
+    db.add(version)
+    await db.flush()
     return version
 
 

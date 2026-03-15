@@ -9,7 +9,7 @@ import { ApiError } from "@/lib/api";
 import type { Example as EntryExample, MentionUser } from "@/lib/types";
 import { buildAbsoluteUrl, useSeo } from "@/lib/seo";
 import { applyZodErrors } from "@/lib/zod-form";
-import { type TranslateFn, useI18n } from "@/i18n";
+import { type Locale, type TranslateFn, useI18n } from "@/i18n";
 import { trackEvent } from "@/lib/analytics";
 import { splitEntryDefinition } from "@/lib/entry-definition";
 import { formatDate, formatDateTime, formatRelativeOrDate } from "@/i18n/formatters";
@@ -22,7 +22,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { UserBadge } from "@/components/user-badge";
 import { useCurrentUser } from "@/features/auth/hooks";
 import { createComment, voteComment } from "@/features/comments/api";
-import { reportExample, updateExample, voteExample } from "@/features/examples/api";
+import { listExampleVersions, reportExample, updateExample, voteExample } from "@/features/examples/api";
 import { createExample, getEntry, reportEntry, updateEntry, voteEntry } from "@/features/entries/api";
 import { approveEntry, approveExample, rejectEntry, rejectExample } from "@/features/moderation/api";
 import { listMentionUsers, resolveMentionUsers } from "@/features/users/api";
@@ -192,6 +192,62 @@ function historyActionLabel(actionType: string | null, t: TranslateFn): string {
     default:
       return actionType || t("entry.history.moderationAction");
   }
+}
+
+function ExampleVersionHistory({
+  exampleId,
+  locale,
+  t,
+}: {
+  exampleId: string;
+  locale: Locale;
+  t: TranslateFn;
+}) {
+  const [open, setOpen] = useState(false);
+  const versionsQuery = useQuery({
+    queryKey: ["example-versions", exampleId],
+    queryFn: () => listExampleVersions(exampleId),
+    enabled: open,
+    staleTime: 60_000,
+  });
+
+  return (
+    <details
+      className="mt-2"
+      onToggle={(event) => {
+        setOpen(event.currentTarget.open);
+      }}
+    >
+      <summary className="cursor-pointer text-xs text-brand-700">{t("entry.showExampleVersions")}</summary>
+      <div className="mt-2 rounded-md border border-brand-100 bg-brand-50/30 p-2">
+        <p className="text-xs font-semibold text-brand-900">{t("entry.exampleVersionHistory")}</p>
+        {versionsQuery.isLoading ? (
+          <p className="mt-1 text-xs text-slate-600">{t("entry.loading")}</p>
+        ) : null}
+        {versionsQuery.error ? (
+          <p className="mt-1 text-xs text-red-700">{t("entry.loadError")}</p>
+        ) : null}
+        {versionsQuery.data && versionsQuery.data.length === 0 ? (
+          <p className="mt-1 text-xs text-slate-600">{t("entry.noExampleVersions")}</p>
+        ) : null}
+        {versionsQuery.data && versionsQuery.data.length > 0 ? (
+          <ul className="mt-1 space-y-1 text-xs text-slate-700">
+            {versionsQuery.data.map((version) => (
+              <li key={version.id}>
+                <span className="font-medium">
+                  {t("entry.history.versionPrefix", { version: version.version_number })}
+                </span>
+                {" · "}
+                {version.edit_summary || t("entry.noSummary")}
+                {" · "}
+                {formatDateTime(version.created_at, locale)}
+              </li>
+            ))}
+          </ul>
+        ) : null}
+      </div>
+    </details>
+  );
 }
 
 function buildEntryMetaDescription(entry: {
@@ -1259,6 +1315,7 @@ export function EntryDetailPage() {
                       </div>
                     </form>
                   ) : null}
+                  <ExampleVersionHistory exampleId={example.id} locale={locale} t={t} />
                   {voteExampleMutation.error instanceof ApiError ? (
                     <p className="mt-2 text-xs text-red-700">
                       {getLocalizedApiErrorMessage(voteExampleMutation.error, t)}

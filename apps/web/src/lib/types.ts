@@ -80,6 +80,16 @@ export interface Example {
   updated_at: string;
 }
 
+export interface ExampleVersion {
+  id: string;
+  example_id: string;
+  edited_by_user_id: string;
+  version_number: number;
+  snapshot_json: Record<string, unknown>;
+  edit_summary: string | null;
+  created_at: string;
+}
+
 export interface EntryComment {
   id: string;
   entry_id: string;

@@ -34,7 +34,25 @@ def serialize_example(
     example: Example,
     moderation_map: dict[uuid.UUID, ModerationContext] | None = None,
 ) -> ExampleOut:
-    serialized = ExampleOut.model_validate(example)
+    serialized = ExampleOut.model_validate(
+        {
+            "id": example.id,
+            "entry_id": example.entry_id,
+            "user_id": example.user_id,
+            "sentence_original": example.sentence_original,
+            "translation_pt": example.translation_pt,
+            "translation_en": example.translation_en,
+            "source_citation": example.source_citation,
+            "usage_note": example.usage_note,
+            "context_tag": example.context_tag,
+            "status": example.status,
+            "score_cache": example.score_cache,
+            "upvote_count_cache": example.upvote_count_cache,
+            "downvote_count_cache": example.downvote_count_cache,
+            "created_at": example.created_at,
+            "updated_at": example.updated_at,
+        }
+    )
     if moderation_map and example.id in moderation_map:
         reason, notes, moderated_at = moderation_map[example.id]
         serialized.moderation_reason = reason

@@ -1,4 +1,5 @@
 import { apiFetch } from "@/lib/api";
+import type { ExampleVersion } from "@/lib/types";
 
 export interface ReportExamplePayload {
   reason_code: string;
@@ -16,6 +17,7 @@ export interface UpdateExamplePayload {
   source_citation?: string | null;
   usage_note?: string | null;
   context_tag?: string | null;
+  edit_summary?: string | null;
 }
 
 export function reportExample(exampleId: string, payload: ReportExamplePayload) {
@@ -24,6 +26,10 @@ export function reportExample(exampleId: string, payload: ReportExamplePayload) 
 
 export function updateExample(exampleId: string, payload: UpdateExamplePayload) {
   return apiFetch(`/examples/${exampleId}`, { method: "PATCH", body: payload });
+}
+
+export function listExampleVersions(exampleId: string) {
+  return apiFetch<ExampleVersion[]>(`/examples/${exampleId}/versions`);
 }
 
 export function voteExample(exampleId: string, payload: ExampleVotePayload) {

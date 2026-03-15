@@ -9,7 +9,7 @@ import app.api.routes.moderation as moderation_routes
 import app.db as db_module
 from app.config import get_settings
 from app.core.enums import TagType
-from app.models.discussion import CommentVote, EntryComment, Notification, NotificationPreference
+from app.models.discussion import CommentVote, Notification, NotificationPreference
 from app.models.entry import Entry, Example, ExampleVote, Tag, Vote
 from app.models.moderation import Report
 from app.models.user import Profile, User
@@ -262,6 +262,46 @@ async def test_add_example(client):
     assert response.status_code == 201, response.text
     assert response.json()["status"] == "pending"
     assert response.json()["source_citation"] == "Wikipédia · artigo teste"
+
+
+@pytest.mark.asyncio
+async def test_edit_example_creates_version_history(client):
+    await register_user(client, "example-editor@example.com", "Example Editor")
+    entry = await create_entry(client, "example-edit-entry")
+
+    create_response = await client.post(
+        f"/api/entries/{entry['id']}/examples",
+        json={
+            "sentence_original": "Frase inicial de exemplo.",
+            "translation_pt": "Tradução inicial.",
+            "source_citation": "Fonte inicial",
+        },
+    )
+    assert create_response.status_code == 201, create_response.text
+    example_id = create_response.json()["id"]
+
+    edit_response = await client.patch(
+        f"/api/examples/{example_id}",
+        json={
+            "sentence_original": "Frase revisada de exemplo.",
+            "translation_pt": "Tradução revisada.",
+            "source_citation": "Fonte revisada",
+            "edit_summary": "ajuste de clareza",
+        },
+    )
+    assert edit_response.status_code == 200, edit_response.text
+    edited = edit_response.json()
+    assert edited["sentence_original"] == "Frase revisada de exemplo."
+    assert edited["translation_pt"] == "Tradução revisada."
+    assert edited["source_citation"] == "Fonte revisada"
+
+    versions_response = await client.get(f"/api/examples/{example_id}/versions")
+    assert versions_response.status_code == 200, versions_response.text
+    versions = versions_response.json()
+    assert len(versions) >= 2
+    assert versions[0]["version_number"] > versions[1]["version_number"]
+    assert versions[0]["edit_summary"] == "ajuste de clareza"
+    assert versions[1]["edit_summary"] == "Initial submission"
 
 
 @pytest.mark.asyncio

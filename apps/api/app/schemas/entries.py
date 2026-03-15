@@ -92,6 +92,18 @@ class ExampleOut(BaseModel):
     model_config = {"from_attributes": True}
 
 
+class ExampleVersionOut(BaseModel):
+    id: uuid.UUID
+    example_id: uuid.UUID
+    edited_by_user_id: uuid.UUID
+    version_number: int
+    snapshot_json: dict
+    edit_summary: str | None
+    created_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
 class EntryCommentOut(BaseModel):
     id: uuid.UUID
     entry_id: uuid.UUID
@@ -174,6 +186,7 @@ class ExampleUpdate(BaseModel):
     source_citation: str | None = Field(default=None, max_length=500)
     usage_note: str | None = None
     context_tag: str | None = Field(default=None, max_length=120)
+    edit_summary: str | None = Field(default=None, max_length=280)
 
 
 class CommentCreate(BaseModel):

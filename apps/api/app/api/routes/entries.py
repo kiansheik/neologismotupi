@@ -15,7 +15,7 @@ from app.core.errors import raise_api_error
 from app.core.permissions import can_edit_entry, can_edit_example, is_moderator
 from app.core.utils import collapse_whitespace, slugify
 from app.models.discussion import CommentVote, EntryComment
-from app.models.entry import Entry, EntryTag, EntryVersion, Example, ExampleVote, Tag, Vote
+from app.models.entry import Entry, EntryTag, EntryVersion, Example, ExampleVersion, ExampleVote, Tag, Vote
 from app.models.moderation import ModerationAction, Report
 from app.models.user import Profile, User
 from app.schemas.entries import (
@@ -33,6 +33,7 @@ from app.schemas.entries import (
     ExampleOut,
     ExampleVoteOut,
     ExampleUpdate,
+    ExampleVersionOut,
     ReportCreate,
     VoteOut,
     VoteRequest,
@@ -44,6 +45,7 @@ from app.services.entries import (
     count_user_entries,
     count_user_examples,
     create_entry_version,
+    create_example_version,
     ensure_unique_slug,
     find_possible_duplicates,
     is_effectively_empty,
@@ -69,6 +71,7 @@ from app.services.serializers import (
     serialize_entry_comment,
     serialize_entry_detail,
     serialize_entry_summary,
+    serialize_example,
 )
 from app.services.user_badges import get_user_badge_leaders
 
@@ -955,11 +958,18 @@ async def create_example(
     )
     db.add(example)
     await db.flush()
+    await create_example_version(
+        db,
+        example=example,
+        edited_by_user_id=user.id,
+        edit_summary="Initial submission",
+    )
 
     await refresh_vote_and_example_caches(db, entry)
     await db.commit()
+    await db.refresh(example)
 
-    return ExampleOut.model_validate(example)
+    return serialize_example(example)
 
 
 @router.post("/{entry_id}/comments", response_model=EntryCommentOut, status_code=status.HTTP_201_CREATED)
@@ -1106,8 +1116,26 @@ async def update_example(
     if not is_moderator(user):
         example.status = ExampleStatus.pending
 
+    await create_example_version(
+        db,
+        example=example,
+        edited_by_user_id=user.id,
+        edit_summary=payload.edit_summary or "Example update",
+    )
     await db.commit()
-    return ExampleOut.model_validate(example)
+    await db.refresh(example)
+    return serialize_example(example)
+
+
+@example_router.get("/{example_id}/versions", response_model=list[ExampleVersionOut])
+async def list_example_versions(example_id: uuid.UUID, db: SessionDep) -> list[ExampleVersionOut]:
+    stmt = (
+        select(ExampleVersion)
+        .where(ExampleVersion.example_id == example_id)
+        .order_by(ExampleVersion.version_number.desc())
+    )
+    versions = (await db.execute(stmt)).scalars().all()
+    return [ExampleVersionOut.model_validate(version) for version in versions]
 
 
 @example_router.post("/{example_id}/vote", response_model=ExampleVoteOut)
