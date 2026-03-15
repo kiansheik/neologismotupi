@@ -823,6 +823,12 @@ async def update_entry(
     if not changed:
         raise_api_error(status_code=400, code="no_changes", message="No changes provided")
 
+    # Any user-driven edit to an approved entry must be reviewed again.
+    if entry.status == EntryStatus.approved and not is_moderator(user):
+        entry.status = EntryStatus.pending
+        entry.approved_at = None
+        entry.approved_by_user_id = None
+
     await create_entry_version(
         db,
         entry=entry,

@@ -425,6 +425,40 @@ async def test_edit_own_entry(client):
 
 
 @pytest.mark.asyncio
+async def test_edit_own_approved_entry_reverts_to_pending(client):
+    await register_user(client, "owner-reapprove@example.com", "Owner Reapprove")
+    entry = await create_entry(client, "edit-approved-target")
+
+    await client.post("/api/auth/logout")
+    await register_user(client, "mod-reapprove@example.com", "Mod Reapprove")
+
+    async with db_module.AsyncSessionLocal() as session:
+        moderator = (await session.execute(select(User).where(User.email == "mod-reapprove@example.com"))).scalar_one()
+        moderator.is_superuser = True
+        await session.commit()
+
+    approve_response = await client.post(
+        f"/api/mod/entries/{entry['id']}/approve",
+        json={"notes": "ok", "reason": "good-faith"},
+    )
+    assert approve_response.status_code == 200, approve_response.text
+    assert approve_response.json()["status"] == "approved"
+
+    await client.post("/api/auth/logout")
+    await login_user(client, "owner-reapprove@example.com")
+
+    patch_response = await client.patch(
+        f"/api/entries/{entry['id']}",
+        json={"short_definition": "Definição revisada pelo autor", "edit_summary": "corrige typo"},
+    )
+    assert patch_response.status_code == 200, patch_response.text
+    payload = patch_response.json()
+    assert payload["status"] == "pending"
+    assert payload["approved_at"] is None
+    assert payload["approved_by_user_id"] is None
+
+
+@pytest.mark.asyncio
 async def test_cannot_edit_others_entry(client):
     await register_user(client, "user1@example.com", "User1")
     entry = await create_entry(client, "shared-entry")
