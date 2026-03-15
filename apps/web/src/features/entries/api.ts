@@ -45,6 +45,7 @@ export interface CreateExamplePayload {
   sentence_original: string;
   translation_pt?: string;
   translation_en?: string;
+  source_citation?: string;
   usage_note?: string;
   context_tag?: string;
 }

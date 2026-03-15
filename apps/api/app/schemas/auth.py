@@ -25,6 +25,11 @@ class ProfileOut(BaseModel):
     bio: str | None
     affiliation_label: str | None
     role_label: str | None
+    website_url: str | None
+    instagram_handle: str | None
+    tiktok_handle: str | None
+    youtube_handle: str | None
+    bluesky_handle: str | None
     reputation_score: int
     badges: list[UserBadgeKind] = Field(default_factory=list)
     created_at: datetime

@@ -5,13 +5,14 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy import func, select, update
+from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.core.deps import SessionDep, get_current_user
 from app.core.errors import raise_api_error
-from app.models.discussion import Notification, NotificationPreference
-from app.models.entry import Entry
-from app.models.user import Profile, User
+from app.models.discussion import EntryComment, Notification, NotificationPreference
+from app.models.entry import Entry, Example
+from app.models.user import Profile, Session, User
 from app.schemas.notifications import (
     NotificationListOut,
     NotificationOut,
@@ -22,7 +23,9 @@ from app.schemas.notifications import (
 from app.schemas.users import (
     MentionResolveRequest,
     MentionUserOut,
+    ProfileUpdateRequest,
     PublicProfileOut,
+    PublicProfileStatsOut,
     PublicUserOut,
 )
 from app.services.notifications import (
@@ -86,6 +89,93 @@ def _match_priority(candidate: MentionCandidate, query_key: str) -> int:
     return 4
 
 
+def _latest_timestamp(values: list[datetime | None]) -> datetime | None:
+    available = [value for value in values if value is not None]
+    if not available:
+        return None
+    return max(available)
+
+
+def _earliest_timestamp(values: list[datetime | None]) -> datetime | None:
+    available = [value for value in values if value is not None]
+    if not available:
+        return None
+    return min(available)
+
+
+def _normalize_optional_text(value: str | None) -> str | None:
+    if value is None:
+        return None
+    cleaned = value.strip()
+    if not cleaned:
+        return None
+    return cleaned
+
+
+async def _build_public_profile_stats(
+    db: AsyncSession,
+    user_id: uuid.UUID,
+) -> PublicProfileStatsOut:
+    total_entries = int(
+        (
+            await db.execute(
+                select(func.count()).select_from(Entry).where(Entry.proposer_user_id == user_id)
+            )
+        ).scalar_one()
+    )
+    total_comments = int(
+        (
+            await db.execute(
+                select(func.count())
+                .select_from(EntryComment)
+                .where(EntryComment.user_id == user_id)
+            )
+        ).scalar_one()
+    )
+
+    first_entry_at = (
+        await db.execute(
+            select(func.min(Entry.created_at)).where(Entry.proposer_user_id == user_id)
+        )
+    ).scalar_one_or_none()
+    first_example_at = (
+        await db.execute(select(func.min(Example.created_at)).where(Example.user_id == user_id))
+    ).scalar_one_or_none()
+    first_comment_at = (
+        await db.execute(
+            select(func.min(EntryComment.created_at)).where(EntryComment.user_id == user_id)
+        )
+    ).scalar_one_or_none()
+
+    latest_entry_at = (
+        await db.execute(
+            select(func.max(Entry.created_at)).where(Entry.proposer_user_id == user_id)
+        )
+    ).scalar_one_or_none()
+    latest_example_at = (
+        await db.execute(select(func.max(Example.created_at)).where(Example.user_id == user_id))
+    ).scalar_one_or_none()
+    latest_comment_at = (
+        await db.execute(
+            select(func.max(EntryComment.created_at)).where(EntryComment.user_id == user_id)
+        )
+    ).scalar_one_or_none()
+
+    last_seen_at = (
+        await db.execute(select(func.max(Session.last_seen_at)).where(Session.user_id == user_id))
+    ).scalar_one_or_none()
+
+    return PublicProfileStatsOut(
+        total_entries=total_entries,
+        total_comments=total_comments,
+        last_seen_at=last_seen_at,
+        last_active_at=_latest_timestamp([latest_entry_at, latest_example_at, latest_comment_at]),
+        submitting_since_at=_earliest_timestamp(
+            [first_entry_at, first_example_at, first_comment_at]
+        ),
+    )
+
+
 @router.get("/me/notification-preferences", response_model=NotificationPreferenceOut)
 async def get_my_notification_preferences(
     db: SessionDep,
@@ -105,6 +195,44 @@ async def get_my_notification_preferences(
             notify_on_mentions=True,
         )
     return NotificationPreferenceOut.model_validate(pref)
+
+
+@router.patch("/me/profile", response_model=PublicProfileOut)
+async def update_my_profile(
+    payload: ProfileUpdateRequest,
+    db: SessionDep,
+    user: Annotated[User, Depends(get_current_user)],
+) -> PublicProfileOut:
+    profile = (
+        await db.execute(select(Profile).where(Profile.user_id == user.id))
+    ).scalar_one_or_none()
+    if profile is None:
+        raise_api_error(status_code=404, code="user_not_found", message="User not found")
+
+    updates = payload.model_dump(exclude_unset=True)
+    for field, value in updates.items():
+        if field == "display_name":
+            if value is None:
+                continue
+            cleaned_display_name = value.strip()
+            if len(cleaned_display_name) < 2:
+                raise_api_error(
+                    status_code=422,
+                    code="invalid_profile",
+                    message="Display name must have at least 2 characters",
+                )
+            setattr(profile, field, cleaned_display_name)
+            continue
+        setattr(profile, field, _normalize_optional_text(value))
+
+    await db.commit()
+    await db.refresh(profile)
+
+    badge_leaders = await get_user_badge_leaders(db)
+    profile_out = PublicProfileOut.model_validate(profile)
+    profile_out.badges = resolve_user_badges(user.id, badge_leaders)
+    profile_out.stats = await _build_public_profile_stats(db, user_id=user.id)
+    return profile_out
 
 
 @router.patch("/me/notification-preferences", response_model=NotificationPreferenceOut)
@@ -406,4 +534,5 @@ async def get_user_profile(user_id: uuid.UUID, db: SessionDep) -> PublicUserOut:
     badge_leaders = await get_user_badge_leaders(db)
     profile_out = PublicProfileOut.model_validate(user.profile)
     profile_out.badges = resolve_user_badges(user.id, badge_leaders)
+    profile_out.stats = await _build_public_profile_stats(db, user_id=user.id)
     return PublicUserOut(id=user.id, created_at=user.created_at, profile=profile_out)

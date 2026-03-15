@@ -66,6 +66,7 @@ export interface Example {
   sentence_original: string;
   translation_pt: string | null;
   translation_en: string | null;
+  source_citation: string | null;
   usage_note: string | null;
   context_tag: string | null;
   status: ExampleStatus;
@@ -119,10 +120,24 @@ export interface Profile {
   bio: string | null;
   affiliation_label: string | null;
   role_label: string | null;
+  website_url?: string | null;
+  instagram_handle?: string | null;
+  tiktok_handle?: string | null;
+  youtube_handle?: string | null;
+  bluesky_handle?: string | null;
   reputation_score: number;
   badges?: UserBadgeKind[];
+  stats?: PublicProfileStats;
   created_at: string;
   updated_at: string;
+}
+
+export interface PublicProfileStats {
+  total_entries: number;
+  total_comments: number;
+  last_seen_at: string | null;
+  last_active_at: string | null;
+  submitting_since_at: string | null;
 }
 
 export interface User {

@@ -1,11 +1,13 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { StatusBadge } from "@/components/status-badge";
 import { Card } from "@/components/ui/card";
+import { Textarea } from "@/components/ui/textarea";
 import { UserBadge } from "@/components/user-badge";
 import { useCurrentUser } from "@/features/auth/hooks";
 import { listEntries } from "@/features/entries/api";
@@ -16,6 +18,7 @@ import {
   markNotificationRead,
   updateNotificationPreferences,
 } from "@/features/notifications/api";
+import { updateMyProfile } from "@/features/users/api";
 import { useI18n } from "@/i18n";
 import { formatRelativeOrDate } from "@/i18n/formatters";
 import { ApiError } from "@/lib/api";
@@ -25,6 +28,17 @@ export function MePage() {
   const queryClient = useQueryClient();
   const { locale, t } = useI18n();
   const { data: currentUser } = useCurrentUser();
+  const [profileForm, setProfileForm] = useState({
+    display_name: "",
+    bio: "",
+    website_url: "",
+    instagram_handle: "",
+    tiktok_handle: "",
+    youtube_handle: "",
+    bluesky_handle: "",
+    affiliation_label: "",
+    role_label: "",
+  });
 
   const { data } = useQuery({
     queryKey: ["my-entries"],
@@ -65,6 +79,17 @@ export function MePage() {
     },
   });
 
+  const updateProfileMutation = useMutation({
+    mutationFn: updateMyProfile,
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["me"] });
+      if (currentUser?.id) {
+        await queryClient.invalidateQueries({ queryKey: ["public-user", currentUser.id] });
+        await queryClient.invalidateQueries({ queryKey: ["user-entries", currentUser.id] });
+      }
+    },
+  });
+
   const prefValue = notificationPreferencesQuery.data;
   const unreadCount = notificationsQuery.data?.unread_count ?? 0;
   const notifications = notificationsQuery.data?.items ?? [];
@@ -90,6 +115,23 @@ export function MePage() {
     });
   };
 
+  useEffect(() => {
+    if (!currentUser?.profile) {
+      return;
+    }
+    setProfileForm({
+      display_name: currentUser.profile.display_name ?? "",
+      bio: currentUser.profile.bio ?? "",
+      website_url: currentUser.profile.website_url ?? "",
+      instagram_handle: currentUser.profile.instagram_handle ?? "",
+      tiktok_handle: currentUser.profile.tiktok_handle ?? "",
+      youtube_handle: currentUser.profile.youtube_handle ?? "",
+      bluesky_handle: currentUser.profile.bluesky_handle ?? "",
+      affiliation_label: currentUser.profile.affiliation_label ?? "",
+      role_label: currentUser.profile.role_label ?? "",
+    });
+  }, [currentUser]);
+
   if (!currentUser) {
     return (
       <Card>
@@ -114,6 +156,141 @@ export function MePage() {
         <p className="mt-1 text-sm text-slate-600">
           {t("reputation.label", { score: currentUser.profile?.reputation_score ?? 0 })}
         </p>
+      </Card>
+
+      <Card>
+        <h2 className="text-lg font-semibold text-brand-900">{t("me.profileFormTitle")}</h2>
+        <p className="mt-1 text-sm text-slate-600">{t("me.profileFormHelp")}</p>
+        <form
+          className="mt-3 space-y-3"
+          onSubmit={(event) => {
+            event.preventDefault();
+            updateProfileMutation.mutate({
+              display_name: profileForm.display_name,
+              bio: profileForm.bio.trim() || null,
+              website_url: profileForm.website_url.trim() || null,
+              instagram_handle: profileForm.instagram_handle.trim() || null,
+              tiktok_handle: profileForm.tiktok_handle.trim() || null,
+              youtube_handle: profileForm.youtube_handle.trim() || null,
+              bluesky_handle: profileForm.bluesky_handle.trim() || null,
+              affiliation_label: profileForm.affiliation_label.trim() || null,
+              role_label: profileForm.role_label.trim() || null,
+            });
+          }}
+        >
+          <div className="grid gap-3 sm:grid-cols-2">
+            <label className="space-y-1">
+              <span className="text-sm font-medium text-slate-700">{t("me.profile.displayName")}</span>
+              <Input
+                value={profileForm.display_name}
+                onChange={(event) =>
+                  setProfileForm((current) => ({ ...current, display_name: event.target.value }))
+                }
+                maxLength={120}
+                required
+              />
+            </label>
+            <label className="space-y-1">
+              <span className="text-sm font-medium text-slate-700">{t("me.profile.website")}</span>
+              <Input
+                value={profileForm.website_url}
+                onChange={(event) =>
+                  setProfileForm((current) => ({ ...current, website_url: event.target.value }))
+                }
+                maxLength={500}
+                placeholder="https://..."
+              />
+            </label>
+            <label className="space-y-1">
+              <span className="text-sm font-medium text-slate-700">{t("me.profile.instagram")}</span>
+              <Input
+                value={profileForm.instagram_handle}
+                onChange={(event) =>
+                  setProfileForm((current) => ({ ...current, instagram_handle: event.target.value }))
+                }
+                maxLength={120}
+                placeholder="@usuario"
+              />
+            </label>
+            <label className="space-y-1">
+              <span className="text-sm font-medium text-slate-700">{t("me.profile.tiktok")}</span>
+              <Input
+                value={profileForm.tiktok_handle}
+                onChange={(event) =>
+                  setProfileForm((current) => ({ ...current, tiktok_handle: event.target.value }))
+                }
+                maxLength={120}
+                placeholder="@usuario"
+              />
+            </label>
+            <label className="space-y-1">
+              <span className="text-sm font-medium text-slate-700">{t("me.profile.youtube")}</span>
+              <Input
+                value={profileForm.youtube_handle}
+                onChange={(event) =>
+                  setProfileForm((current) => ({ ...current, youtube_handle: event.target.value }))
+                }
+                maxLength={120}
+                placeholder="@canal"
+              />
+            </label>
+            <label className="space-y-1">
+              <span className="text-sm font-medium text-slate-700">{t("me.profile.bluesky")}</span>
+              <Input
+                value={profileForm.bluesky_handle}
+                onChange={(event) =>
+                  setProfileForm((current) => ({ ...current, bluesky_handle: event.target.value }))
+                }
+                maxLength={253}
+                placeholder="usuario.bsky.social"
+              />
+            </label>
+            <label className="space-y-1">
+              <span className="text-sm font-medium text-slate-700">{t("me.profile.affiliation")}</span>
+              <Input
+                value={profileForm.affiliation_label}
+                onChange={(event) =>
+                  setProfileForm((current) => ({ ...current, affiliation_label: event.target.value }))
+                }
+                maxLength={120}
+              />
+            </label>
+            <label className="space-y-1">
+              <span className="text-sm font-medium text-slate-700">{t("me.profile.role")}</span>
+              <Input
+                value={profileForm.role_label}
+                onChange={(event) =>
+                  setProfileForm((current) => ({ ...current, role_label: event.target.value }))
+                }
+                maxLength={120}
+              />
+            </label>
+          </div>
+          <label className="block space-y-1">
+            <span className="text-sm font-medium text-slate-700">{t("me.profile.bio")}</span>
+            <Textarea
+              value={profileForm.bio}
+              onChange={(event) =>
+                setProfileForm((current) => ({ ...current, bio: event.target.value }))
+              }
+              maxLength={500}
+              rows={4}
+            />
+          </label>
+          <div className="flex flex-wrap items-center gap-2">
+            <Button type="submit" disabled={updateProfileMutation.isPending}>
+              {t("me.profile.save")}
+            </Button>
+            {updateProfileMutation.isSuccess ? (
+              <p className="text-sm text-green-700">{t("me.profile.saved")}</p>
+            ) : null}
+            {updateProfileMutation.error instanceof ApiError ? (
+              <p className="text-sm text-red-700">
+                {getLocalizedApiErrorMessage(updateProfileMutation.error, t)}
+              </p>
+            ) : null}
+          </div>
+        </form>
       </Card>
 
       <Card>

@@ -29,6 +29,7 @@ import { listMentionUsers, resolveMentionUsers } from "@/features/users/api";
 type ExampleForm = {
   sentence_original: string;
   translation_pt?: string;
+  source_citation?: string;
 };
 
 type CommentForm = {
@@ -319,6 +320,7 @@ export function EntryDetailPage() {
     defaultValues: {
       sentence_original: "",
       translation_pt: "",
+      source_citation: "",
     },
   });
 
@@ -424,6 +426,7 @@ export function EntryDetailPage() {
     onSuccess: (_, payload) => {
       trackEvent("example_submitted", {
         has_translation_pt: Boolean(payload.translation_pt?.trim()),
+        has_source_citation: Boolean(payload.source_citation?.trim()),
       });
       exampleForm.reset();
       queryClient.invalidateQueries({ queryKey: ["entry", slug] });
@@ -489,6 +492,7 @@ export function EntryDetailPage() {
     const exampleSchema = z.object({
       sentence_original: z.string().trim().min(3, t("entry.error.sentenceMin")),
       translation_pt: z.string().optional(),
+      source_citation: z.string().optional(),
     });
     const parsed = exampleSchema.safeParse(payload);
     if (!parsed.success) {
@@ -682,7 +686,8 @@ export function EntryDetailPage() {
         ) : null}
         {entry.morphology_notes ? (
           <p className="mt-2 text-sm text-slate-700">
-            {t("entry.morphology")}: {entry.morphology_notes}
+            <span className="font-semibold text-slate-900">{t("entry.morphology")}:</span>{" "}
+            {entry.morphology_notes}
           </p>
         ) : null}
 
@@ -969,6 +974,11 @@ export function EntryDetailPage() {
                     {t("entry.translationPt")}: {example.translation_pt}
                   </p>
                 ) : null}
+                {example.source_citation ? (
+                  <p className="mt-1 text-xs text-slate-600">
+                    {t("entry.exampleSource")}: {example.source_citation}
+                  </p>
+                ) : null}
                 {(example.status === "rejected" || example.status === "hidden") &&
                 (example.moderation_reason || example.moderation_notes) ? (
                   <p className="mt-1 rounded-md border border-red-200 bg-red-50 px-2 py-1 text-xs text-red-800">
@@ -1251,6 +1261,12 @@ export function EntryDetailPage() {
                 {t("entry.translationPt")}
               </label>
               <Input id="translation_pt" {...exampleForm.register("translation_pt")} />
+            </div>
+            <div>
+              <label className="mb-1 block text-sm font-medium" htmlFor="source_citation">
+                {t("entry.exampleSource")}
+              </label>
+              <Input id="source_citation" {...exampleForm.register("source_citation")} />
             </div>
             {createExampleMutation.error instanceof ApiError ? (
               <p className="text-sm text-red-700">{getLocalizedApiErrorMessage(createExampleMutation.error, t)}</p>

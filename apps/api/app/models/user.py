@@ -56,6 +56,11 @@ class Profile(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     bio: Mapped[str | None] = mapped_column(String(500), nullable=True)
     affiliation_label: Mapped[str | None] = mapped_column(String(120), nullable=True)
     role_label: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    website_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    instagram_handle: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    tiktok_handle: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    youtube_handle: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    bluesky_handle: Mapped[str | None] = mapped_column(String(253), nullable=True)
     reputation_score: Mapped[int] = mapped_column(default=0, nullable=False)
 
     user: Mapped[User] = relationship(back_populates="profile")

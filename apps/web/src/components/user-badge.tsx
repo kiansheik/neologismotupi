@@ -2,7 +2,12 @@ import { useMemo, useState } from "react";
 
 import { Badge } from "@/components/ui/badge";
 import { useI18n } from "@/i18n";
-import { resolveUserBadges, type UserBadgeKind } from "@/lib/user-badges";
+import {
+  badgeEmoji,
+  badgeLabelKey,
+  resolveUserBadges,
+  type UserBadgeKind,
+} from "@/lib/user-badges";
 
 interface Props {
   displayName: string | null | undefined;
@@ -14,26 +19,6 @@ export function UserBadge({ displayName, badges }: Props) {
   const resolved = useMemo(() => resolveUserBadges(displayName, badges), [displayName, badges]);
   const [activeBadge, setActiveBadge] = useState<UserBadgeKind | null>(null);
 
-  const labelForBadge = (badge: UserBadgeKind): string => {
-    if (badge === "founder") {
-      return t("badge.founder");
-    }
-    if (badge === "top_contributor") {
-      return t("badge.topContributor");
-    }
-    return t("badge.karmaLeader");
-  };
-
-  const emojiForBadge = (badge: UserBadgeKind): string => {
-    if (badge === "founder") {
-      return "🛠️";
-    }
-    if (badge === "top_contributor") {
-      return "💪";
-    }
-    return "💎";
-  };
-
   if (resolved.length === 0) {
     return null;
   }
@@ -41,7 +26,7 @@ export function UserBadge({ displayName, badges }: Props) {
   return (
     <span className="relative inline-flex flex-wrap items-center gap-1 align-middle">
       {resolved.map((badge) => {
-        const label = labelForBadge(badge);
+        const label = t(badgeLabelKey(badge));
         return (
           <button
             key={badge}
@@ -54,13 +39,13 @@ export function UserBadge({ displayName, badges }: Props) {
               setActiveBadge((current) => (current === badge ? null : badge));
             }}
           >
-            <span aria-hidden>{emojiForBadge(badge)}</span>
+            <span aria-hidden>{badgeEmoji(badge)}</span>
           </button>
         );
       })}
       {activeBadge ? (
         <Badge tone="neutral">
-          {labelForBadge(activeBadge)}
+          {t(badgeLabelKey(activeBadge))}
         </Badge>
       ) : null}
     </span>

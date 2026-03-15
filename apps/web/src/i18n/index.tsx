@@ -52,7 +52,7 @@ export function I18nProvider({ children }: PropsWithChildren) {
 
   useEffect(() => {
     window.localStorage.setItem(STORAGE_KEY, locale);
-    document.documentElement.lang = locale;
+    document.documentElement.lang = locale === "tupi-BR" ? "pt-BR" : locale;
   }, [locale]);
 
   const value = useMemo<I18nContextValue>(() => {

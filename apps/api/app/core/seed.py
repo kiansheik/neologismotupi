@@ -331,6 +331,14 @@ async def _seed_from_csv(
             ).scalar_one_or_none()
 
             if existing_example is None:
+                source_citation_parts: list[str] = []
+                if source:
+                    source_citation_parts.append(source)
+                if source_page:
+                    source_citation_parts.append(f"p. {source_page}")
+                if source_date:
+                    source_citation_parts.append(source_date)
+
                 usage_note_parts: list[str] = []
                 if source_evidence and source_evidence != attestation:
                     usage_note_parts.append(f"Evidência: {source_evidence}")
@@ -344,6 +352,11 @@ async def _seed_from_csv(
                         sentence_original=attestation,
                         translation_pt=_clean(row.get("Tradução Portuguesa")),
                         translation_en=_clean(row.get("Tradução Inglesa")),
+                        source_citation=(
+                            " · ".join(source_citation_parts)
+                            if source_citation_parts
+                            else None
+                        ),
                         usage_note=" | ".join(usage_note_parts) if usage_note_parts else None,
                         context_tag=_clean(source, limit=120),
                         status=ExampleStatus.approved,

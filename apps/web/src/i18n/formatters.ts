@@ -2,6 +2,13 @@ import type { EntryStatus, ExampleStatus, ModerationReport } from "@/lib/types";
 import type { TranslationKey } from "@/i18n/messages";
 import type { Locale, TranslateFn } from "@/i18n";
 
+function resolveIntlLocale(locale: Locale): string {
+  if (locale === "tupi-BR") {
+    return "pt-BR";
+  }
+  return locale;
+}
+
 export function statusToKey(status: EntryStatus | ExampleStatus): TranslationKey {
   switch (status) {
     case "approved":
@@ -94,7 +101,7 @@ export function formatDateTime(iso: string, locale: Locale): string {
   if (Number.isNaN(parsed.valueOf())) {
     return iso;
   }
-  return new Intl.DateTimeFormat(locale, {
+  return new Intl.DateTimeFormat(resolveIntlLocale(locale), {
     dateStyle: "medium",
     timeStyle: "short",
   }).format(parsed);
@@ -105,7 +112,7 @@ export function formatDate(iso: string, locale: Locale): string {
   if (Number.isNaN(parsed.valueOf())) {
     return iso;
   }
-  return new Intl.DateTimeFormat(locale, {
+  return new Intl.DateTimeFormat(resolveIntlLocale(locale), {
     dateStyle: "long",
   }).format(parsed);
 }
@@ -124,7 +131,7 @@ export function formatBytes(bytes: number, locale: Locale): string {
     value /= 1024;
     unitIndex += 1;
   }
-  return `${new Intl.NumberFormat(locale, { maximumFractionDigits: 1 }).format(value)} ${units[unitIndex]}`;
+  return `${new Intl.NumberFormat(resolveIntlLocale(locale), { maximumFractionDigits: 1 }).format(value)} ${units[unitIndex]}`;
 }
 
 export function formatRelativeOrDate(iso: string, locale: Locale): string {
@@ -144,7 +151,7 @@ export function formatRelativeOrDate(iso: string, locale: Locale): string {
     return formatDate(iso, locale);
   }
 
-  const rtf = new Intl.RelativeTimeFormat(locale, { numeric: "auto" });
+  const rtf = new Intl.RelativeTimeFormat(resolveIntlLocale(locale), { numeric: "auto" });
   if (absMs < oneMinuteMs) {
     const seconds = Math.round(diffMs / 1000);
     return rtf.format(seconds, "second");
@@ -155,4 +162,38 @@ export function formatRelativeOrDate(iso: string, locale: Locale): string {
   }
   const hours = Math.round(diffMs / oneHourMs);
   return rtf.format(hours, "hour");
+}
+
+export function formatTimeSince(iso: string, locale: Locale): string {
+  const parsed = new Date(iso);
+  if (Number.isNaN(parsed.valueOf())) {
+    return iso;
+  }
+
+  const now = new Date();
+  const diffMs = parsed.getTime() - now.getTime();
+  const absMs = Math.abs(diffMs);
+  const oneMinuteMs = 60 * 1000;
+  const oneHourMs = 60 * oneMinuteMs;
+  const oneDayMs = 24 * oneHourMs;
+  const oneMonthMs = 30 * oneDayMs;
+  const oneYearMs = 365 * oneDayMs;
+
+  const rtf = new Intl.RelativeTimeFormat(resolveIntlLocale(locale), { numeric: "auto" });
+  if (absMs < oneMinuteMs) {
+    return rtf.format(Math.round(diffMs / 1000), "second");
+  }
+  if (absMs < oneHourMs) {
+    return rtf.format(Math.round(diffMs / oneMinuteMs), "minute");
+  }
+  if (absMs < oneDayMs) {
+    return rtf.format(Math.round(diffMs / oneHourMs), "hour");
+  }
+  if (absMs < oneMonthMs) {
+    return rtf.format(Math.round(diffMs / oneDayMs), "day");
+  }
+  if (absMs < oneYearMs) {
+    return rtf.format(Math.round(diffMs / oneMonthMs), "month");
+  }
+  return rtf.format(Math.round(diffMs / oneYearMs), "year");
 }

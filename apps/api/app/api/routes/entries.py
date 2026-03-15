@@ -938,11 +938,20 @@ async def create_example(
         sentence_original=collapse_whitespace(payload.sentence_original),
         translation_pt=payload.translation_pt,
         translation_en=payload.translation_en,
+        source_citation=(
+            collapse_whitespace(payload.source_citation)
+            if payload.source_citation
+            else None
+        ),
         usage_note=payload.usage_note,
         context_tag=payload.context_tag,
         status=status_value,
         approved_at=datetime.now(UTC) if status_value == ExampleStatus.approved else None,
-        approved_by_user_id=user.id if status_value == ExampleStatus.approved and user.is_superuser else None,
+        approved_by_user_id=(
+            user.id
+            if status_value == ExampleStatus.approved and user.is_superuser
+            else None
+        ),
     )
     db.add(example)
     await db.flush()
@@ -1075,6 +1084,12 @@ async def update_example(
 
     if payload.translation_en is not None:
         example.translation_en = payload.translation_en
+        changed = True
+
+    if payload.source_citation is not None:
+        example.source_citation = (
+            collapse_whitespace(payload.source_citation) if payload.source_citation else None
+        )
         changed = True
 
     if payload.usage_note is not None:

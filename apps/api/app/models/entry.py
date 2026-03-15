@@ -97,6 +97,7 @@ class Example(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     sentence_original: Mapped[str] = mapped_column(Text, nullable=False)
     translation_pt: Mapped[str | None] = mapped_column(Text, nullable=True)
     translation_en: Mapped[str | None] = mapped_column(Text, nullable=True)
+    source_citation: Mapped[str | None] = mapped_column(String(500), nullable=True)
     usage_note: Mapped[str | None] = mapped_column(Text, nullable=True)
     context_tag: Mapped[str | None] = mapped_column(String(120), nullable=True)
     status: Mapped[ExampleStatus] = mapped_column(

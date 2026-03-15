@@ -76,6 +76,7 @@ class ExampleOut(BaseModel):
     sentence_original: str
     translation_pt: str | None
     translation_en: str | None
+    source_citation: str | None
     usage_note: str | None
     context_tag: str | None
     status: ExampleStatus
@@ -160,6 +161,7 @@ class ExampleCreate(BaseModel):
     sentence_original: str = Field(min_length=3)
     translation_pt: str | None = None
     translation_en: str | None = None
+    source_citation: str | None = Field(default=None, max_length=500)
     usage_note: str | None = None
     context_tag: str | None = Field(default=None, max_length=120)
     turnstile_token: str | None = None
@@ -169,6 +171,7 @@ class ExampleUpdate(BaseModel):
     sentence_original: str | None = Field(default=None, min_length=3)
     translation_pt: str | None = None
     translation_en: str | None = None
+    source_citation: str | None = Field(default=None, max_length=500)
     usage_note: str | None = None
     context_tag: str | None = Field(default=None, max_length=120)
 

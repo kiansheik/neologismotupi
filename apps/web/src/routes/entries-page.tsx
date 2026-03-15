@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useInfiniteQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 
 import { StatusBadge } from "@/components/status-badge";
@@ -15,6 +15,7 @@ import { entryDefinitionPreview } from "@/lib/entry-definition";
 export function EntriesPage() {
   const { t } = useI18n();
   const hasMounted = useRef(false);
+  const loadMoreRef = useRef<HTMLDivElement | null>(null);
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState("");
   const [partOfSpeech, setPartOfSpeech] = useState("");
@@ -38,10 +39,8 @@ export function EntriesPage() {
     return () => window.clearTimeout(timer);
   }, [partOfSpeech, search, sort, status]);
 
-  const params = useMemo(
+  const filters = useMemo(
     () => ({
-      page: 1,
-      page_size: 50,
       search,
       status,
       part_of_speech: partOfSpeech,
@@ -50,10 +49,49 @@ export function EntriesPage() {
     [search, status, partOfSpeech, sort],
   );
 
-  const { data, isLoading } = useQuery({
-    queryKey: ["entries", params],
-    queryFn: () => listEntries(params),
+  const { data, isPending, isFetchingNextPage, hasNextPage, fetchNextPage } = useInfiniteQuery({
+    queryKey: ["entries", filters],
+    initialPageParam: 1,
+    queryFn: ({ pageParam }) =>
+      listEntries({
+        ...filters,
+        page: typeof pageParam === "number" ? pageParam : Number(pageParam),
+        page_size: 50,
+      }),
+    getNextPageParam: (lastPage, allPages) => {
+      if (!lastPage.items.length) {
+        return undefined;
+      }
+      const loadedCount = allPages.reduce((total, page) => total + page.items.length, 0);
+      return loadedCount < lastPage.total ? lastPage.page + 1 : undefined;
+    },
   });
+
+  const items = useMemo(() => data?.pages.flatMap((page) => page.items) ?? [], [data]);
+
+  useEffect(() => {
+    if (!hasNextPage || isFetchingNextPage) {
+      return;
+    }
+    const sentinel = loadMoreRef.current;
+    if (!sentinel) {
+      return;
+    }
+    if (typeof window === "undefined" || !("IntersectionObserver" in window)) {
+      return;
+    }
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (!entries[0]?.isIntersecting) {
+          return;
+        }
+        void fetchNextPage();
+      },
+      { rootMargin: "300px 0px" },
+    );
+    observer.observe(sentinel);
+    return () => observer.disconnect();
+  }, [fetchNextPage, hasNextPage, isFetchingNextPage, items.length]);
 
   return (
     <section className="space-y-4">
@@ -109,11 +147,11 @@ export function EntriesPage() {
       <Card>
         <h2 className="text-base font-semibold text-brand-900">{t("entries.resultsTitle")}</h2>
         <div className="mt-4 space-y-3" data-testid="entry-list">
-          {isLoading ? <p className="text-sm text-slate-600">{t("entries.loading")}</p> : null}
-          {!isLoading && !data?.items.length ? (
+          {isPending ? <p className="text-sm text-slate-600">{t("entries.loading")}</p> : null}
+          {!isPending && !items.length ? (
             <p className="text-sm text-slate-600">{t("entries.noMatches")}</p>
           ) : null}
-          {data?.items.map((entry) => (
+          {items.map((entry) => (
             <article key={entry.id} className="rounded-md border border-brand-100 p-3">
               <div className="flex items-center justify-between gap-2">
                 <Link
@@ -143,6 +181,8 @@ export function EntriesPage() {
               </p>
             </article>
           ))}
+          {isFetchingNextPage ? <p className="text-sm text-slate-600">{t("entries.loadingMore")}</p> : null}
+          {hasNextPage ? <div ref={loadMoreRef} className="h-1 w-full" aria-hidden /> : null}
         </div>
       </Card>
     </section>

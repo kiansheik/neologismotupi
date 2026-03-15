@@ -256,10 +256,12 @@ async def test_add_example(client):
             "sentence_original": "A fake sentence for tests.",
             "translation_pt": "Uma frase falsa de teste.",
             "translation_en": "A fake test sentence.",
+            "source_citation": "Wikipédia · artigo teste",
         },
     )
     assert response.status_code == 201, response.text
     assert response.json()["status"] == "pending"
+    assert response.json()["source_citation"] == "Wikipédia · artigo teste"
 
 
 @pytest.mark.asyncio
@@ -732,6 +734,67 @@ async def test_public_user_profile_endpoint(client):
     payload = response.json()
     assert payload["id"] == user_id
     assert payload["profile"]["display_name"] == "Profile User"
+    stats = payload["profile"]["stats"]
+    assert stats["total_entries"] == 0
+    assert stats["total_comments"] == 0
+    assert stats["last_seen_at"] is not None
+    assert stats["last_active_at"] is None
+    assert stats["submitting_since_at"] is None
+
+
+@pytest.mark.asyncio
+async def test_public_user_profile_stats_include_contribution_counts(client):
+    created = await register_user(client, "profile-stats@example.com", "Profile Stats")
+    user_id = created["id"]
+    entry = await create_entry(client, "profile-stats-entry")
+
+    comment_response = await client.post(
+        f"/api/entries/{entry['id']}/comments",
+        json={"body": "Comentário para validar estatísticas do perfil."},
+    )
+    assert comment_response.status_code == 201, comment_response.text
+
+    response = await client.get(f"/api/users/{user_id}")
+    assert response.status_code == 200, response.text
+    stats = response.json()["profile"]["stats"]
+    assert stats["total_entries"] >= 1
+    assert stats["total_comments"] >= 1
+    assert stats["last_active_at"] is not None
+    assert stats["submitting_since_at"] is not None
+
+
+@pytest.mark.asyncio
+async def test_update_my_profile_social_fields(client):
+    created = await register_user(client, "profile-edit@example.com", "Profile Edit")
+    user_id = created["id"]
+
+    response = await client.patch(
+        "/api/users/me/profile",
+        json={
+            "display_name": "  Profile Editado  ",
+            "bio": "  Bio curta para teste.  ",
+            "website_url": "  academiatupi.com  ",
+            "instagram_handle": "  @academiatupi  ",
+            "tiktok_handle": "  @academiatupi  ",
+            "youtube_handle": "  @academiatupi  ",
+            "bluesky_handle": "  academiatupi.com.br  ",
+        },
+    )
+    assert response.status_code == 200, response.text
+    payload = response.json()
+    assert payload["display_name"] == "Profile Editado"
+    assert payload["bio"] == "Bio curta para teste."
+    assert payload["website_url"] == "academiatupi.com"
+    assert payload["instagram_handle"] == "@academiatupi"
+    assert payload["tiktok_handle"] == "@academiatupi"
+    assert payload["youtube_handle"] == "@academiatupi"
+    assert payload["bluesky_handle"] == "academiatupi.com.br"
+
+    public_response = await client.get(f"/api/users/{user_id}")
+    assert public_response.status_code == 200, public_response.text
+    public_profile = public_response.json()["profile"]
+    assert public_profile["website_url"] == "academiatupi.com"
+    assert public_profile["instagram_handle"] == "@academiatupi"
 
 
 @pytest.mark.asyncio
