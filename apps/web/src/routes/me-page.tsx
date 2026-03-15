@@ -2,15 +2,14 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 
+import { EntryBrowser } from "@/components/entry-browser";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { StatusBadge } from "@/components/status-badge";
 import { Card } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
 import { UserBadge } from "@/components/user-badge";
 import { useCurrentUser } from "@/features/auth/hooks";
-import { listEntries } from "@/features/entries/api";
 import {
   getNotificationPreferences,
   listNotifications,
@@ -47,12 +46,6 @@ export function MePage() {
   const [profileForm, setProfileForm] = useState(profileToForm(null));
   const [isEditingProfile, setIsEditingProfile] = useState(false);
 
-  const { data } = useQuery({
-    queryKey: ["my-entries"],
-    queryFn: () => listEntries({ page: 1, page_size: 50, mine: true, sort: "recent" }),
-    enabled: Boolean(currentUser),
-  });
-
   const notificationPreferencesQuery = useQuery({
     queryKey: ["notification-preferences"],
     queryFn: getNotificationPreferences,
@@ -68,12 +61,15 @@ export function MePage() {
   const updatePreferencesMutation = useMutation({
     mutationFn: updateNotificationPreferences,
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ["notification-preferences"] });
+      await queryClient.invalidateQueries({
+        queryKey: ["notification-preferences"],
+      });
     },
   });
 
   const markNotificationReadMutation = useMutation({
-    mutationFn: (notificationId: string) => markNotificationRead(notificationId),
+    mutationFn: (notificationId: string) =>
+      markNotificationRead(notificationId),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["notifications"] });
     },
@@ -96,8 +92,12 @@ export function MePage() {
       setIsEditingProfile(false);
       await queryClient.invalidateQueries({ queryKey: ["me"] });
       if (currentUser?.id) {
-        await queryClient.invalidateQueries({ queryKey: ["public-user", currentUser.id] });
-        await queryClient.invalidateQueries({ queryKey: ["user-entries", currentUser.id] });
+        await queryClient.invalidateQueries({
+          queryKey: ["public-user", currentUser.id],
+        });
+        await queryClient.invalidateQueries({
+          queryKey: ["user-entries", currentUser.id],
+        });
       }
     },
   });
@@ -138,7 +138,9 @@ export function MePage() {
   if (!currentUser) {
     return (
       <Card>
-        <h1 className="text-xl font-semibold text-brand-900">{t("me.title")}</h1>
+        <h1 className="text-xl font-semibold text-brand-900">
+          {t("me.title")}
+        </h1>
         <p className="mt-2 text-sm text-slate-700">{t("me.signInPrompt")}</p>
       </Card>
     );
@@ -147,9 +149,13 @@ export function MePage() {
   return (
     <section className="space-y-4">
       <Card>
-        <h1 className="text-xl font-semibold text-brand-900">{t("me.title")}</h1>
+        <h1 className="text-xl font-semibold text-brand-900">
+          {t("me.title")}
+        </h1>
         <div className="mt-2 flex flex-wrap items-center gap-2 text-sm text-slate-700">
-          <span>{currentUser.profile?.display_name ?? t("me.fallbackUser")}</span>
+          <span>
+            {currentUser.profile?.display_name ?? t("me.fallbackUser")}
+          </span>
           <UserBadge
             displayName={currentUser.profile?.display_name}
             badges={currentUser.profile?.badges}
@@ -157,18 +163,27 @@ export function MePage() {
           <span>· {currentUser.email}</span>
         </div>
         <p className="mt-1 text-sm text-slate-600">
-          {t("reputation.label", { score: currentUser.profile?.reputation_score ?? 0 })}
+          {t("reputation.label", {
+            score: currentUser.profile?.reputation_score ?? 0,
+          })}
         </p>
       </Card>
 
       <Card>
         <div className="flex flex-wrap items-start justify-between gap-2">
           <div>
-            <h2 className="text-lg font-semibold text-brand-900">{t("me.profilePreviewTitle")}</h2>
-            <p className="mt-1 text-sm text-slate-600">{t("me.profilePreviewHelp")}</p>
+            <h2 className="text-lg font-semibold text-brand-900">
+              {t("me.profilePreviewTitle")}
+            </h2>
+            <p className="mt-1 text-sm text-slate-600">
+              {t("me.profilePreviewHelp")}
+            </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            <Link className="text-sm text-brand-700 hover:underline" to={`/profiles/${currentUser.id}`}>
+            <Link
+              className="text-sm text-brand-700 hover:underline"
+              to={`/profiles/${currentUser.id}`}
+            >
               {t("me.profile.viewPublic")}
             </Link>
             <Button
@@ -196,16 +211,24 @@ export function MePage() {
             />
           </div>
           <p className="mt-1 text-sm text-slate-600">
-            {t("reputation.label", { score: currentUser.profile?.reputation_score ?? 0 })}
+            {t("reputation.label", {
+              score: currentUser.profile?.reputation_score ?? 0,
+            })}
           </p>
           {currentUser.profile?.role_label ? (
-            <p className="mt-1 text-sm text-slate-700">{currentUser.profile.role_label}</p>
+            <p className="mt-1 text-sm text-slate-700">
+              {currentUser.profile.role_label}
+            </p>
           ) : null}
           {currentUser.profile?.affiliation_label ? (
-            <p className="text-sm text-slate-700">{currentUser.profile.affiliation_label}</p>
+            <p className="text-sm text-slate-700">
+              {currentUser.profile.affiliation_label}
+            </p>
           ) : null}
           {currentUser.profile?.bio ? (
-            <p className="mt-2 text-sm text-slate-700">{currentUser.profile.bio}</p>
+            <p className="mt-2 text-sm text-slate-700">
+              {currentUser.profile.bio}
+            </p>
           ) : null}
           {profileLinks.length ? (
             <ul className="mt-3 flex flex-wrap gap-2">
@@ -229,9 +252,15 @@ export function MePage() {
 
       {isEditingProfile ? (
         <Card>
-          <h2 className="text-lg font-semibold text-brand-900">{t("me.profileFormTitle")}</h2>
-          <p className="mt-1 text-sm text-slate-600">{t("me.profileFormHelp")}</p>
-          <p className="mt-1 text-xs text-slate-600">{t("form.requiredLegend")}</p>
+          <h2 className="text-lg font-semibold text-brand-900">
+            {t("me.profileFormTitle")}
+          </h2>
+          <p className="mt-1 text-sm text-slate-600">
+            {t("me.profileFormHelp")}
+          </p>
+          <p className="mt-1 text-xs text-slate-600">
+            {t("form.requiredLegend")}
+          </p>
           <form
             className="mt-3 space-y-3"
             onSubmit={(event) => {
@@ -251,11 +280,16 @@ export function MePage() {
           >
             <div className="grid gap-3 sm:grid-cols-2">
               <label className="space-y-1">
-                <span className="text-sm font-medium text-slate-700">{t("me.profile.displayName")} *</span>
+                <span className="text-sm font-medium text-slate-700">
+                  {t("me.profile.displayName")} *
+                </span>
                 <Input
                   value={profileForm.display_name}
                   onChange={(event) =>
-                    setProfileForm((current) => ({ ...current, display_name: event.target.value }))
+                    setProfileForm((current) => ({
+                      ...current,
+                      display_name: event.target.value,
+                    }))
                   }
                   maxLength={120}
                   required
@@ -268,7 +302,10 @@ export function MePage() {
                 <Input
                   value={profileForm.website_url}
                   onChange={(event) =>
-                    setProfileForm((current) => ({ ...current, website_url: event.target.value }))
+                    setProfileForm((current) => ({
+                      ...current,
+                      website_url: event.target.value,
+                    }))
                   }
                   maxLength={500}
                   placeholder="https://..."
@@ -281,7 +318,10 @@ export function MePage() {
                 <Input
                   value={profileForm.instagram_handle}
                   onChange={(event) =>
-                    setProfileForm((current) => ({ ...current, instagram_handle: event.target.value }))
+                    setProfileForm((current) => ({
+                      ...current,
+                      instagram_handle: event.target.value,
+                    }))
                   }
                   maxLength={120}
                   placeholder="@usuario"
@@ -294,7 +334,10 @@ export function MePage() {
                 <Input
                   value={profileForm.tiktok_handle}
                   onChange={(event) =>
-                    setProfileForm((current) => ({ ...current, tiktok_handle: event.target.value }))
+                    setProfileForm((current) => ({
+                      ...current,
+                      tiktok_handle: event.target.value,
+                    }))
                   }
                   maxLength={120}
                   placeholder="@usuario"
@@ -307,7 +350,10 @@ export function MePage() {
                 <Input
                   value={profileForm.youtube_handle}
                   onChange={(event) =>
-                    setProfileForm((current) => ({ ...current, youtube_handle: event.target.value }))
+                    setProfileForm((current) => ({
+                      ...current,
+                      youtube_handle: event.target.value,
+                    }))
                   }
                   maxLength={120}
                   placeholder="@canal"
@@ -320,7 +366,10 @@ export function MePage() {
                 <Input
                   value={profileForm.bluesky_handle}
                   onChange={(event) =>
-                    setProfileForm((current) => ({ ...current, bluesky_handle: event.target.value }))
+                    setProfileForm((current) => ({
+                      ...current,
+                      bluesky_handle: event.target.value,
+                    }))
                   }
                   maxLength={253}
                   placeholder="usuario.bsky.social"
@@ -333,7 +382,10 @@ export function MePage() {
                 <Input
                   value={profileForm.affiliation_label}
                   onChange={(event) =>
-                    setProfileForm((current) => ({ ...current, affiliation_label: event.target.value }))
+                    setProfileForm((current) => ({
+                      ...current,
+                      affiliation_label: event.target.value,
+                    }))
                   }
                   maxLength={120}
                 />
@@ -345,7 +397,10 @@ export function MePage() {
                 <Input
                   value={profileForm.role_label}
                   onChange={(event) =>
-                    setProfileForm((current) => ({ ...current, role_label: event.target.value }))
+                    setProfileForm((current) => ({
+                      ...current,
+                      role_label: event.target.value,
+                    }))
                   }
                   maxLength={120}
                 />
@@ -358,7 +413,10 @@ export function MePage() {
               <Textarea
                 value={profileForm.bio}
                 onChange={(event) =>
-                  setProfileForm((current) => ({ ...current, bio: event.target.value }))
+                  setProfileForm((current) => ({
+                    ...current,
+                    bio: event.target.value,
+                  }))
                 }
                 maxLength={500}
                 rows={4}
@@ -379,7 +437,9 @@ export function MePage() {
                 {t("me.profile.cancel")}
               </Button>
               {updateProfileMutation.isSuccess ? (
-                <p className="text-sm text-green-700">{t("me.profile.saved")}</p>
+                <p className="text-sm text-green-700">
+                  {t("me.profile.saved")}
+                </p>
               ) : null}
               {updateProfileMutation.error instanceof ApiError ? (
                 <p className="text-sm text-red-700">
@@ -391,29 +451,19 @@ export function MePage() {
         </Card>
       ) : null}
 
-      <Card>
-        <h2 className="text-lg font-semibold text-brand-900">{t("me.submissionsTitle")}</h2>
-        <div className="mt-3 space-y-2">
-          {data?.items.length ? (
-            data.items.map((entry) => (
-              <article key={entry.id} className="rounded-md border border-brand-100 p-3">
-                <div className="flex items-center justify-between gap-2">
-                  <Link className="text-brand-800 hover:underline" to={`/entries/${entry.slug}`}>
-                    {entry.headword}
-                  </Link>
-                  <StatusBadge status={entry.status} />
-                </div>
-              </article>
-            ))
-          ) : (
-            <p className="text-sm text-slate-600">{t("me.noSubmissions")}</p>
-          )}
-        </div>
-      </Card>
+      <EntryBrowser
+        compact
+        queryKey={`me-${currentUser.id}`}
+        title={t("me.submissionsTitle")}
+        emptyMessage={t("me.noSubmissions")}
+        scope={{ proposer_user_id: currentUser.id }}
+      />
 
       <Card>
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <h2 className="text-lg font-semibold text-brand-900">{t("me.notificationsTitle")}</h2>
+          <h2 className="text-lg font-semibold text-brand-900">
+            {t("me.notificationsTitle")}
+          </h2>
           <div className="flex items-center gap-2">
             <Badge tone={unreadCount > 0 ? "pending" : "neutral"}>
               {t("me.notificationsUnread", { count: unreadCount })}
@@ -436,23 +486,36 @@ export function MePage() {
                 className="rounded-md border border-brand-100 p-3"
               >
                 <div className="flex flex-wrap items-center gap-2">
-                  <p className="text-sm font-medium text-slate-900">{notification.title}</p>
-                  {!notification.is_read ? <Badge tone="pending">{t("me.notificationNew")}</Badge> : null}
+                  <p className="text-sm font-medium text-slate-900">
+                    {notification.title}
+                  </p>
+                  {!notification.is_read ? (
+                    <Badge tone="pending">{t("me.notificationNew")}</Badge>
+                  ) : null}
                 </div>
                 {notification.body ? (
-                  <p className="mt-1 text-sm text-slate-700">{notification.body}</p>
+                  <p className="mt-1 text-sm text-slate-700">
+                    {notification.body}
+                  </p>
                 ) : null}
                 <p className="mt-1 text-xs text-slate-600">
                   {formatRelativeOrDate(notification.created_at, locale)}
                 </p>
                 <div className="mt-2 flex flex-wrap items-center gap-2">
                   {notification.entry_url ? (
-                    <Link className="text-sm text-brand-700 hover:underline" to={notification.entry_url}>
+                    <Link
+                      className="text-sm text-brand-700 hover:underline"
+                      to={notification.entry_url}
+                    >
                       {notification.entry_headword ?? notification.entry_url}
                     </Link>
                   ) : null}
-                  {notification.actor_profile_url && notification.actor_display_name ? (
-                    <Link className="text-sm text-brand-700 hover:underline" to={notification.actor_profile_url}>
+                  {notification.actor_profile_url &&
+                  notification.actor_display_name ? (
+                    <Link
+                      className="text-sm text-brand-700 hover:underline"
+                      to={notification.actor_profile_url}
+                    >
                       {notification.actor_display_name}
                     </Link>
                   ) : null}
@@ -461,7 +524,9 @@ export function MePage() {
                       type="button"
                       variant="ghost"
                       className="px-2 py-1"
-                      onClick={() => markNotificationReadMutation.mutate(notification.id)}
+                      onClick={() =>
+                        markNotificationReadMutation.mutate(notification.id)
+                      }
                       disabled={markNotificationReadMutation.isPending}
                     >
                       {t("me.markRead")}
@@ -471,13 +536,17 @@ export function MePage() {
               </article>
             ))
           ) : (
-            <p className="text-sm text-slate-600">{t("me.notificationsNone")}</p>
+            <p className="text-sm text-slate-600">
+              {t("me.notificationsNone")}
+            </p>
           )}
         </div>
       </Card>
 
       <Card>
-        <h2 className="text-lg font-semibold text-brand-900">{t("me.notificationPrefsTitle")}</h2>
+        <h2 className="text-lg font-semibold text-brand-900">
+          {t("me.notificationPrefsTitle")}
+        </h2>
         <div className="mt-2 flex flex-wrap gap-2">
           <Button
             type="button"
@@ -498,7 +567,9 @@ export function MePage() {
         </div>
         <div className="mt-3 grid gap-2 sm:grid-cols-2">
           {preferenceRows.map((item) => {
-            const value = prefValue ? Boolean(prefValue[item.key as keyof typeof prefValue]) : true;
+            const value = prefValue
+              ? Boolean(prefValue[item.key as keyof typeof prefValue])
+              : true;
             return (
               <label
                 key={item.key}
@@ -520,7 +591,9 @@ export function MePage() {
           })}
         </div>
         {updatePreferencesMutation.isSuccess ? (
-          <p className="mt-2 text-sm text-green-700">{t("me.notificationPrefsSaved")}</p>
+          <p className="mt-2 text-sm text-green-700">
+            {t("me.notificationPrefsSaved")}
+          </p>
         ) : null}
         {updatePreferencesMutation.error instanceof ApiError ? (
           <p className="mt-2 text-sm text-red-700">
