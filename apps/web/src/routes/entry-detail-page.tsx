@@ -617,11 +617,14 @@ export function EntryDetailPage() {
   );
   const canWrite = Boolean(currentUser);
   const isModerator = Boolean(currentUser?.is_superuser);
+  const canEditEntry = Boolean(
+    currentUser && entry && (isModerator || currentUser.id === entry.proposer_user_id),
+  );
 
   const entrySourceSuggestionsQuery = useQuery({
     queryKey: ["entry-source-suggestions", entrySourceLookupQuery],
     queryFn: () => listSources({ query: entrySourceLookupQuery, limit: 8 }),
-    enabled: isModerator && showEditForm && entryHasSource && entrySourceLookupQuery.length >= 2,
+    enabled: canEditEntry && showEditForm && entryHasSource && entrySourceLookupQuery.length >= 2,
     staleTime: 30_000,
   });
 
@@ -786,7 +789,7 @@ export function EntryDetailPage() {
   const updateEntryMutation = useMutation({
     mutationFn: (payload: Parameters<typeof updateEntry>[1]) => updateEntry(String(entry?.id), payload),
     onSuccess: () => {
-      trackEvent("entry_moderator_edited");
+      trackEvent("entry_edited");
       entryEditForm.resetField("edit_summary");
       setShowEditForm(false);
       queryClient.invalidateQueries({ queryKey: ["entry", slug] });
@@ -794,7 +797,7 @@ export function EntryDetailPage() {
       queryClient.invalidateQueries({ queryKey: ["mod-queue"] });
     },
     onError: (error) => {
-      trackEvent("entry_moderator_edit_failed", {
+      trackEvent("entry_edit_failed", {
         error_code: error instanceof ApiError ? error.code : "unknown",
       });
     },
@@ -1414,13 +1417,18 @@ export function EntryDetailPage() {
                 {rejectEntryMutation.isPending ? t("moderation.rejecting") : t("entry.reject")}
               </Button>
             ) : null}
+          </div>
+        ) : null}
+
+        {canEditEntry ? (
+          <div className="mt-2 flex flex-wrap items-center gap-2">
             <Button
               type="button"
               variant="secondary"
               className="px-2.5 py-1 text-xs"
               onClick={() => {
                 setShowEditForm((current) => !current);
-                trackEvent("entry_moderator_edit_toggled");
+                trackEvent("entry_edit_toggled");
               }}
             >
               {t("entry.editButton")}
@@ -1428,7 +1436,7 @@ export function EntryDetailPage() {
           </div>
         ) : null}
 
-        {isModerator && showEditForm ? (
+        {canEditEntry && showEditForm ? (
           <form
             className="mt-3 space-y-3 rounded-lg border border-brand-200 bg-brand-50/40 p-3"
             onSubmit={(event) => {
