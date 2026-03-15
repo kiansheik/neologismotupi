@@ -130,7 +130,7 @@ export const ptBR = {
   "submit.headword": "Verbete",
   "submit.glossPt": "Glosa (PT)",
   "submit.partOfSpeech": "Classe gramatical",
-  "submit.definition": "Entrada",
+  "submit.definition": "Definição",
   "submit.sourceIfApplicableOptional": "Fonte (se aplicável) ({optional})",
   "submit.morphologyNotes": "Etimologia",
   "submit.help.headword": "A forma principal do neologismo, sem explicação longa.",
@@ -138,7 +138,7 @@ export const ptBR = {
     "Campo obrigatório. Use uma palavra ou expressão curta em português que melhor represente o sentido.",
   "submit.help.partOfSpeech": "Escolha a classe gramatical que melhor representa o uso.",
   "submit.help.definition":
-    "Opcional. Se a glosa já for suficiente, deixe em branco: ela será usada automaticamente como entrada.",
+    "Opcional. Descreva o significado do verbete em português, como em um dicionário, sem repetir o próprio termo. Se a glosa já for suficiente, pode deixar em branco.",
   "submit.help.sourceCitation":
     "Opcional. Informe a fonte quando houver (obra, página, link ou referência de atestação).",
   "submit.help.morphologyNotes":
@@ -149,7 +149,9 @@ export const ptBR = {
   "submit.exampleHeadword": "Verbete",
   "submit.exampleGloss": "Glosa",
   "submit.examplePartOfSpeech": "Classe",
-  "submit.exampleDefinition": "Entrada",
+  "submit.exampleDefinition": "Definição",
+  "submit.exampleSource": "Fonte",
+  "submit.exampleSourceEmpty": "(deixado em branco)",
   "submit.exampleScore": "Karma do verbete",
   "submit.exampleOpen": "Abrir exemplo completo",
   "submit.button": "Enviar verbete",
@@ -499,7 +501,7 @@ export const enUS: Record<TranslationKey, string> = {
     "Required field. Use a short Portuguese word or phrase that best represents the meaning.",
   "submit.help.partOfSpeech": "Choose the grammatical class that best matches usage.",
   "submit.help.definition":
-    "Optional. If the gloss already covers it, leave blank and it will be used automatically as the definition.",
+    "Optional. Describe the word in Portuguese as in a dictionary, without self-referencing the term. If the gloss is enough, you can leave it blank.",
   "submit.help.sourceCitation":
     "Optional. Add source details when available (work, page, link, or attestation reference).",
   "submit.help.morphologyNotes":
@@ -511,6 +513,8 @@ export const enUS: Record<TranslationKey, string> = {
   "submit.exampleGloss": "Gloss",
   "submit.examplePartOfSpeech": "Part of speech",
   "submit.exampleDefinition": "Definition",
+  "submit.exampleSource": "Source",
+  "submit.exampleSourceEmpty": "(left blank)",
   "submit.exampleScore": "Entry karma",
   "submit.exampleOpen": "Open full example",
   "submit.button": "Submit entry",

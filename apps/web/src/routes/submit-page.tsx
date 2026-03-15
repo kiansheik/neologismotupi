@@ -125,24 +125,28 @@ export function SubmitPage() {
         <div className="mt-2 space-y-2 text-xs text-slate-700">
           <p>
             <span className="font-semibold">{t("submit.exampleHeadword")}:</span>{" "}
-            <Link className="text-brand-700 underline" to="/entries/mba-eekokuaba">
-              Mba&apos;eekokuaba
+            <Link className="text-brand-700 underline" to="/entries/morupisara">
+              morupisara
             </Link>
           </p>
           <p>
-            <span className="font-semibold">{t("submit.exampleGloss")}:</span> Física
+            <span className="font-semibold">{t("submit.exampleGloss")}:</span> elevador
           </p>
           <p>
             <span className="font-semibold">{t("submit.examplePartOfSpeech")}:</span>{" "}
             {partOfSpeechLabel("noun", t)}
           </p>
           <p>
-            <span className="font-semibold">{t("submit.exampleDefinition")}:</span> Física.
+            <span className="font-semibold">{t("submit.exampleDefinition")}:</span> Uma máquina que sobe e
+            desce entre andares.
+          </p>
+          <p>
+            <span className="font-semibold">{t("submit.exampleSource")}:</span>{" "}
+            {t("submit.exampleSourceEmpty")}
           </p>
           <p>
             <span className="font-semibold">{t("entry.morphology")}:</span>{" "}
-            Calque do guarani, estudo de como as coisas agem. &quot;Estudo&quot; deixado como kuaba, verbo
-            nominalizado, pois é o ato de estudar, e não alguma circunstância.
+            Mor - gente; upir - subir; saba - instrumental; o que faz pessoas subirem.
           </p>
         </div>
       </div>
