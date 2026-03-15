@@ -30,6 +30,7 @@ class Settings(BaseSettings):
     enforce_downvote_account_age: bool = True
     pending_entry_threshold: int = 3
     pending_example_threshold: int = 5
+    auto_approve_after_threshold: int = -1
 
     signup_rate_limit_count: int = 5
     signup_rate_limit_window_seconds: int = 60 * 60
@@ -99,6 +100,13 @@ class Settings(BaseSettings):
         if cleaned == "":
             return None
         return cleaned
+
+    @field_validator("auto_approve_after_threshold")
+    @classmethod
+    def validate_auto_approve_after_threshold(cls, value: int) -> int:
+        if value < -1:
+            raise ValueError("AUTO_APPROVE_AFTER_THRESHOLD must be -1 or >= 0")
+        return value
 
     @field_validator("email_delivery", mode="before")
     @classmethod

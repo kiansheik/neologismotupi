@@ -210,6 +210,7 @@ SESSION_COOKIE_SAMESITE=lax
 SESSION_COOKIE_DOMAIN=
 SESSION_COOKIE_PATH=/
 ENFORCE_DOWNVOTE_ACCOUNT_AGE=true
+AUTO_APPROVE_AFTER_THRESHOLD=-1
 EMAIL_DELIVERY=log
 SMTP_HOST=
 SMTP_PORT=587
@@ -244,6 +245,7 @@ SESSION_COOKIE_SAMESITE=lax
 SESSION_COOKIE_DOMAIN=
 SESSION_COOKIE_PATH=/
 ENFORCE_DOWNVOTE_ACCOUNT_AGE=true
+AUTO_APPROVE_AFTER_THRESHOLD=-1
 EMAIL_DELIVERY=smtp
 SMTP_HOST=mail.privateemail.com
 SMTP_PORT=587
@@ -284,6 +286,9 @@ Turnstile note:
 - `EMAIL_DELIVERY=log` is for local/dev troubleshooting only. Use `EMAIL_DELIVERY=smtp` in production.
 - `FOUNDER_EMAIL` controls who receives the `fundador/founder` badge.
 - `ENFORCE_DOWNVOTE_ACCOUNT_AGE=false` temporarily disables the 72h downvote restriction (useful for beta).
+- `AUTO_APPROVE_AFTER_THRESHOLD=-1` disables auto-approval for non-moderators (everything stays `pending` until review or moderator/superuser vote).
+- `AUTO_APPROVE_AFTER_THRESHOLD=0` auto-approves immediately.
+- `AUTO_APPROVE_AFTER_THRESHOLD=N` (N >= 1) auto-approves after the user already has at least N submissions.
 
 ### `apps/web/.env.production.example`
 

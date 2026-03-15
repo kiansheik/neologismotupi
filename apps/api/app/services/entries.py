@@ -248,15 +248,23 @@ async def count_user_examples(db: AsyncSession, user_id: uuid.UUID) -> int:
 
 
 def build_entry_status_for_submission(user: User, user_entry_count: int) -> EntryStatus:
-    if should_new_entry_be_pending(user_entry_count, user.is_superuser):
-        return EntryStatus.pending
-    return EntryStatus.approved
+    if user.is_superuser:
+        return EntryStatus.approved
+
+    settings = get_settings()
+    if settings.auto_approve_after_threshold >= 0 and user_entry_count >= settings.auto_approve_after_threshold:
+        return EntryStatus.approved
+    return EntryStatus.pending
 
 
 def build_example_status_for_submission(user: User, user_example_count: int) -> ExampleStatus:
-    if should_new_example_be_pending(user_example_count, user.is_superuser):
-        return ExampleStatus.pending
-    return ExampleStatus.approved
+    if user.is_superuser:
+        return ExampleStatus.approved
+
+    settings = get_settings()
+    if settings.auto_approve_after_threshold >= 0 and user_example_count >= settings.auto_approve_after_threshold:
+        return ExampleStatus.approved
+    return ExampleStatus.pending
 
 
 def cleaned_text(value: str) -> str:

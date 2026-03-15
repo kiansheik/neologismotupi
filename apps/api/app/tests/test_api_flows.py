@@ -87,6 +87,25 @@ async def test_create_entry(client):
 
 
 @pytest.mark.asyncio
+async def test_non_moderator_entries_remain_pending_after_threshold(client):
+    await register_user(client, "trusted-user@example.com", "Trusted User")
+
+    for index in range(1, 6):
+        created = await create_entry(client, f"trusted-user-entry-{index}")
+        assert created["status"] == "pending"
+
+
+@pytest.mark.asyncio
+async def test_auto_approve_threshold_zero_approves_immediately(client, monkeypatch):
+    monkeypatch.setenv("AUTO_APPROVE_AFTER_THRESHOLD", "0")
+    get_settings.cache_clear()
+
+    await register_user(client, "auto-approve-user@example.com", "Auto Approve User")
+    entry = await create_entry(client, "auto-approve-immediate")
+    assert entry["status"] == "approved"
+
+
+@pytest.mark.asyncio
 async def test_entry_source_citation_is_detail_only(client):
     await register_user(client, "source-owner@example.com", "Source Owner")
     response = await client.post(
