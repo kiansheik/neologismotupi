@@ -1,0 +1,11 @@
+User-agent: *
+Allow: /
+Disallow: /me
+Disallow: /moderation
+Disallow: /login
+Disallow: /signup
+Disallow: /recover
+Disallow: /verify-email
+Disallow: /reset-password
+Sitemap: https://neo.academiatupi.com/sitemap.xml
+

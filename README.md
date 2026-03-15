@@ -271,6 +271,7 @@ Docker deploy stack note (Namecheap relay default):
 
 ```env
 VITE_API_BASE_URL=http://localhost:8000/api
+VITE_SITE_URL=http://localhost:5173
 VITE_APP_NAME=Nheenga Neologismos
 VITE_TURNSTILE_SITE_KEY=
 VITE_GA_MEASUREMENT_ID=
@@ -288,6 +289,7 @@ Turnstile note:
 
 ```env
 VITE_API_BASE_URL=https://api.academiatupi.com/api
+VITE_SITE_URL=https://neo.academiatupi.com
 VITE_APP_NAME=Nheenga Neologismos
 VITE_TURNSTILE_SITE_KEY=
 VITE_GA_MEASUREMENT_ID=G-XXXXXXXXXX
@@ -295,6 +297,7 @@ VITE_GA_MEASUREMENT_ID=G-XXXXXXXXXX
 
 Google Analytics (GA4) note:
 - Frontend analytics is enabled only when `VITE_GA_MEASUREMENT_ID` is set.
+- `VITE_SITE_URL` is used to generate canonical URLs, `robots.txt`, and `sitemap.xml` during frontend build.
 - Tracked events include SPA page views, auth flows, entry/example submit & vote actions, report actions, moderation actions, and list filter usage.
 - Avoid sending PII (emails/free text) in analytics params.
 

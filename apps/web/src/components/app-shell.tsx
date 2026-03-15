@@ -7,6 +7,7 @@ import { logout } from "@/features/auth/api";
 import { Button } from "@/components/ui/button";
 import { type Locale, useI18n } from "@/i18n";
 import { initAnalytics, trackEvent, trackPageView } from "@/lib/analytics";
+import { buildAbsoluteUrl, useSeo } from "@/lib/seo";
 import { isTurnstileConfigured, preloadTurnstile } from "@/lib/turnstile";
 
 export function AppShell() {
@@ -30,6 +31,65 @@ export function AppShell() {
     }
     void preloadTurnstile();
   }, []);
+
+  const normalizedPath = location.pathname === "/entries" ? "/" : location.pathname;
+  const hasDedicatedPageSeo =
+    normalizedPath === "/" ||
+    normalizedPath === "/entries" ||
+    normalizedPath.startsWith("/entries/") ||
+    normalizedPath.startsWith("/profiles/");
+  const noindexRoutes = new Set([
+    "/login",
+    "/signup",
+    "/recover",
+    "/verify-email",
+    "/reset-password",
+    "/me",
+    "/moderation",
+  ]);
+  const shouldNoindex = [...noindexRoutes].some(
+    (route) => normalizedPath === route || normalizedPath.startsWith(`${route}/`),
+  );
+
+  let pageTitle = import.meta.env.VITE_APP_NAME ?? "Nheenga Neologismos";
+  if (normalizedPath === "/submit") {
+    pageTitle = `${t("submit.title")} | ${pageTitle}`;
+  } else if (normalizedPath === "/login") {
+    pageTitle = `${t("auth.loginTitle")} | ${pageTitle}`;
+  } else if (normalizedPath === "/signup") {
+    pageTitle = `${t("auth.signupTitle")} | ${pageTitle}`;
+  } else if (normalizedPath === "/moderation") {
+    pageTitle = `${t("moderation.title")} | ${pageTitle}`;
+  } else if (normalizedPath === "/me") {
+    pageTitle = `${t("me.title")} | ${pageTitle}`;
+  } else if (normalizedPath === "/" || normalizedPath === "/entries") {
+    pageTitle = `Dicionário vivo de Tupi moderno | ${pageTitle}`;
+  }
+
+  useSeo({
+    title: pageTitle,
+    description:
+      "Comunidade para registrar, buscar e discutir verbetes de Tupi moderno com histórico e moderação transparente.",
+    canonicalPath: normalizedPath,
+    noindex: shouldNoindex,
+    locale,
+    structuredData:
+      normalizedPath === "/" || normalizedPath === "/entries"
+        ? {
+            "@context": "https://schema.org",
+            "@type": "WebSite",
+            name: import.meta.env.VITE_APP_NAME ?? "Nheenga Neologismos",
+            url: buildAbsoluteUrl("/"),
+            inLanguage: "pt-BR",
+            potentialAction: {
+              "@type": "SearchAction",
+              target: buildAbsoluteUrl("/?search={search_term_string}"),
+              "query-input": "required name=search_term_string",
+            },
+          }
+        : null,
+    disabled: hasDedicatedPageSeo,
+  });
 
   const logoutMutation = useMutation({
     mutationFn: logout,

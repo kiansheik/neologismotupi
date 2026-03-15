@@ -9,6 +9,7 @@ import { listEntries } from "@/features/entries/api";
 import { formatDate, formatRelativeOrDate, formatTimeSince } from "@/i18n/formatters";
 import { useI18n } from "@/i18n";
 import { buildProfileLinks } from "@/lib/profile-links";
+import { buildAbsoluteUrl, useSeo } from "@/lib/seo";
 import { badgeEmoji, badgeLabelKey, resolveUserBadges } from "@/lib/user-badges";
 
 export function ProfilePage() {
@@ -25,6 +26,31 @@ export function ProfilePage() {
     queryKey: ["user-entries", userId],
     queryFn: () => listEntries({ page: 1, page_size: 50, proposer_user_id: String(userId), sort: "recent" }),
     enabled: Boolean(userId),
+  });
+
+  const seoProfile = userQuery.data?.profile;
+  useSeo({
+    title: seoProfile
+      ? `${seoProfile.display_name} | ${import.meta.env.VITE_APP_NAME ?? "Nheenga Neologismos"}`
+      : `${t("profile.loading")} | ${import.meta.env.VITE_APP_NAME ?? "Nheenga Neologismos"}`,
+    description: seoProfile
+      ? `Perfil da comunidade Tupi de ${seoProfile.display_name} com verbetes publicados, comentários e atividade recente.`
+      : "Perfil da comunidade de Tupi moderno.",
+    canonicalPath: userId ? `/profiles/${userId}` : "/",
+    locale,
+    structuredData: seoProfile
+      ? {
+          "@context": "https://schema.org",
+          "@type": "ProfilePage",
+          url: buildAbsoluteUrl(`/profiles/${userId}`),
+          mainEntity: {
+            "@type": "Person",
+            name: seoProfile.display_name,
+            description: seoProfile.bio ?? undefined,
+          },
+        }
+      : null,
+    disabled: !userId,
   });
 
   if (!userId) {

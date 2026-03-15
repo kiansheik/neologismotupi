@@ -7,6 +7,7 @@ import { z } from "zod";
 
 import { ApiError } from "@/lib/api";
 import type { MentionUser } from "@/lib/types";
+import { buildAbsoluteUrl, useSeo } from "@/lib/seo";
 import { applyZodErrors } from "@/lib/zod-form";
 import { type TranslateFn, useI18n } from "@/i18n";
 import { trackEvent } from "@/lib/analytics";
@@ -188,6 +189,27 @@ function historyActionLabel(actionType: string | null, t: TranslateFn): string {
   }
 }
 
+function buildEntryMetaDescription(entry: {
+  headword: string;
+  gloss_pt: string | null;
+  short_definition: string;
+  morphology_notes: string | null;
+}): string {
+  const parts = [
+    entry.headword,
+    entry.gloss_pt ?? "",
+    entry.short_definition,
+    entry.morphology_notes ?? "",
+  ]
+    .map((value) => value.trim())
+    .filter(Boolean);
+  const joined = parts.join(" · ");
+  if (joined.length <= 180) {
+    return joined;
+  }
+  return `${joined.slice(0, 177).trim()}...`;
+}
+
 export function EntryDetailPage() {
   const { slug } = useParams();
   const queryClient = useQueryClient();
@@ -204,6 +226,33 @@ export function EntryDetailPage() {
     queryKey: ["entry", slug],
     queryFn: () => getEntry(String(slug)),
     enabled: Boolean(slug),
+  });
+
+  const entryPageTitle = entry
+    ? `${entry.headword} | ${import.meta.env.VITE_APP_NAME ?? "Nheenga Neologismos"}`
+    : `${t("entry.loading")} | ${import.meta.env.VITE_APP_NAME ?? "Nheenga Neologismos"}`;
+  const entryDescription = entry
+    ? buildEntryMetaDescription(entry)
+    : "Verbete de Tupi moderno com histórico de revisões, exemplos e validação comunitária.";
+  useSeo({
+    title: entryPageTitle,
+    description: entryDescription,
+    canonicalPath: slug ? `/entries/${slug}` : "/",
+    locale,
+    ogType: "article",
+    noindex: entry ? entry.status !== "approved" : false,
+    structuredData: entry
+      ? {
+          "@context": "https://schema.org",
+          "@type": "DefinedTerm",
+          name: entry.headword,
+          description: entry.short_definition,
+          inDefinedTermSet: buildAbsoluteUrl("/"),
+          termCode: entry.slug,
+          url: buildAbsoluteUrl(`/entries/${entry.slug}`),
+          inLanguage: "tupi",
+        }
+      : null,
   });
 
   const voteMutation = useMutation({
