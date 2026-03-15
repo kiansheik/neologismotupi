@@ -66,6 +66,7 @@ export function SignupPage() {
   return (
     <Card>
       <h1 className="text-xl font-semibold text-brand-900">{t("auth.signupTitle")}</h1>
+      <p className="mt-1 text-xs text-slate-600">{t("form.requiredLegend")}</p>
       <form
         className="mt-4 space-y-3"
         onSubmit={(event) => {
@@ -74,7 +75,7 @@ export function SignupPage() {
       >
         <div>
           <label className="mb-1 block text-sm font-medium" htmlFor="display_name">
-            {t("auth.displayName")}
+            {t("auth.displayName")} *
           </label>
           <Input id="display_name" {...form.register("display_name")} />
           {form.formState.errors.display_name?.message ? (
@@ -83,7 +84,7 @@ export function SignupPage() {
         </div>
         <div>
           <label className="mb-1 block text-sm font-medium" htmlFor="email">
-            {t("auth.email")}
+            {t("auth.email")} *
           </label>
           <Input id="email" type="email" {...form.register("email")} />
           {form.formState.errors.email?.message ? (
@@ -92,7 +93,7 @@ export function SignupPage() {
         </div>
         <div>
           <label className="mb-1 block text-sm font-medium" htmlFor="password">
-            {t("auth.password")}
+            {t("auth.password")} *
           </label>
           <Input id="password" type="password" {...form.register("password")} />
           <p className="mt-1 text-xs text-slate-600">{t("auth.passwordHint")}</p>

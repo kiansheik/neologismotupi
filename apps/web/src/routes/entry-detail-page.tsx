@@ -917,8 +917,9 @@ export function EntryDetailPage() {
               void onEntryReportSubmit(event).catch(() => undefined);
             }}
           >
+            <p className="text-xs text-slate-600">{t("form.requiredLegend")}</p>
             <label className="block text-sm font-medium text-slate-800" htmlFor="entry_report_reason">
-              {t("entry.reportReason")}
+              {t("entry.reportReason")} *
             </label>
             <Textarea
               id="entry_report_reason"
@@ -1011,9 +1012,10 @@ export function EntryDetailPage() {
             }}
           >
             <h3 className="text-sm font-semibold text-brand-900">{t("entry.editTitle")}</h3>
+            <p className="text-xs text-slate-600">{t("form.requiredLegend")}</p>
             <div>
               <label className="mb-1 block text-sm font-medium" htmlFor="edit_headword">
-                {t("submit.headword")}
+                {t("submit.headword")} *
               </label>
               <Input id="edit_headword" {...entryEditForm.register("headword")} />
               {entryEditForm.formState.errors.headword?.message ? (
@@ -1022,7 +1024,7 @@ export function EntryDetailPage() {
             </div>
             <div>
               <label className="mb-1 block text-sm font-medium" htmlFor="edit_gloss_pt">
-                {t("submit.glossPt")}
+                {t("submit.glossPt")} *
               </label>
               <Input id="edit_gloss_pt" {...entryEditForm.register("gloss_pt")} />
               {entryEditForm.formState.errors.gloss_pt?.message ? (
@@ -1031,13 +1033,13 @@ export function EntryDetailPage() {
             </div>
             <div>
               <label className="mb-1 block text-sm font-medium" htmlFor="edit_gloss_en">
-                {t("entry.editGlossEn")}
+                {t("entry.editGlossEn")} ({t("form.optional")})
               </label>
               <Input id="edit_gloss_en" {...entryEditForm.register("gloss_en")} />
             </div>
             <div>
               <label className="mb-1 block text-sm font-medium" htmlFor="edit_part_of_speech">
-                {t("submit.partOfSpeech")}
+                {t("submit.partOfSpeech")} ({t("form.optional")})
               </label>
               <select
                 id="edit_part_of_speech"
@@ -1057,19 +1059,19 @@ export function EntryDetailPage() {
             </div>
             <div>
               <label className="mb-1 block text-sm font-medium" htmlFor="edit_short_definition">
-                {t("submit.definition")}
+                {t("submit.definition")} ({t("form.optional")})
               </label>
               <Textarea id="edit_short_definition" {...entryEditForm.register("short_definition")} />
             </div>
             <div>
               <label className="mb-1 block text-sm font-medium" htmlFor="edit_morphology_notes">
-                {t("entry.morphology")}
+                {t("entry.morphology")} ({t("form.optional")})
               </label>
               <Textarea id="edit_morphology_notes" {...entryEditForm.register("morphology_notes")} />
             </div>
             <div>
               <label className="mb-1 block text-sm font-medium" htmlFor="edit_summary">
-                {t("entry.editSummary")}
+                {t("entry.editSummary")} *
               </label>
               <Input id="edit_summary" {...entryEditForm.register("edit_summary")} />
               <p className="mt-1 text-xs text-slate-600">{t("entry.editSummaryHelp")}</p>
@@ -1259,12 +1261,13 @@ export function EntryDetailPage() {
                       }}
                     >
                       <h3 className="text-sm font-semibold text-brand-900">{t("entry.editExampleTitle")}</h3>
+                      <p className="text-xs text-slate-600">{t("form.requiredLegend")}</p>
                       <div>
                         <label
                           className="mb-1 block text-sm font-medium"
                           htmlFor={`example_sentence_original_${example.id}`}
                         >
-                          {t("entry.sentence")}
+                          {t("entry.sentenceInTupiRequired")}
                         </label>
                         <Textarea
                           id={`example_sentence_original_${example.id}`}
@@ -1281,7 +1284,7 @@ export function EntryDetailPage() {
                           className="mb-1 block text-sm font-medium"
                           htmlFor={`example_translation_pt_${example.id}`}
                         >
-                          {t("entry.translationPt")}
+                          {t("entry.translationInPortugueseOptional", { optional: t("form.optional") })}
                         </label>
                         <Input
                           id={`example_translation_pt_${example.id}`}
@@ -1293,7 +1296,7 @@ export function EntryDetailPage() {
                           className="mb-1 block text-sm font-medium"
                           htmlFor={`example_source_citation_${example.id}`}
                         >
-                          {t("entry.exampleSource")}
+                          {t("entry.sourceIfApplicableOptional", { optional: t("form.optional") })}
                         </label>
                         <Input
                           id={`example_source_citation_${example.id}`}
@@ -1511,6 +1514,7 @@ export function EntryDetailPage() {
       {canWrite ? (
         <Card>
           <h2 className="text-lg font-semibold text-brand-900">{t("entry.addExample")}</h2>
+          <p className="mt-1 text-xs text-slate-600">{t("form.requiredLegend")}</p>
           <form
             className="mt-3 space-y-3"
             onSubmit={(event) => {
@@ -1519,7 +1523,7 @@ export function EntryDetailPage() {
           >
             <div>
               <label className="mb-1 block text-sm font-medium" htmlFor="sentence_original">
-                {t("entry.sentence")}
+                {t("entry.sentenceInTupiRequired")}
               </label>
               <Textarea id="sentence_original" {...exampleForm.register("sentence_original")} />
               {exampleForm.formState.errors.sentence_original?.message ? (
@@ -1530,13 +1534,13 @@ export function EntryDetailPage() {
             </div>
             <div>
               <label className="mb-1 block text-sm font-medium" htmlFor="translation_pt">
-                {t("entry.translationPt")}
+                {t("entry.translationInPortugueseOptional", { optional: t("form.optional") })}
               </label>
               <Input id="translation_pt" {...exampleForm.register("translation_pt")} />
             </div>
             <div>
               <label className="mb-1 block text-sm font-medium" htmlFor="source_citation">
-                {t("entry.exampleSource")}
+                {t("entry.sourceIfApplicableOptional", { optional: t("form.optional") })}
               </label>
               <Input id="source_citation" {...exampleForm.register("source_citation")} />
             </div>

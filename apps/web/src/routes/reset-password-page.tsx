@@ -58,6 +58,7 @@ export function ResetPasswordPage() {
     <Card>
       <h1 className="text-xl font-semibold text-brand-900">{t("auth.resetTitle")}</h1>
       <p className="mt-2 text-sm text-slate-700">{t("auth.resetDescription")}</p>
+      <p className="mt-1 text-xs text-slate-600">{t("form.requiredLegend")}</p>
       <form
         className="mt-4 space-y-3"
         onSubmit={(event) => {
@@ -66,7 +67,7 @@ export function ResetPasswordPage() {
       >
         <div>
           <label className="mb-1 block text-sm font-medium" htmlFor="token">
-            {t("auth.resetTokenLabel")}
+            {t("auth.resetTokenLabel")} *
           </label>
           <Input id="token" {...form.register("token")} />
           {form.formState.errors.token?.message ? (
@@ -75,7 +76,7 @@ export function ResetPasswordPage() {
         </div>
         <div>
           <label className="mb-1 block text-sm font-medium" htmlFor="new_password">
-            {t("auth.resetNewPasswordLabel")}
+            {t("auth.resetNewPasswordLabel")} *
           </label>
           <Input id="new_password" type="password" {...form.register("new_password")} />
           <p className="mt-1 text-xs text-slate-600">{t("auth.passwordHint")}</p>

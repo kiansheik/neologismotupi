@@ -115,6 +115,7 @@ export function SubmitPage() {
   return (
     <Card>
       <h1 className="text-xl font-semibold text-brand-900">{t("submit.title")}</h1>
+      <p className="mt-1 text-xs text-slate-600">{t("form.requiredLegend")}</p>
       <p className="mt-1 text-xs text-slate-600">{t("submit.onlyRequired")}</p>
       <div className="mt-3 rounded-md border border-brand-200 bg-brand-50/40 p-3">
         <h2 className="text-sm font-semibold text-brand-900">{t("submit.exampleTitle")}</h2>
@@ -150,7 +151,7 @@ export function SubmitPage() {
       >
         <div>
           <label className="mb-1 block text-sm font-medium" htmlFor="headword">
-            {t("submit.headword")}
+            {t("submit.headword")} *
           </label>
           <p className="mb-1 text-xs text-slate-600">{t("submit.help.headword")}</p>
           <Input id="headword" {...form.register("headword")} />
@@ -185,7 +186,7 @@ export function SubmitPage() {
 
         <div>
           <label className="mb-1 block text-sm font-medium" htmlFor="gloss_pt">
-            {t("submit.glossPt")}
+            {t("submit.glossPt")} *
           </label>
           <p className="mb-1 text-xs text-slate-600">{t("submit.help.glossPt")}</p>
           <Input id="gloss_pt" {...form.register("gloss_pt")} />
@@ -196,7 +197,7 @@ export function SubmitPage() {
 
         <div>
           <label className="mb-1 block text-sm font-medium" htmlFor="part_of_speech">
-            {t("submit.partOfSpeech")}
+            {t("submit.partOfSpeech")} ({t("form.optional")})
           </label>
           <p className="mb-1 text-xs text-slate-600">{t("submit.help.partOfSpeech")}</p>
           <select
@@ -216,7 +217,7 @@ export function SubmitPage() {
 
         <div>
           <label className="mb-1 block text-sm font-medium" htmlFor="short_definition">
-            {t("submit.definition")}
+            {t("submit.definition")} ({t("form.optional")})
           </label>
           <p className="mb-1 text-xs text-slate-600">{t("submit.help.definition")}</p>
           <Textarea id="short_definition" {...form.register("short_definition")} />
@@ -224,7 +225,7 @@ export function SubmitPage() {
 
         <div>
           <label className="mb-1 block text-sm font-medium" htmlFor="morphology_notes">
-            {t("submit.morphologyNotes")}
+            {t("submit.morphologyNotes")} ({t("form.optional")})
           </label>
           <p className="mb-1 text-xs text-slate-600">{t("submit.help.morphologyNotes")}</p>
           <Textarea id="morphology_notes" {...form.register("morphology_notes")} />

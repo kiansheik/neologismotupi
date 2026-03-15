@@ -161,6 +161,7 @@ export function MePage() {
       <Card>
         <h2 className="text-lg font-semibold text-brand-900">{t("me.profileFormTitle")}</h2>
         <p className="mt-1 text-sm text-slate-600">{t("me.profileFormHelp")}</p>
+        <p className="mt-1 text-xs text-slate-600">{t("form.requiredLegend")}</p>
         <form
           className="mt-3 space-y-3"
           onSubmit={(event) => {
@@ -180,7 +181,7 @@ export function MePage() {
         >
           <div className="grid gap-3 sm:grid-cols-2">
             <label className="space-y-1">
-              <span className="text-sm font-medium text-slate-700">{t("me.profile.displayName")}</span>
+              <span className="text-sm font-medium text-slate-700">{t("me.profile.displayName")} *</span>
               <Input
                 value={profileForm.display_name}
                 onChange={(event) =>
@@ -191,7 +192,9 @@ export function MePage() {
               />
             </label>
             <label className="space-y-1">
-              <span className="text-sm font-medium text-slate-700">{t("me.profile.website")}</span>
+              <span className="text-sm font-medium text-slate-700">
+                {t("me.profile.website")} ({t("form.optional")})
+              </span>
               <Input
                 value={profileForm.website_url}
                 onChange={(event) =>
@@ -202,7 +205,9 @@ export function MePage() {
               />
             </label>
             <label className="space-y-1">
-              <span className="text-sm font-medium text-slate-700">{t("me.profile.instagram")}</span>
+              <span className="text-sm font-medium text-slate-700">
+                {t("me.profile.instagram")} ({t("form.optional")})
+              </span>
               <Input
                 value={profileForm.instagram_handle}
                 onChange={(event) =>
@@ -213,7 +218,9 @@ export function MePage() {
               />
             </label>
             <label className="space-y-1">
-              <span className="text-sm font-medium text-slate-700">{t("me.profile.tiktok")}</span>
+              <span className="text-sm font-medium text-slate-700">
+                {t("me.profile.tiktok")} ({t("form.optional")})
+              </span>
               <Input
                 value={profileForm.tiktok_handle}
                 onChange={(event) =>
@@ -224,7 +231,9 @@ export function MePage() {
               />
             </label>
             <label className="space-y-1">
-              <span className="text-sm font-medium text-slate-700">{t("me.profile.youtube")}</span>
+              <span className="text-sm font-medium text-slate-700">
+                {t("me.profile.youtube")} ({t("form.optional")})
+              </span>
               <Input
                 value={profileForm.youtube_handle}
                 onChange={(event) =>
@@ -235,7 +244,9 @@ export function MePage() {
               />
             </label>
             <label className="space-y-1">
-              <span className="text-sm font-medium text-slate-700">{t("me.profile.bluesky")}</span>
+              <span className="text-sm font-medium text-slate-700">
+                {t("me.profile.bluesky")} ({t("form.optional")})
+              </span>
               <Input
                 value={profileForm.bluesky_handle}
                 onChange={(event) =>
@@ -246,7 +257,9 @@ export function MePage() {
               />
             </label>
             <label className="space-y-1">
-              <span className="text-sm font-medium text-slate-700">{t("me.profile.affiliation")}</span>
+              <span className="text-sm font-medium text-slate-700">
+                {t("me.profile.affiliation")} ({t("form.optional")})
+              </span>
               <Input
                 value={profileForm.affiliation_label}
                 onChange={(event) =>
@@ -256,7 +269,9 @@ export function MePage() {
               />
             </label>
             <label className="space-y-1">
-              <span className="text-sm font-medium text-slate-700">{t("me.profile.role")}</span>
+              <span className="text-sm font-medium text-slate-700">
+                {t("me.profile.role")} ({t("form.optional")})
+              </span>
               <Input
                 value={profileForm.role_label}
                 onChange={(event) =>
@@ -267,7 +282,9 @@ export function MePage() {
             </label>
           </div>
           <label className="block space-y-1">
-            <span className="text-sm font-medium text-slate-700">{t("me.profile.bio")}</span>
+            <span className="text-sm font-medium text-slate-700">
+              {t("me.profile.bio")} ({t("form.optional")})
+            </span>
             <Textarea
               value={profileForm.bio}
               onChange={(event) =>

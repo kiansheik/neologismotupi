@@ -55,6 +55,7 @@ export function VerifyEmailPage() {
     <Card>
       <h1 className="text-xl font-semibold text-brand-900">{t("auth.verifyTitle")}</h1>
       <p className="mt-2 text-sm text-slate-700">{t("auth.verifyDescription")}</p>
+      <p className="mt-1 text-xs text-slate-600">{t("form.requiredLegend")}</p>
       <form
         className="mt-4 space-y-3"
         onSubmit={(event) => {
@@ -63,7 +64,7 @@ export function VerifyEmailPage() {
       >
         <div>
           <label className="mb-1 block text-sm font-medium" htmlFor="token">
-            {t("auth.verifyTokenLabel")}
+            {t("auth.verifyTokenLabel")} *
           </label>
           <Input id="token" {...form.register("token")} />
           {form.formState.errors.token?.message ? (

@@ -55,6 +55,7 @@ export function RecoverAccountPage() {
     <Card>
       <h1 className="text-xl font-semibold text-brand-900">{t("auth.recoverTitle")}</h1>
       <p className="mt-2 text-sm text-slate-700">{t("auth.recoverDescription")}</p>
+      <p className="mt-1 text-xs text-slate-600">{t("form.requiredLegend")}</p>
       <form
         className="mt-4 space-y-3"
         onSubmit={(event) => {
@@ -63,7 +64,7 @@ export function RecoverAccountPage() {
       >
         <div>
           <label className="mb-1 block text-sm font-medium" htmlFor="email">
-            {t("auth.email")}
+            {t("auth.email")} *
           </label>
           <Input id="email" type="email" {...form.register("email")} />
           {form.formState.errors.email?.message ? (
