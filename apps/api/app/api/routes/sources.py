@@ -1,7 +1,8 @@
 import uuid
+from collections import defaultdict
 
 from fastapi import APIRouter, Query
-from sqlalchemy import and_, func, select
+from sqlalchemy import and_, func, or_, select
 
 from app.core.deps import SessionDep
 from app.core.enums import EntryStatus, ExampleStatus
@@ -66,11 +67,8 @@ async def get_source_detail(
 
     hidden_example_statuses = [ExampleStatus.hidden, ExampleStatus.rejected]
 
-    links_payload = (
-        await db.execute(
-            select(SourceLink).where(SourceLink.work_id == work_id).order_by(SourceLink.created_at.desc())
-        )
-    ).scalars().all()
+    entry_count_expr = func.count(func.distinct(Entry.id))
+    example_count_expr = func.count(func.distinct(Example.id))
 
     edition_rows = (
         await db.execute(
@@ -78,8 +76,8 @@ async def get_source_detail(
                 SourceEdition.id,
                 SourceEdition.publication_year,
                 SourceEdition.edition_label,
-                func.count(func.distinct(Entry.id)).label("entry_count"),
-                func.count(func.distinct(Example.id)).label("example_count"),
+                entry_count_expr.label("entry_count"),
+                example_count_expr.label("example_count"),
             )
             .select_from(SourceEdition)
             .outerjoin(
@@ -102,9 +100,27 @@ async def get_source_detail(
                 SourceEdition.publication_year,
                 SourceEdition.edition_label,
             )
+            .having(
+                or_(
+                    entry_count_expr > 0,
+                    example_count_expr > 0,
+                )
+            )
             .order_by(SourceEdition.publication_year.desc().nullslast(), SourceEdition.edition_label.asc().nullsfirst())
         )
     ).all()
+    edition_ids = [edition_id for edition_id, *_ in edition_rows]
+    links_by_edition: dict[uuid.UUID, list[SourceLink]] = defaultdict(list)
+    if edition_ids:
+        links = (
+            await db.execute(
+                select(SourceLink)
+                .where(SourceLink.edition_id.in_(edition_ids))
+                .order_by(SourceLink.created_at.desc())
+            )
+        ).scalars().all()
+        for link in links:
+            links_by_edition[link.edition_id].append(link)
 
     entries_count = int(
         (
@@ -134,6 +150,9 @@ async def get_source_detail(
             )
         ).scalar_one()
     )
+
+    if entries_count == 0 and examples_count == 0:
+        raise_api_error(status_code=404, code="source_not_found", message="Source not found")
 
     entry_rows = (
         await db.execute(
@@ -181,7 +200,6 @@ async def get_source_detail(
         work_id=work.id,
         authors=work.authors,
         title=work.title,
-        links=[SourceLinkOut(id=link.id, url=link.url, created_at=link.created_at) for link in links_payload],
         editions=[
             SourceEditionStatsOut(
                 edition_id=edition_id,
@@ -189,6 +207,10 @@ async def get_source_detail(
                 edition_label=edition_label,
                 entry_count=int(entry_count or 0),
                 example_count=int(example_count or 0),
+                links=[
+                    SourceLinkOut(id=link.id, url=link.url, created_at=link.created_at)
+                    for link in links_by_edition.get(edition_id, [])
+                ],
             )
             for edition_id, publication_year, edition_label, entry_count, example_count in edition_rows
         ],

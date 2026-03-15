@@ -231,6 +231,6 @@ def _serialize_source_fields(
         publication_year=source_edition.publication_year,
         edition_label=source_edition.edition_label,
         pages=source_pages,
-        urls=[link.url for link in sorted(work.links, key=lambda item: item.created_at, reverse=True)],
+        urls=[link.url for link in sorted(source_edition.links, key=lambda item: item.created_at, reverse=True)],
         citation=citation,
     )

@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from app.core.enums import EntryStatus, ExampleStatus
 
@@ -28,6 +28,7 @@ class SourceEditionStatsOut(BaseModel):
     edition_label: str | None
     entry_count: int
     example_count: int
+    links: list[SourceLinkOut] = Field(default_factory=list)
 
 
 class SourceEntryRefOut(BaseModel):
@@ -52,7 +53,6 @@ class SourceDetailOut(BaseModel):
     work_id: uuid.UUID
     authors: str | None
     title: str | None
-    links: list[SourceLinkOut]
     editions: list[SourceEditionStatsOut]
     entries_count: int
     examples_count: int

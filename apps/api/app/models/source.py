@@ -30,10 +30,6 @@ class SourceWork(Base, UUIDPrimaryKeyMixin, TimestampMixin):
         back_populates="work",
         cascade="all, delete-orphan",
     )
-    links: Mapped[list["SourceLink"]] = relationship(
-        back_populates="work",
-        cascade="all, delete-orphan",
-    )
 
 
 class SourceEdition(Base, UUIDPrimaryKeyMixin, TimestampMixin):
@@ -60,17 +56,21 @@ class SourceEdition(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     work: Mapped[SourceWork] = relationship(back_populates="editions")
     entries: Mapped[list["Entry"]] = relationship(back_populates="source_edition")
     examples: Mapped[list["Example"]] = relationship(back_populates="source_edition")
+    links: Mapped[list["SourceLink"]] = relationship(
+        back_populates="edition",
+        cascade="all, delete-orphan",
+    )
 
 
 class SourceLink(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     __tablename__ = "source_links"
     __table_args__ = (
-        UniqueConstraint("work_id", "normalized_url", name="uq_source_links_work_normalized_url"),
+        UniqueConstraint("edition_id", "normalized_url", name="uq_source_links_edition_normalized_url"),
     )
 
-    work_id: Mapped[uuid.UUID] = mapped_column(
+    edition_id: Mapped[uuid.UUID] = mapped_column(
         Uuid,
-        ForeignKey("source_works.id", ondelete="CASCADE"),
+        ForeignKey("source_editions.id", ondelete="CASCADE"),
         nullable=False,
         index=True,
     )
@@ -82,5 +82,5 @@ class SourceLink(Base, UUIDPrimaryKeyMixin, TimestampMixin):
         nullable=True,
     )
 
-    work: Mapped[SourceWork] = relationship(back_populates="links")
+    edition: Mapped[SourceEdition] = relationship(back_populates="links")
     created_by_user: Mapped["User | None"] = relationship(foreign_keys=[created_by_user_id])

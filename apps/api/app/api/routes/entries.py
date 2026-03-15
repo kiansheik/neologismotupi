@@ -102,13 +102,12 @@ async def _load_entry_with_relations(db: SessionDep, entry_id: uuid.UUID) -> Ent
         .options(
             selectinload(Entry.tags).selectinload(EntryTag.tag),
             selectinload(Entry.versions),
-            selectinload(Entry.examples)
-            .selectinload(Example.source_edition)
-            .selectinload(SourceEdition.work)
-            .selectinload(SourceWork.links),
+            selectinload(Entry.examples).selectinload(Example.source_edition).selectinload(SourceEdition.work),
+            selectinload(Entry.examples).selectinload(Example.source_edition).selectinload(SourceEdition.links),
             selectinload(Entry.comments).selectinload(EntryComment.author).selectinload(User.profile),
             selectinload(Entry.proposer).selectinload(User.profile),
-            selectinload(Entry.source_edition).selectinload(SourceEdition.work).selectinload(SourceWork.links),
+            selectinload(Entry.source_edition).selectinload(SourceEdition.work),
+            selectinload(Entry.source_edition).selectinload(SourceEdition.links),
         )
     )
     return (await db.execute(stmt)).scalar_one_or_none()
@@ -598,13 +597,12 @@ async def get_entry(
         .options(
             selectinload(Entry.tags).selectinload(EntryTag.tag),
             selectinload(Entry.versions),
-            selectinload(Entry.examples)
-            .selectinload(Example.source_edition)
-            .selectinload(SourceEdition.work)
-            .selectinload(SourceWork.links),
+            selectinload(Entry.examples).selectinload(Example.source_edition).selectinload(SourceEdition.work),
+            selectinload(Entry.examples).selectinload(Example.source_edition).selectinload(SourceEdition.links),
             selectinload(Entry.comments).selectinload(EntryComment.author).selectinload(User.profile),
             selectinload(Entry.proposer).selectinload(User.profile),
-            selectinload(Entry.source_edition).selectinload(SourceEdition.work).selectinload(SourceWork.links),
+            selectinload(Entry.source_edition).selectinload(SourceEdition.work),
+            selectinload(Entry.source_edition).selectinload(SourceEdition.links),
         )
     )
     entry = (await db.execute(stmt)).scalar_one_or_none()
@@ -1108,9 +1106,8 @@ async def create_example(
             select(Example)
             .where(Example.id == example.id)
             .options(
-                selectinload(Example.source_edition)
-                .selectinload(SourceEdition.work)
-                .selectinload(SourceWork.links)
+                selectinload(Example.source_edition).selectinload(SourceEdition.work),
+                selectinload(Example.source_edition).selectinload(SourceEdition.links),
             )
         )
     ).scalar_one_or_none()
@@ -1284,9 +1281,8 @@ async def update_example(
             select(Example)
             .where(Example.id == example.id)
             .options(
-                selectinload(Example.source_edition)
-                .selectinload(SourceEdition.work)
-                .selectinload(SourceWork.links)
+                selectinload(Example.source_edition).selectinload(SourceEdition.work),
+                selectinload(Example.source_edition).selectinload(SourceEdition.links),
             )
         )
     ).scalar_one_or_none()

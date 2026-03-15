@@ -154,6 +154,7 @@ export interface SourceEditionStats {
   edition_label: string | null;
   entry_count: number;
   example_count: number;
+  links: SourceLink[];
 }
 
 export interface SourceEntryRef {
@@ -178,7 +179,6 @@ export interface SourceDetail {
   work_id: string;
   authors: string | null;
   title: string | null;
-  links: SourceLink[];
   editions: SourceEditionStats[];
   entries_count: number;
   examples_count: number;

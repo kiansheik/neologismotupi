@@ -12,6 +12,7 @@ from app.core.enums import TagType
 from app.models.discussion import CommentVote, Notification, NotificationPreference
 from app.models.entry import Entry, Example, ExampleVote, Tag, Vote
 from app.models.moderation import Report
+from app.models.source import SourceEdition, SourceWork
 from app.models.user import Profile, User
 from app.security import hash_password
 
@@ -198,6 +199,113 @@ async def test_sources_autocomplete_lists_existing_source(client):
     suggestions = suggestions_response.json()
     assert len(suggestions) >= 1
     assert any(suggestion["authors"] == "Padre Antônio Vieira" for suggestion in suggestions)
+
+
+@pytest.mark.asyncio
+async def test_sources_autocomplete_hides_orphan_source_editions(client):
+    await register_user(client, "source-orphan-owner@example.com", "Source Orphan Owner")
+    create_response = await client.post(
+        "/api/entries",
+        json={
+            "headword": "source-orphan-entry",
+            "gloss_pt": "fonte órfã",
+            "short_definition": "Entrada para testar ocultação de edição órfã",
+            "source": {
+                "authors": "Fonte Ativa",
+                "title": "Obra Ativa",
+                "publication_year": 2025,
+                "edition_label": "Edição ativa",
+            },
+            "force_submit": True,
+            "tag_ids": [],
+        },
+    )
+    assert create_response.status_code == 201, create_response.text
+    created = create_response.json()
+    work_id = created["source"]["work_id"]
+
+    async with db_module.AsyncSessionLocal() as session:
+        orphan_work = SourceWork(
+            authors="Fonte Sem Uso",
+            title="Obra Sem Uso",
+            normalized_authors="fonte sem uso",
+            normalized_title="obra sem uso",
+        )
+        session.add(orphan_work)
+        await session.flush()
+
+        session.add(
+            SourceEdition(
+                work_id=uuid.UUID(work_id),
+                publication_year=2024,
+                edition_label="1",
+                normalized_edition_label="1",
+            )
+        )
+        session.add(
+            SourceEdition(
+                work_id=orphan_work.id,
+                publication_year=2023,
+                edition_label="edição sem uso",
+                normalized_edition_label="edicao sem uso",
+            )
+        )
+        await session.commit()
+
+    suggestions_response = await client.get("/api/sources", params={"query": "Fonte"})
+    assert suggestions_response.status_code == 200, suggestions_response.text
+    suggestions = suggestions_response.json()
+
+    assert any(item["authors"] == "Fonte Ativa" for item in suggestions)
+    assert all(item["authors"] != "Fonte Sem Uso" for item in suggestions)
+
+    detail_response = await client.get(f"/api/sources/{work_id}")
+    assert detail_response.status_code == 200, detail_response.text
+    detail_payload = detail_response.json()
+    assert all(
+        not (
+            edition["publication_year"] == 2024
+            and edition["edition_label"] == "1"
+            and edition["entry_count"] == 0
+            and edition["example_count"] == 0
+        )
+        for edition in detail_payload["editions"]
+    )
+
+
+@pytest.mark.asyncio
+async def test_source_detail_nests_links_per_edition(client):
+    await register_user(client, "source-link-owner@example.com", "Source Link Owner")
+    create_response = await client.post(
+        "/api/entries",
+        json={
+            "headword": "source-link-entry",
+            "gloss_pt": "fonte com link",
+            "short_definition": "Entrada para testar links por edição",
+            "source": {
+                "authors": "Fonte Com Link",
+                "title": "Obra Com Link",
+                "publication_year": 2026,
+                "edition_label": "1ª edição",
+                "url": "https://example.org/fonte-com-link",
+            },
+            "force_submit": True,
+            "tag_ids": [],
+        },
+    )
+    assert create_response.status_code == 201, create_response.text
+    created = create_response.json()
+    work_id = created["source"]["work_id"]
+    edition_id = created["source"]["edition_id"]
+
+    detail_response = await client.get(f"/api/sources/{work_id}")
+    assert detail_response.status_code == 200, detail_response.text
+    payload = detail_response.json()
+
+    assert "links" not in payload
+    target_edition = next((item for item in payload["editions"] if item["edition_id"] == edition_id), None)
+    assert target_edition is not None
+    assert any(link["url"] == "https://example.org/fonte-com-link" for link in target_edition["links"])
 
 
 @pytest.mark.asyncio

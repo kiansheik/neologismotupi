@@ -64,16 +64,6 @@ export function SourceDetailPage() {
     <section className="space-y-4">
       <Card>
         <h1 className="text-xl font-semibold text-brand-900">{sourceTitle}</h1>
-        {source.authors ? (
-          <p className="mt-1 text-sm text-slate-700">
-            <span className="font-semibold text-slate-900">{t("source.authors")}:</span> {source.authors}
-          </p>
-        ) : null}
-        {source.title ? (
-          <p className="mt-1 text-sm text-slate-700">
-            <span className="font-semibold text-slate-900">{t("source.workTitle")}:</span> {source.title}
-          </p>
-        ) : null}
         <div className="mt-3 flex flex-wrap gap-2 text-sm">
           <span className="rounded-full bg-slate-100 px-3 py-1 text-slate-700">
             {t("source.entriesCount", { count: source.entries_count })}
@@ -82,26 +72,6 @@ export function SourceDetailPage() {
             {t("source.examplesCount", { count: source.examples_count })}
           </span>
         </div>
-      </Card>
-
-      <Card>
-        <h2 className="text-lg font-semibold text-brand-900">{t("source.mirrors")}</h2>
-        {source.links.length ? (
-          <ul className="mt-3 space-y-2 text-sm text-slate-700">
-            {source.links.map((link) => (
-              <li key={link.id}>
-                <a className="text-brand-700 hover:underline" href={link.url} target="_blank" rel="noreferrer">
-                  {link.url}
-                </a>
-                <span className="ml-2 text-xs text-slate-500">
-                  {t("source.linkAdded", { date: formatDateTime(link.created_at, locale) })}
-                </span>
-              </li>
-            ))}
-          </ul>
-        ) : (
-          <p className="mt-2 text-sm text-slate-600">{t("source.noMirrors")}</p>
-        )}
       </Card>
 
       <Card>
@@ -119,6 +89,28 @@ export function SourceDetailPage() {
                   {" · "}
                   {t("source.examplesCount", { count: edition.example_count })}
                 </p>
+                {edition.links.length ? (
+                  <div className="mt-2">
+                    <p className="text-xs font-semibold text-slate-700">{t("source.mirrors")}</p>
+                    <ul className="mt-1 list-disc space-y-1 pl-5 text-xs text-slate-600">
+                      {edition.links.map((link) => (
+                        <li key={link.id}>
+                          <a
+                            className="break-all text-brand-700 hover:underline"
+                            href={link.url}
+                            target="_blank"
+                            rel="noreferrer"
+                          >
+                            {link.url}
+                          </a>
+                          <span className="ml-2 text-slate-500">
+                            {t("source.linkAdded", { date: formatDateTime(link.created_at, locale) })}
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                ) : null}
               </li>
             ))}
           </ul>

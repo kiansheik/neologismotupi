@@ -5,7 +5,7 @@ from sqlalchemy import String, cast, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.utils import collapse_whitespace, normalize_text
-from app.models.entry import Entry
+from app.models.entry import Entry, Example
 from app.models.source import SourceEdition, SourceLink, SourceWork
 from app.schemas.entries import SourceInput
 
@@ -154,7 +154,7 @@ async def get_or_create_source_edition(
     if source_url:
         await get_or_create_source_link(
             db,
-            work_id=work.id,
+            edition_id=edition.id,
             url=source_url,
             created_by_user_id=created_by_user_id,
         )
@@ -165,7 +165,7 @@ async def get_or_create_source_edition(
 async def get_or_create_source_link(
     db: AsyncSession,
     *,
-    work_id: uuid.UUID,
+    edition_id: uuid.UUID,
     url: str,
     created_by_user_id: uuid.UUID | None = None,
 ) -> SourceLink | None:
@@ -177,7 +177,7 @@ async def get_or_create_source_link(
     link = (
         await db.execute(
             select(SourceLink).where(
-                SourceLink.work_id == work_id,
+                SourceLink.edition_id == edition_id,
                 SourceLink.normalized_url == normalized_url,
             )
         )
@@ -185,7 +185,7 @@ async def get_or_create_source_link(
 
     if link is None:
         link = SourceLink(
-            work_id=work_id,
+            edition_id=edition_id,
             url=cleaned_url,
             normalized_url=normalized_url,
             created_by_user_id=created_by_user_id,
@@ -225,6 +225,11 @@ async def search_sources(
     like_query = f"%{cleaned_query}%"
     normalized_like_query = f"%{normalized_query}%"
 
+    entry_count = func.count(func.distinct(Entry.id))
+    example_count = func.count(func.distinct(Example.id))
+    link_count = func.count(func.distinct(SourceLink.id))
+    activity_count = entry_count + example_count + link_count
+
     stmt = (
         select(
             SourceWork.id,
@@ -237,6 +242,8 @@ async def search_sources(
         .select_from(SourceEdition)
         .join(SourceWork, SourceWork.id == SourceEdition.work_id)
         .outerjoin(Entry, Entry.source_edition_id == SourceEdition.id)
+        .outerjoin(Example, Example.source_edition_id == SourceEdition.id)
+        .outerjoin(SourceLink, SourceLink.edition_id == SourceEdition.id)
         .where(
             or_(
                 SourceWork.authors.ilike(like_query),
@@ -245,6 +252,13 @@ async def search_sources(
                 cast(SourceEdition.publication_year, String).ilike(like_query),
                 SourceWork.normalized_authors.ilike(normalized_like_query),
                 SourceWork.normalized_title.ilike(normalized_like_query),
+            )
+        )
+        .having(
+            or_(
+                entry_count > 0,
+                example_count > 0,
+                link_count > 0,
             )
         )
         .group_by(
@@ -256,7 +270,7 @@ async def search_sources(
             SourceEdition.edition_label,
         )
         .order_by(
-            func.count(Entry.id).desc(),
+            activity_count.desc(),
             SourceWork.updated_at.desc(),
             SourceEdition.updated_at.desc(),
         )
