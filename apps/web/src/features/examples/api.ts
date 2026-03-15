@@ -9,11 +9,20 @@ export interface ExampleVotePayload {
   value: -1 | 1;
 }
 
+export interface UpdateExamplePayload {
+  sentence_original?: string;
+  translation_pt?: string | null;
+  translation_en?: string | null;
+  source_citation?: string | null;
+  usage_note?: string | null;
+  context_tag?: string | null;
+}
+
 export function reportExample(exampleId: string, payload: ReportExamplePayload) {
   return apiFetch(`/examples/${exampleId}/reports`, { method: "POST", body: payload });
 }
 
-export function updateExample(exampleId: string, payload: Record<string, string>) {
+export function updateExample(exampleId: string, payload: UpdateExamplePayload) {
   return apiFetch(`/examples/${exampleId}`, { method: "PATCH", body: payload });
 }
 

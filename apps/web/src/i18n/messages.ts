@@ -135,7 +135,7 @@ export const ptBR = {
     "Campo obrigatório. Use uma palavra ou expressão curta em português que melhor represente o sentido.",
   "submit.help.partOfSpeech": "Escolha a classe gramatical que melhor representa o uso.",
   "submit.help.definition":
-    "Opcional. Se a glosa já for suficiente, deixe em branco: a API copiará a glosa para a entrada.",
+    "Opcional. Se a glosa já for suficiente, deixe em branco: ela será usada automaticamente como entrada.",
   "submit.help.morphologyNotes":
     "Opcional. Explique como a palavra foi criada: origem, inspiração, metodologia e escolhas de formação.",
   "submit.exampleTitle": "Exemplo de verbete com boa avaliação",
@@ -190,6 +190,11 @@ export const ptBR = {
   "entry.usageExamples": "Exemplos de uso",
   "entry.translationPt": "Tradução",
   "entry.exampleSource": "Fonte",
+  "entry.editExampleButton": "Editar exemplo",
+  "entry.editExampleTitle": "Editar exemplo",
+  "entry.editExampleSave": "Salvar exemplo",
+  "entry.editExampleCancel": "Cancelar edição",
+  "entry.editExampleSaved": "Exemplo atualizado.",
   "entry.reportExample": "Denunciar exemplo",
   "entry.noExamples": "Ainda não há exemplos aprovados.",
   "entry.versionHistory": "Histórico de versões",
@@ -479,7 +484,7 @@ export const enUS: Record<TranslationKey, string> = {
     "Required field. Use a short Portuguese word or phrase that best represents the meaning.",
   "submit.help.partOfSpeech": "Choose the grammatical class that best matches usage.",
   "submit.help.definition":
-    "Optional. If the gloss already covers it, leave blank and the API will copy the gloss into this field.",
+    "Optional. If the gloss already covers it, leave blank and it will be used automatically as the definition.",
   "submit.help.morphologyNotes":
     "Optional. Explain how the word was built: origin, inspiration, methodology, and formation choices.",
   "submit.exampleTitle": "Well-rated entry example",
@@ -534,6 +539,11 @@ export const enUS: Record<TranslationKey, string> = {
   "entry.usageExamples": "Usage examples",
   "entry.translationPt": "Translation",
   "entry.exampleSource": "Source",
+  "entry.editExampleButton": "Edit example",
+  "entry.editExampleTitle": "Edit example",
+  "entry.editExampleSave": "Save example",
+  "entry.editExampleCancel": "Cancel edit",
+  "entry.editExampleSaved": "Example updated.",
   "entry.reportExample": "Report example",
   "entry.noExamples": "No approved examples yet.",
   "entry.versionHistory": "Version history",

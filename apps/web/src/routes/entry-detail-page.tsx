@@ -6,7 +6,7 @@ import { Link, useParams } from "react-router-dom";
 import { z } from "zod";
 
 import { ApiError } from "@/lib/api";
-import type { MentionUser } from "@/lib/types";
+import type { Example as EntryExample, MentionUser } from "@/lib/types";
 import { buildAbsoluteUrl, useSeo } from "@/lib/seo";
 import { applyZodErrors } from "@/lib/zod-form";
 import { type TranslateFn, useI18n } from "@/i18n";
@@ -22,7 +22,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { UserBadge } from "@/components/user-badge";
 import { useCurrentUser } from "@/features/auth/hooks";
 import { createComment, voteComment } from "@/features/comments/api";
-import { reportExample, voteExample } from "@/features/examples/api";
+import { reportExample, updateExample, voteExample } from "@/features/examples/api";
 import { createExample, getEntry, reportEntry, updateEntry, voteEntry } from "@/features/entries/api";
 import { approveEntry, approveExample, rejectEntry, rejectExample } from "@/features/moderation/api";
 import { listMentionUsers, resolveMentionUsers } from "@/features/users/api";
@@ -72,6 +72,11 @@ function normalizeComparableText(value: string | null | undefined): string {
     .replace(/\s+/g, " ")
     .trim()
     .toLowerCase();
+}
+
+function normalizeOptionalField(value: string | undefined): string | null {
+  const trimmed = value?.trim() ?? "";
+  return trimmed ? trimmed : null;
 }
 
 function normalizeMentionHandle(value: string): string {
@@ -217,6 +222,7 @@ export function EntryDetailPage() {
   const { locale, t } = useI18n();
   const [showEntryReportForm, setShowEntryReportForm] = useState(false);
   const [showEditForm, setShowEditForm] = useState(false);
+  const [editingExampleId, setEditingExampleId] = useState<string | null>(null);
 
   const {
     data: entry,
@@ -372,6 +378,13 @@ export function EntryDetailPage() {
       source_citation: "",
     },
   });
+  const exampleEditForm = useForm<ExampleForm>({
+    defaultValues: {
+      sentence_original: "",
+      translation_pt: "",
+      source_citation: "",
+    },
+  });
 
   const entryReportForm = useForm<ReportForm>({
     defaultValues: {
@@ -485,6 +498,23 @@ export function EntryDetailPage() {
     },
   });
 
+  const updateExampleMutation = useMutation({
+    mutationFn: (params: { exampleId: string; payload: Parameters<typeof updateExample>[1] }) =>
+      updateExample(params.exampleId, params.payload),
+    onSuccess: (_, params) => {
+      trackEvent("example_edited", { example_id: params.exampleId });
+      setEditingExampleId(null);
+      queryClient.invalidateQueries({ queryKey: ["entry", slug] });
+      queryClient.invalidateQueries({ queryKey: ["entries"] });
+      queryClient.invalidateQueries({ queryKey: ["mod-queue"] });
+    },
+    onError: (error) => {
+      trackEvent("example_edit_failed", {
+        error_code: error instanceof ApiError ? error.code : "unknown",
+      });
+    },
+  });
+
   const createCommentMutation = useMutation({
     mutationFn: (payload: CommentForm) => createComment(String(entry?.id), payload),
     onSuccess: () => {
@@ -549,6 +579,31 @@ export function EntryDetailPage() {
       return;
     }
     createExampleMutation.mutate(parsed.data);
+  });
+
+  const onExampleEditSubmit = exampleEditForm.handleSubmit((payload) => {
+    if (!editingExampleId) {
+      return;
+    }
+    exampleEditForm.clearErrors();
+    const exampleSchema = z.object({
+      sentence_original: z.string().trim().min(3, t("entry.error.sentenceMin")),
+      translation_pt: z.string().optional(),
+      source_citation: z.string().trim().max(500).optional(),
+    });
+    const parsed = exampleSchema.safeParse(payload);
+    if (!parsed.success) {
+      applyZodErrors(parsed.error, exampleEditForm.setError);
+      return;
+    }
+    updateExampleMutation.mutate({
+      exampleId: editingExampleId,
+      payload: {
+        sentence_original: parsed.data.sentence_original.trim(),
+        translation_pt: normalizeOptionalField(parsed.data.translation_pt),
+        source_citation: normalizeOptionalField(parsed.data.source_citation),
+      },
+    });
   });
 
   const onCommentSubmit = commentForm.handleSubmit((payload) => {
@@ -656,6 +711,26 @@ export function EntryDetailPage() {
     }
   };
   const showMentionSuggestions = mentionContext !== null;
+
+  const startEditingExample = (example: EntryExample) => {
+    setEditingExampleId(example.id);
+    updateExampleMutation.reset();
+    exampleEditForm.reset({
+      sentence_original: example.sentence_original ?? "",
+      translation_pt: example.translation_pt ?? "",
+      source_citation: example.source_citation ?? "",
+    });
+  };
+
+  const cancelEditingExample = () => {
+    setEditingExampleId(null);
+    updateExampleMutation.reset();
+    exampleEditForm.reset({
+      sentence_original: "",
+      translation_pt: "",
+      source_citation: "",
+    });
+  };
 
   const promptRequiredReason = (promptText: string): string | null => {
     const response = window.prompt(promptText);
@@ -1012,102 +1087,193 @@ export function EntryDetailPage() {
         <h2 className="text-lg font-semibold text-brand-900">{t("entry.usageExamples")}</h2>
         <div className="mt-3 space-y-3">
           {entry.examples.length ? (
-            entry.examples.map((example) => (
-              <article key={example.id} className="rounded-md border border-brand-100 p-3">
-                <div className="flex items-center justify-between gap-2">
-                  <p className="text-sm text-slate-800">{example.sentence_original}</p>
-                  <StatusBadge status={example.status} />
-                </div>
-                {example.translation_pt ? (
-                  <p className="mt-1 text-xs text-slate-600">
-                    {t("entry.translationPt")}: {example.translation_pt}
-                  </p>
-                ) : null}
-                {example.source_citation ? (
-                  <p className="mt-1 text-xs text-slate-600">
-                    {t("entry.exampleSource")}: {example.source_citation}
-                  </p>
-                ) : null}
-                {(example.status === "rejected" || example.status === "hidden") &&
-                (example.moderation_reason || example.moderation_notes) ? (
-                  <p className="mt-1 rounded-md border border-red-200 bg-red-50 px-2 py-1 text-xs text-red-800">
-                    {t("entry.moderationReason")}: {example.moderation_reason || example.moderation_notes}
-                  </p>
-                ) : null}
-                <div className="mt-2 flex flex-wrap items-center gap-2">
-                  <Button
-                    type="button"
-                    variant="secondary"
-                    className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-[#d3c6b0] bg-[#fffaf2] p-0 text-base leading-none shadow-sm hover:border-brand-500 hover:bg-brand-50"
-                    onClick={() => voteExampleMutation.mutate({ exampleId: example.id, value: 1 })}
-                    disabled={!canWrite || voteExampleMutation.isPending}
-                    title={t("entry.upvote")}
-                    aria-label={t("entry.upvote")}
-                  >
-                    <span aria-hidden>{t("entry.upvoteEmoji")}</span>
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="secondary"
-                    className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-[#d3c6b0] bg-[#fffaf2] p-0 text-base leading-none shadow-sm hover:border-red-500 hover:bg-red-100"
-                    onClick={() => voteExampleMutation.mutate({ exampleId: example.id, value: -1 })}
-                    disabled={!canWrite || voteExampleMutation.isPending}
-                    title={t("entry.downvote")}
-                    aria-label={t("entry.downvote")}
-                  >
-                    <span aria-hidden>{t("entry.downvoteEmoji")}</span>
-                  </Button>
-                  <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-xs text-slate-700">
-                    {t("entry.exampleScore", { score: example.score_cache })}
-                  </span>
-                </div>
-                {isModerator ? (
-                  <div className="mt-2 flex flex-wrap gap-2">
-                    <Button
-                      type="button"
-                      onClick={() => approveExampleMutation.mutate(example.id)}
-                      disabled={approveExampleMutation.isPending || example.status === "approved"}
-                    >
-                      {t("moderation.approve")}
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="danger"
-                      onClick={() => {
-                        const reason = promptRequiredReason(t("moderation.prompt.exampleRejectReason"));
-                        if (!reason) {
-                          return;
-                        }
-                        rejectExampleMutation.mutate({ exampleId: example.id, reason });
-                      }}
-                      disabled={rejectExampleMutation.isPending || example.status === "rejected"}
-                    >
-                      {t("moderation.reject")}
-                    </Button>
+            entry.examples.map((example) => {
+              const canEditThisExample = Boolean(
+                currentUser && (isModerator || currentUser.id === example.user_id),
+              );
+              const isEditingThisExample = editingExampleId === example.id;
+
+              return (
+                <article key={example.id} className="rounded-md border border-brand-100 p-3">
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="text-sm text-slate-800">{example.sentence_original}</p>
+                    <StatusBadge status={example.status} />
                   </div>
-                ) : null}
-                {canWrite ? (
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    className="mt-2"
-                    onClick={() => reportExampleMutation.mutate(example.id)}
-                    disabled={reportExampleMutation.isPending}
-                  >
-                    {t("entry.reportExample")}
-                  </Button>
-                ) : null}
-                {voteExampleMutation.error instanceof ApiError ? (
-                  <p className="mt-2 text-xs text-red-700">
-                    {getLocalizedApiErrorMessage(voteExampleMutation.error, t)}
-                  </p>
-                ) : null}
-              </article>
-            ))
+                  {example.translation_pt ? (
+                    <p className="mt-1 text-xs text-slate-600">
+                      {t("entry.translationPt")}: {example.translation_pt}
+                    </p>
+                  ) : null}
+                  {example.source_citation ? (
+                    <p className="mt-1 text-xs text-slate-600">
+                      {t("entry.exampleSource")}: {example.source_citation}
+                    </p>
+                  ) : null}
+                  {(example.status === "rejected" || example.status === "hidden") &&
+                  (example.moderation_reason || example.moderation_notes) ? (
+                    <p className="mt-1 rounded-md border border-red-200 bg-red-50 px-2 py-1 text-xs text-red-800">
+                      {t("entry.moderationReason")}: {example.moderation_reason || example.moderation_notes}
+                    </p>
+                  ) : null}
+                  <div className="mt-2 flex flex-wrap items-center gap-2">
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-[#d3c6b0] bg-[#fffaf2] p-0 text-base leading-none shadow-sm hover:border-brand-500 hover:bg-brand-50"
+                      onClick={() => voteExampleMutation.mutate({ exampleId: example.id, value: 1 })}
+                      disabled={!canWrite || voteExampleMutation.isPending}
+                      title={t("entry.upvote")}
+                      aria-label={t("entry.upvote")}
+                    >
+                      <span aria-hidden>{t("entry.upvoteEmoji")}</span>
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-[#d3c6b0] bg-[#fffaf2] p-0 text-base leading-none shadow-sm hover:border-red-500 hover:bg-red-100"
+                      onClick={() => voteExampleMutation.mutate({ exampleId: example.id, value: -1 })}
+                      disabled={!canWrite || voteExampleMutation.isPending}
+                      title={t("entry.downvote")}
+                      aria-label={t("entry.downvote")}
+                    >
+                      <span aria-hidden>{t("entry.downvoteEmoji")}</span>
+                    </Button>
+                    <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-xs text-slate-700">
+                      {t("entry.exampleScore", { score: example.score_cache })}
+                    </span>
+                  </div>
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    {isModerator ? (
+                      <>
+                        <Button
+                          type="button"
+                          onClick={() => approveExampleMutation.mutate(example.id)}
+                          disabled={approveExampleMutation.isPending || example.status === "approved"}
+                        >
+                          {t("moderation.approve")}
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="danger"
+                          onClick={() => {
+                            const reason = promptRequiredReason(t("moderation.prompt.exampleRejectReason"));
+                            if (!reason) {
+                              return;
+                            }
+                            rejectExampleMutation.mutate({ exampleId: example.id, reason });
+                          }}
+                          disabled={rejectExampleMutation.isPending || example.status === "rejected"}
+                        >
+                          {t("moderation.reject")}
+                        </Button>
+                      </>
+                    ) : null}
+                    {canEditThisExample ? (
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        onClick={() => {
+                          if (isEditingThisExample) {
+                            cancelEditingExample();
+                            return;
+                          }
+                          startEditingExample(example);
+                        }}
+                        disabled={updateExampleMutation.isPending && isEditingThisExample}
+                      >
+                        {isEditingThisExample ? t("entry.editExampleCancel") : t("entry.editExampleButton")}
+                      </Button>
+                    ) : null}
+                    {canWrite ? (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        onClick={() => reportExampleMutation.mutate(example.id)}
+                        disabled={reportExampleMutation.isPending}
+                      >
+                        {t("entry.reportExample")}
+                      </Button>
+                    ) : null}
+                  </div>
+                  {isEditingThisExample ? (
+                    <form
+                      className="mt-3 space-y-3 rounded-lg border border-brand-200 bg-brand-50/40 p-3"
+                      onSubmit={(event) => {
+                        void onExampleEditSubmit(event).catch(() => undefined);
+                      }}
+                    >
+                      <h3 className="text-sm font-semibold text-brand-900">{t("entry.editExampleTitle")}</h3>
+                      <div>
+                        <label
+                          className="mb-1 block text-sm font-medium"
+                          htmlFor={`example_sentence_original_${example.id}`}
+                        >
+                          {t("entry.sentence")}
+                        </label>
+                        <Textarea
+                          id={`example_sentence_original_${example.id}`}
+                          {...exampleEditForm.register("sentence_original")}
+                        />
+                        {exampleEditForm.formState.errors.sentence_original?.message ? (
+                          <p className="mt-1 text-xs text-red-700">
+                            {exampleEditForm.formState.errors.sentence_original.message}
+                          </p>
+                        ) : null}
+                      </div>
+                      <div>
+                        <label
+                          className="mb-1 block text-sm font-medium"
+                          htmlFor={`example_translation_pt_${example.id}`}
+                        >
+                          {t("entry.translationPt")}
+                        </label>
+                        <Input
+                          id={`example_translation_pt_${example.id}`}
+                          {...exampleEditForm.register("translation_pt")}
+                        />
+                      </div>
+                      <div>
+                        <label
+                          className="mb-1 block text-sm font-medium"
+                          htmlFor={`example_source_citation_${example.id}`}
+                        >
+                          {t("entry.exampleSource")}
+                        </label>
+                        <Input
+                          id={`example_source_citation_${example.id}`}
+                          {...exampleEditForm.register("source_citation")}
+                        />
+                      </div>
+                      {updateExampleMutation.error instanceof ApiError ? (
+                        <p className="text-sm text-red-700">
+                          {getLocalizedApiErrorMessage(updateExampleMutation.error, t)}
+                        </p>
+                      ) : null}
+                      <div className="flex flex-wrap gap-2">
+                        <Button type="submit" disabled={updateExampleMutation.isPending}>
+                          {t("entry.editExampleSave")}
+                        </Button>
+                        <Button type="button" variant="secondary" onClick={cancelEditingExample}>
+                          {t("entry.editExampleCancel")}
+                        </Button>
+                      </div>
+                    </form>
+                  ) : null}
+                  {voteExampleMutation.error instanceof ApiError ? (
+                    <p className="mt-2 text-xs text-red-700">
+                      {getLocalizedApiErrorMessage(voteExampleMutation.error, t)}
+                    </p>
+                  ) : null}
+                </article>
+              );
+            })
           ) : (
             <p className="text-sm text-slate-600">{t("entry.noExamples")}</p>
           )}
         </div>
+        {updateExampleMutation.isSuccess ? (
+          <p className="mt-2 text-sm text-green-700">{t("entry.editExampleSaved")}</p>
+        ) : null}
       </Card>
 
       <Card>
