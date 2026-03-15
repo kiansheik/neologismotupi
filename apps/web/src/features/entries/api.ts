@@ -21,6 +21,7 @@ export interface CreateEntryPayload {
   gloss_en?: string;
   part_of_speech?: string;
   short_definition?: string;
+  source_citation?: string;
   morphology_notes?: string;
   tag_ids?: string[];
   force_submit?: boolean;
@@ -32,6 +33,7 @@ export interface UpdateEntryPayload {
   gloss_en?: string;
   part_of_speech?: string;
   short_definition?: string;
+  source_citation?: string | null;
   morphology_notes?: string;
   tag_ids?: string[];
   edit_summary?: string;

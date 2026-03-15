@@ -105,6 +105,7 @@ export interface EntryComment {
 }
 
 export interface EntryDetail extends EntrySummary {
+  source_citation?: string | null;
   morphology_notes: string | null;
   approved_at: string | null;
   approved_by_user_id: string | null;

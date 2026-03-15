@@ -119,6 +119,7 @@ class EntryCommentOut(BaseModel):
 
 
 class EntryDetailOut(EntrySummaryOut):
+    source_citation: str | None
     morphology_notes: str | None
     approved_at: datetime | None
     approved_by_user_id: uuid.UUID | None
@@ -152,6 +153,7 @@ class EntryCreate(BaseModel):
     gloss_en: str | None = Field(default=None, max_length=255)
     part_of_speech: str | None = Field(default=None, max_length=64)
     short_definition: str | None = None
+    source_citation: str | None = Field(default=None, max_length=500)
     morphology_notes: str | None = None
     tag_ids: list[uuid.UUID] = Field(default_factory=list)
     force_submit: bool = False
@@ -164,6 +166,7 @@ class EntryUpdate(BaseModel):
     gloss_en: str | None = Field(default=None, max_length=255)
     part_of_speech: str | None = Field(default=None, max_length=64)
     short_definition: str | None = Field(default=None, min_length=3)
+    source_citation: str | None = Field(default=None, max_length=500)
     morphology_notes: str | None = None
     tag_ids: list[uuid.UUID] | None = None
     edit_summary: str | None = Field(default=None, max_length=280)

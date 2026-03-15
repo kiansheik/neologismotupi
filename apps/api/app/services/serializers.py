@@ -171,6 +171,7 @@ def serialize_entry_detail(
 
     payload = {
         **serialize_entry_summary(entry, badge_leaders).model_dump(),
+        "source_citation": entry.source_citation,
         "morphology_notes": entry.morphology_notes,
         "approved_at": entry.approved_at,
         "approved_by_user_id": entry.approved_by_user_id,

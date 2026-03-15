@@ -36,6 +36,7 @@ class Entry(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     gloss_en: Mapped[str | None] = mapped_column(String(255), nullable=True)
     part_of_speech: Mapped[str | None] = mapped_column(String(64), nullable=True)
     short_definition: Mapped[str] = mapped_column(Text, nullable=False)
+    source_citation: Mapped[str | None] = mapped_column(String(500), nullable=True)
     morphology_notes: Mapped[str | None] = mapped_column(Text, nullable=True)
     status: Mapped[EntryStatus] = mapped_column(
         Enum(EntryStatus, native_enum=False), default=EntryStatus.pending, index=True, nullable=False

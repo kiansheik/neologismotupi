@@ -87,6 +87,36 @@ async def test_create_entry(client):
 
 
 @pytest.mark.asyncio
+async def test_entry_source_citation_is_detail_only(client):
+    await register_user(client, "source-owner@example.com", "Source Owner")
+    response = await client.post(
+        "/api/entries",
+        json={
+            "headword": "source-entry",
+            "gloss_pt": "fonte",
+            "short_definition": "Entrada com fonte",
+            "source_citation": "Protocolo Mendonça · p. 22",
+            "force_submit": True,
+            "tag_ids": [],
+        },
+    )
+    assert response.status_code == 201, response.text
+    created = response.json()
+    assert created["source_citation"] == "Protocolo Mendonça · p. 22"
+
+    list_response = await client.get("/api/entries", params={"search": "source-entry"})
+    assert list_response.status_code == 200, list_response.text
+    matching_item = next(
+        item for item in list_response.json()["items"] if item["id"] == created["id"]
+    )
+    assert "source_citation" not in matching_item
+
+    detail_response = await client.get(f"/api/entries/{created['slug']}")
+    assert detail_response.status_code == 200, detail_response.text
+    assert detail_response.json()["source_citation"] == "Protocolo Mendonça · p. 22"
+
+
+@pytest.mark.asyncio
 async def test_create_entry_uses_gloss_when_definition_is_blank(client):
     await register_user(client, "creator-blank@example.com", "Creator Blank")
 

@@ -23,6 +23,7 @@ type SubmitForm = {
   gloss_pt: string;
   part_of_speech?: string;
   short_definition?: string;
+  source_citation?: string;
   morphology_notes?: string;
   force_submit: boolean;
 };
@@ -39,6 +40,7 @@ export function SubmitPage() {
       gloss_pt: "",
       part_of_speech: "",
       short_definition: "",
+      source_citation: "",
       morphology_notes: "",
       force_submit: false,
     },
@@ -89,6 +91,7 @@ export function SubmitPage() {
       gloss_pt: z.string().trim().min(1, t("submit.error.glossRequired")),
       part_of_speech: z.string().optional(),
       short_definition: z.string().trim().optional(),
+      source_citation: z.string().trim().max(500).optional(),
       morphology_notes: z.string().optional(),
       force_submit: z.boolean().default(false),
     });
@@ -221,6 +224,14 @@ export function SubmitPage() {
           </label>
           <p className="mb-1 text-xs text-slate-600">{t("submit.help.definition")}</p>
           <Textarea id="short_definition" {...form.register("short_definition")} />
+        </div>
+
+        <div>
+          <label className="mb-1 block text-sm font-medium" htmlFor="source_citation">
+            {t("submit.sourceIfApplicableOptional", { optional: t("form.optional") })}
+          </label>
+          <p className="mb-1 text-xs text-slate-600">{t("submit.help.sourceCitation")}</p>
+          <Input id="source_citation" {...form.register("source_citation")} />
         </div>
 
         <div>

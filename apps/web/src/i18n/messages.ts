@@ -131,6 +131,7 @@ export const ptBR = {
   "submit.glossPt": "Glosa (PT)",
   "submit.partOfSpeech": "Classe gramatical",
   "submit.definition": "Entrada",
+  "submit.sourceIfApplicableOptional": "Fonte (se aplicável) ({optional})",
   "submit.morphologyNotes": "Etimologia",
   "submit.help.headword": "A forma principal do neologismo, sem explicação longa.",
   "submit.help.glossPt":
@@ -138,6 +139,8 @@ export const ptBR = {
   "submit.help.partOfSpeech": "Escolha a classe gramatical que melhor representa o uso.",
   "submit.help.definition":
     "Opcional. Se a glosa já for suficiente, deixe em branco: ela será usada automaticamente como entrada.",
+  "submit.help.sourceCitation":
+    "Opcional. Informe a fonte quando houver (obra, página, link ou referência de atestação).",
   "submit.help.morphologyNotes":
     "Opcional. Explique como a palavra foi criada: origem, inspiração, metodologia e escolhas de formação.",
   "submit.exampleTitle": "Exemplo de verbete com boa avaliação",
@@ -161,6 +164,7 @@ export const ptBR = {
   "entry.submittedBy": "Enviado por",
   "entry.firstRegistered": "Primeiro registro: {date}",
   "entry.moderationReason": "Motivo da moderação",
+  "entry.sourceCitation": "Fonte",
   "entry.morphology": "Etimologia",
   "entry.upvote": "Voto positivo",
   "entry.downvote": "Voto negativo",
@@ -488,6 +492,7 @@ export const enUS: Record<TranslationKey, string> = {
   "submit.glossPt": "Gloss (PT)",
   "submit.partOfSpeech": "Part of speech",
   "submit.definition": "Definition",
+  "submit.sourceIfApplicableOptional": "Source (if applicable) ({optional})",
   "submit.morphologyNotes": "Etymology",
   "submit.help.headword": "The main neologism form, without long explanation.",
   "submit.help.glossPt":
@@ -495,6 +500,8 @@ export const enUS: Record<TranslationKey, string> = {
   "submit.help.partOfSpeech": "Choose the grammatical class that best matches usage.",
   "submit.help.definition":
     "Optional. If the gloss already covers it, leave blank and it will be used automatically as the definition.",
+  "submit.help.sourceCitation":
+    "Optional. Add source details when available (work, page, link, or attestation reference).",
   "submit.help.morphologyNotes":
     "Optional. Explain how the word was built: origin, inspiration, methodology, and formation choices.",
   "submit.exampleTitle": "Well-rated entry example",
@@ -518,6 +525,7 @@ export const enUS: Record<TranslationKey, string> = {
   "entry.submittedBy": "Submitted by",
   "entry.firstRegistered": "First registered: {date}",
   "entry.moderationReason": "Moderation reason",
+  "entry.sourceCitation": "Source",
   "entry.morphology": "Etymology",
   "entry.upvote": "Upvote",
   "entry.downvote": "Downvote",

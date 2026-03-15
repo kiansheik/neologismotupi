@@ -47,6 +47,7 @@ type EntryEditForm = {
   gloss_en: string;
   part_of_speech: string;
   short_definition: string;
+  source_citation: string;
   morphology_notes: string;
   edit_summary: string;
 };
@@ -461,6 +462,7 @@ export function EntryDetailPage() {
       gloss_en: "",
       part_of_speech: "",
       short_definition: "",
+      source_citation: "",
       morphology_notes: "",
       edit_summary: "",
     },
@@ -523,6 +525,7 @@ export function EntryDetailPage() {
       gloss_en: entry.gloss_en ?? "",
       part_of_speech: entry.part_of_speech ?? "",
       short_definition: entry.short_definition ?? "",
+      source_citation: entry.source_citation ?? "",
       morphology_notes: entry.morphology_notes ?? "",
       edit_summary: "",
     });
@@ -700,6 +703,7 @@ export function EntryDetailPage() {
       gloss_en: z.string().optional(),
       part_of_speech: z.string().optional(),
       short_definition: z.string().optional(),
+      source_citation: z.string().trim().max(500).optional(),
       morphology_notes: z.string().optional(),
       edit_summary: z.string().trim().min(3, t("entry.error.editSummaryMin")),
     });
@@ -868,6 +872,12 @@ export function EntryDetailPage() {
           <p className="mt-2 text-sm text-slate-700">
             <span className="font-semibold text-slate-900">{t("entry.morphology")}:</span>{" "}
             {entry.morphology_notes}
+          </p>
+        ) : null}
+        {entry.source_citation ? (
+          <p className="mt-2 text-sm text-slate-700">
+            <span className="font-semibold text-slate-900">{t("entry.sourceCitation")}:</span>{" "}
+            {entry.source_citation}
           </p>
         ) : null}
 
@@ -1064,6 +1074,12 @@ export function EntryDetailPage() {
               <Textarea id="edit_short_definition" {...entryEditForm.register("short_definition")} />
             </div>
             <div>
+              <label className="mb-1 block text-sm font-medium" htmlFor="edit_source_citation">
+                {t("entry.sourceIfApplicableOptional", { optional: t("form.optional") })}
+              </label>
+              <Input id="edit_source_citation" {...entryEditForm.register("source_citation")} />
+            </div>
+            <div>
               <label className="mb-1 block text-sm font-medium" htmlFor="edit_morphology_notes">
                 {t("entry.morphology")} ({t("form.optional")})
               </label>
@@ -1093,6 +1109,7 @@ export function EntryDetailPage() {
                     gloss_en: entry.gloss_en ?? "",
                     part_of_speech: entry.part_of_speech ?? "",
                     short_definition: entry.short_definition ?? "",
+                    source_citation: entry.source_citation ?? "",
                     morphology_notes: entry.morphology_notes ?? "",
                     edit_summary: "",
                   });

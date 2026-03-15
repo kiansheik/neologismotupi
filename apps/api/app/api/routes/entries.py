@@ -599,6 +599,11 @@ async def create_entry(
         gloss_en=payload.gloss_en,
         part_of_speech=payload.part_of_speech,
         short_definition=short_definition,
+        source_citation=(
+            collapse_whitespace(payload.source_citation)
+            if payload.source_citation is not None and not is_effectively_empty(payload.source_citation)
+            else None
+        ),
         morphology_notes=payload.morphology_notes,
         status=status_value,
         proposer_user_id=user.id,
@@ -681,6 +686,14 @@ async def update_entry(
             entry.short_definition = collapse_whitespace(entry.gloss_pt)
         else:
             entry.short_definition = collapse_whitespace(payload.short_definition)
+        changed = True
+
+    if payload.source_citation is not None:
+        entry.source_citation = (
+            collapse_whitespace(payload.source_citation)
+            if not is_effectively_empty(payload.source_citation)
+            else None
+        )
         changed = True
 
     if payload.morphology_notes is not None:
