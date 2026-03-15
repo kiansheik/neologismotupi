@@ -102,7 +102,7 @@ async def _load_entry_with_relations(db: SessionDep, entry_id: uuid.UUID) -> Ent
         .options(
             selectinload(Entry.tags).selectinload(EntryTag.tag),
             selectinload(Entry.versions),
-            selectinload(Entry.examples),
+            selectinload(Entry.examples).selectinload(Example.source_edition).selectinload(SourceEdition.work),
             selectinload(Entry.comments).selectinload(EntryComment.author).selectinload(User.profile),
             selectinload(Entry.proposer).selectinload(User.profile),
             selectinload(Entry.source_edition).selectinload(SourceEdition.work),
@@ -130,6 +130,34 @@ async def _apply_entry_source_fields(
     entry.source_edition_id = source_edition.id
     entry.source_pages = source_pages
     entry.source_citation = build_source_citation(
+        authors=source_work.authors,
+        title=source_work.title,
+        publication_year=source_edition.publication_year,
+        edition_label=source_edition.edition_label,
+        pages=source_pages,
+        fallback=source_citation_fallback,
+    )
+
+
+async def _apply_example_source_fields(
+    db: SessionDep,
+    *,
+    example: Example,
+    source_payload: SourceInput | None,
+    source_citation_fallback: str | None,
+) -> None:
+    if source_payload is None:
+        example.source_edition_id = None
+        example.source_pages = None
+        example.source_citation = clean_source_text(source_citation_fallback, max_length=500)
+        return
+
+    source_edition, source_work = await get_or_create_source_edition(db, source=source_payload)
+    source_pages = clean_source_text(source_payload.pages, max_length=120)
+
+    example.source_edition_id = source_edition.id
+    example.source_pages = source_pages
+    example.source_citation = build_source_citation(
         authors=source_work.authors,
         title=source_work.title,
         publication_year=source_edition.publication_year,
@@ -557,7 +585,7 @@ async def get_entry(
         .options(
             selectinload(Entry.tags).selectinload(EntryTag.tag),
             selectinload(Entry.versions),
-            selectinload(Entry.examples),
+            selectinload(Entry.examples).selectinload(Example.source_edition).selectinload(SourceEdition.work),
             selectinload(Entry.comments).selectinload(EntryComment.author).selectinload(User.profile),
             selectinload(Entry.proposer).selectinload(User.profile),
             selectinload(Entry.source_edition).selectinload(SourceEdition.work),
@@ -1026,11 +1054,9 @@ async def create_example(
         sentence_original=collapse_whitespace(payload.sentence_original),
         translation_pt=payload.translation_pt,
         translation_en=payload.translation_en,
-        source_citation=(
-            collapse_whitespace(payload.source_citation)
-            if payload.source_citation
-            else None
-        ),
+        source_citation=None,
+        source_edition_id=None,
+        source_pages=None,
         usage_note=payload.usage_note,
         context_tag=payload.context_tag,
         status=status_value,
@@ -1043,6 +1069,12 @@ async def create_example(
     )
     db.add(example)
     await db.flush()
+    await _apply_example_source_fields(
+        db,
+        example=example,
+        source_payload=payload.source,
+        source_citation_fallback=payload.source_citation,
+    )
     await create_example_version(
         db,
         example=example,
@@ -1052,9 +1084,17 @@ async def create_example(
 
     await refresh_vote_and_example_caches(db, entry)
     await db.commit()
-    await db.refresh(example)
+    created_example = (
+        await db.execute(
+            select(Example)
+            .where(Example.id == example.id)
+            .options(selectinload(Example.source_edition).selectinload(SourceEdition.work))
+        )
+    ).scalar_one_or_none()
+    if created_example is None:
+        raise_api_error(status_code=500, code="example_create_failed", message="Could not load new example")
 
-    return serialize_example(example)
+    return serialize_example(created_example)
 
 
 @router.post("/{entry_id}/comments", response_model=EntryCommentOut, status_code=status.HTTP_201_CREATED)
@@ -1181,10 +1221,17 @@ async def update_example(
         example.translation_en = payload.translation_en
         changed = True
 
-    if payload.source_citation is not None:
-        example.source_citation = (
-            collapse_whitespace(payload.source_citation) if payload.source_citation else None
+    if "source" in payload.model_fields_set:
+        source_citation_fallback = payload.source_citation if "source_citation" in payload.model_fields_set else None
+        await _apply_example_source_fields(
+            db,
+            example=example,
+            source_payload=payload.source,
+            source_citation_fallback=source_citation_fallback,
         )
+        changed = True
+    elif "source_citation" in payload.model_fields_set:
+        example.source_citation = clean_source_text(payload.source_citation, max_length=500)
         changed = True
 
     if payload.usage_note is not None:
@@ -1208,8 +1255,16 @@ async def update_example(
         edit_summary=payload.edit_summary or "Example update",
     )
     await db.commit()
-    await db.refresh(example)
-    return serialize_example(example)
+    updated_example = (
+        await db.execute(
+            select(Example)
+            .where(Example.id == example.id)
+            .options(selectinload(Example.source_edition).selectinload(SourceEdition.work))
+        )
+    ).scalar_one_or_none()
+    if updated_example is None:
+        raise_api_error(status_code=500, code="example_update_failed", message="Could not load updated example")
+    return serialize_example(updated_example)
 
 
 @example_router.get("/{example_id}/versions", response_model=list[ExampleVersionOut])

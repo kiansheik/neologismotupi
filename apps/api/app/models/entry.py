@@ -109,6 +109,13 @@ class Example(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     translation_pt: Mapped[str | None] = mapped_column(Text, nullable=True)
     translation_en: Mapped[str | None] = mapped_column(Text, nullable=True)
     source_citation: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    source_edition_id: Mapped[uuid.UUID | None] = mapped_column(
+        Uuid,
+        ForeignKey("source_editions.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+    source_pages: Mapped[str | None] = mapped_column(String(120), nullable=True)
     usage_note: Mapped[str | None] = mapped_column(Text, nullable=True)
     context_tag: Mapped[str | None] = mapped_column(String(120), nullable=True)
     status: Mapped[ExampleStatus] = mapped_column(
@@ -124,6 +131,7 @@ class Example(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     votes: Mapped[list["ExampleVote"]] = relationship(
         back_populates="example", cascade="all, delete-orphan"
     )
+    source_edition: Mapped["SourceEdition | None"] = relationship(back_populates="examples")
     versions: Mapped[list["ExampleVersion"]] = relationship(
         back_populates="example",
         cascade="all, delete-orphan",

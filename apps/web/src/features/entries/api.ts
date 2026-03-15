@@ -40,12 +40,12 @@ export interface CreateEntryPayload {
 export interface UpdateEntryPayload {
   headword?: string;
   gloss_pt?: string;
-  gloss_en?: string;
-  part_of_speech?: string;
-  short_definition?: string;
+  gloss_en?: string | null;
+  part_of_speech?: string | null;
+  short_definition?: string | null;
   source_citation?: string | null;
   source?: EntrySourceInput | null;
-  morphology_notes?: string;
+  morphology_notes?: string | null;
   tag_ids?: string[];
   edit_summary?: string;
 }
@@ -59,6 +59,7 @@ export interface CreateExamplePayload {
   translation_pt?: string;
   translation_en?: string;
   source_citation?: string;
+  source?: EntrySourceInput;
   usage_note?: string;
   context_tag?: string;
 }

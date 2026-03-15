@@ -6,7 +6,7 @@ import { Link, useParams } from "react-router-dom";
 import { z } from "zod";
 
 import { ApiError } from "@/lib/api";
-import type { Example as EntryExample, MentionUser } from "@/lib/types";
+import type { Example as EntryExample, MentionUser, SourceSuggestion } from "@/lib/types";
 import { buildAbsoluteUrl, useSeo } from "@/lib/seo";
 import { applyZodErrors } from "@/lib/zod-form";
 import { type Locale, type TranslateFn, useI18n } from "@/i18n";
@@ -25,12 +25,19 @@ import { createComment, voteComment } from "@/features/comments/api";
 import { listExampleVersions, reportExample, updateExample, voteExample } from "@/features/examples/api";
 import { createExample, getEntry, reportEntry, updateEntry, voteEntry } from "@/features/entries/api";
 import { approveEntry, approveExample, rejectEntry, rejectExample } from "@/features/moderation/api";
+import { listSources } from "@/features/sources/api";
 import { listMentionUsers, resolveMentionUsers } from "@/features/users/api";
 
 type ExampleForm = {
   sentence_original: string;
   translation_pt?: string;
   source_citation?: string;
+  has_source: boolean;
+  source_authors?: string;
+  source_title?: string;
+  source_publication_year?: string;
+  source_edition_label?: string;
+  source_pages?: string;
 };
 
 type CommentForm = {
@@ -47,6 +54,12 @@ type EntryEditForm = {
   gloss_en: string;
   part_of_speech: string;
   short_definition: string;
+  has_source: boolean;
+  source_authors: string;
+  source_title: string;
+  source_publication_year: string;
+  source_edition_label: string;
+  source_pages: string;
   source_citation: string;
   morphology_notes: string;
   edit_summary: string;
@@ -78,6 +91,54 @@ function normalizeComparableText(value: string | null | undefined): string {
 function normalizeOptionalField(value: string | undefined): string | null {
   const trimmed = value?.trim() ?? "";
   return trimmed ? trimmed : null;
+}
+
+type SourceFormValues = {
+  has_source: boolean;
+  source_authors?: string;
+  source_title?: string;
+  source_publication_year?: string;
+  source_edition_label?: string;
+  source_pages?: string;
+  source_citation?: string;
+};
+
+function normalizeSourcePayload(values: SourceFormValues): {
+  source: {
+    authors?: string;
+    title?: string;
+    publication_year?: number;
+    edition_label?: string;
+    pages?: string;
+  } | null;
+  source_citation: string | null;
+} {
+  if (!values.has_source) {
+    return { source: null, source_citation: null };
+  }
+
+  const authors = normalizeOptionalField(values.source_authors);
+  const title = normalizeOptionalField(values.source_title);
+  const publicationYearRaw = normalizeOptionalField(values.source_publication_year);
+  const publicationYear = publicationYearRaw ? Number(publicationYearRaw) : undefined;
+  const editionLabel = normalizeOptionalField(values.source_edition_label);
+  const pages = normalizeOptionalField(values.source_pages);
+  const sourceCitation = normalizeOptionalField(values.source_citation);
+
+  if (!authors && !title) {
+    return { source: null, source_citation: sourceCitation };
+  }
+
+  return {
+    source: {
+      authors: authors ?? undefined,
+      title: title ?? undefined,
+      publication_year: publicationYear,
+      edition_label: editionLabel ?? undefined,
+      pages: pages ?? undefined,
+    },
+    source_citation: sourceCitation,
+  };
 }
 
 function normalizeMentionHandle(value: string): string {
@@ -432,6 +493,12 @@ export function EntryDetailPage() {
     defaultValues: {
       sentence_original: "",
       translation_pt: "",
+      has_source: false,
+      source_authors: "",
+      source_title: "",
+      source_publication_year: "",
+      source_edition_label: "",
+      source_pages: "",
       source_citation: "",
     },
   });
@@ -439,6 +506,12 @@ export function EntryDetailPage() {
     defaultValues: {
       sentence_original: "",
       translation_pt: "",
+      has_source: false,
+      source_authors: "",
+      source_title: "",
+      source_publication_year: "",
+      source_edition_label: "",
+      source_pages: "",
       source_citation: "",
     },
   });
@@ -462,6 +535,12 @@ export function EntryDetailPage() {
       gloss_en: "",
       part_of_speech: "",
       short_definition: "",
+      has_source: false,
+      source_authors: "",
+      source_title: "",
+      source_publication_year: "",
+      source_edition_label: "",
+      source_pages: "",
       source_citation: "",
       morphology_notes: "",
       edit_summary: "",
@@ -471,8 +550,51 @@ export function EntryDetailPage() {
   const [mentionContext, setMentionContext] = useState<MentionContext | null>(null);
   const [mentionSelectionIndex, setMentionSelectionIndex] = useState(0);
   const commentBodyValue = commentForm.watch("body");
+  const entryHasSource = entryEditForm.watch("has_source");
+  const entrySourceAuthors = entryEditForm.watch("source_authors");
+  const entrySourceTitle = entryEditForm.watch("source_title");
+  const entrySourceLookupQuery = useMemo(
+    () => [entrySourceAuthors, entrySourceTitle].map((value) => value?.trim() ?? "").join(" ").trim(),
+    [entrySourceAuthors, entrySourceTitle],
+  );
+  const exampleHasSource = exampleForm.watch("has_source");
+  const exampleSourceAuthors = exampleForm.watch("source_authors");
+  const exampleSourceTitle = exampleForm.watch("source_title");
+  const exampleSourceLookupQuery = useMemo(
+    () => [exampleSourceAuthors, exampleSourceTitle].map((value) => value?.trim() ?? "").join(" ").trim(),
+    [exampleSourceAuthors, exampleSourceTitle],
+  );
+  const exampleEditHasSource = exampleEditForm.watch("has_source");
+  const exampleEditSourceAuthors = exampleEditForm.watch("source_authors");
+  const exampleEditSourceTitle = exampleEditForm.watch("source_title");
+  const exampleEditSourceLookupQuery = useMemo(
+    () =>
+      [exampleEditSourceAuthors, exampleEditSourceTitle].map((value) => value?.trim() ?? "").join(" ").trim(),
+    [exampleEditSourceAuthors, exampleEditSourceTitle],
+  );
   const canWrite = Boolean(currentUser);
   const isModerator = Boolean(currentUser?.is_superuser);
+
+  const entrySourceSuggestionsQuery = useQuery({
+    queryKey: ["entry-source-suggestions", entrySourceLookupQuery],
+    queryFn: () => listSources({ query: entrySourceLookupQuery, limit: 8 }),
+    enabled: isModerator && showEditForm && entryHasSource && entrySourceLookupQuery.length >= 2,
+    staleTime: 30_000,
+  });
+
+  const exampleSourceSuggestionsQuery = useQuery({
+    queryKey: ["example-source-suggestions", exampleSourceLookupQuery],
+    queryFn: () => listSources({ query: exampleSourceLookupQuery, limit: 8 }),
+    enabled: canWrite && exampleHasSource && exampleSourceLookupQuery.length >= 2,
+    staleTime: 30_000,
+  });
+
+  const exampleEditSourceSuggestionsQuery = useQuery({
+    queryKey: ["example-edit-source-suggestions", editingExampleId, exampleEditSourceLookupQuery],
+    queryFn: () => listSources({ query: exampleEditSourceLookupQuery, limit: 8 }),
+    enabled: canWrite && Boolean(editingExampleId) && exampleEditHasSource && exampleEditSourceLookupQuery.length >= 2,
+    staleTime: 30_000,
+  });
 
   const commentMentionHandles = useMemo(() => {
     if (!entry?.comments?.length) {
@@ -525,6 +647,15 @@ export function EntryDetailPage() {
       gloss_en: entry.gloss_en ?? "",
       part_of_speech: entry.part_of_speech ?? "",
       short_definition: entry.short_definition ?? "",
+      has_source: Boolean(entry.source || entry.source_citation),
+      source_authors: entry.source?.authors ?? "",
+      source_title: entry.source?.title ?? "",
+      source_publication_year:
+        entry.source?.publication_year !== null && entry.source?.publication_year !== undefined
+          ? String(entry.source.publication_year)
+          : "",
+      source_edition_label: entry.source?.edition_label ?? "",
+      source_pages: entry.source?.pages ?? "",
       source_citation: entry.source_citation ?? "",
       morphology_notes: entry.morphology_notes ?? "",
       edit_summary: "",
@@ -543,11 +674,11 @@ export function EntryDetailPage() {
   }, [mentionSelectionIndex, mentionSuggestions.length]);
 
   const createExampleMutation = useMutation({
-    mutationFn: (payload: ExampleForm) => createExample(String(entry?.id), payload),
+    mutationFn: (payload: Parameters<typeof createExample>[1]) => createExample(String(entry?.id), payload),
     onSuccess: (_, payload) => {
       trackEvent("example_submitted", {
         has_translation_pt: Boolean(payload.translation_pt?.trim()),
-        has_source_citation: Boolean(payload.source_citation?.trim()),
+        has_source: Boolean(payload.source || payload.source_citation),
       });
       exampleForm.reset();
       queryClient.invalidateQueries({ queryKey: ["entry", slug] });
@@ -627,17 +758,54 @@ export function EntryDetailPage() {
 
   const onExampleSubmit = exampleForm.handleSubmit((payload) => {
     exampleForm.clearErrors();
-    const exampleSchema = z.object({
-      sentence_original: z.string().trim().min(3, t("entry.error.sentenceMin")),
-      translation_pt: z.string().optional(),
-      source_citation: z.string().optional(),
-    });
+    const exampleSchema = z
+      .object({
+        sentence_original: z.string().trim().min(3, t("entry.error.sentenceMin")),
+        translation_pt: z.string().optional(),
+        has_source: z.boolean().default(false),
+        source_authors: z.string().trim().max(255).optional(),
+        source_title: z.string().trim().max(400).optional(),
+        source_publication_year: z.string().trim().optional(),
+        source_edition_label: z.string().trim().max(120).optional(),
+        source_pages: z.string().trim().max(120).optional(),
+        source_citation: z.string().trim().max(500).optional(),
+      })
+      .superRefine((values, ctx) => {
+        if (!values.has_source) {
+          return;
+        }
+        if (!values.source_authors && !values.source_title && !values.source_citation) {
+          ctx.addIssue({
+            path: ["source_title"],
+            code: "custom",
+            message: t("submit.error.sourceNeedAuthorTitleOrCitation"),
+          });
+        }
+        if (!values.source_publication_year) {
+          return;
+        }
+        const parsedYear = Number(values.source_publication_year);
+        const isValidYear = Number.isInteger(parsedYear) && parsedYear >= 1 && parsedYear <= 3000;
+        if (!isValidYear) {
+          ctx.addIssue({
+            path: ["source_publication_year"],
+            code: "custom",
+            message: t("submit.error.sourceInvalidYear"),
+          });
+        }
+      });
     const parsed = exampleSchema.safeParse(payload);
     if (!parsed.success) {
       applyZodErrors(parsed.error, exampleForm.setError);
       return;
     }
-    createExampleMutation.mutate(parsed.data);
+    const normalizedSource = normalizeSourcePayload(parsed.data);
+    createExampleMutation.mutate({
+      sentence_original: parsed.data.sentence_original.trim(),
+      translation_pt: normalizeOptionalField(parsed.data.translation_pt) ?? undefined,
+      source_citation: normalizedSource.source_citation ?? undefined,
+      source: normalizedSource.source ?? undefined,
+    });
   });
 
   const onExampleEditSubmit = exampleEditForm.handleSubmit((payload) => {
@@ -645,22 +813,55 @@ export function EntryDetailPage() {
       return;
     }
     exampleEditForm.clearErrors();
-    const exampleSchema = z.object({
-      sentence_original: z.string().trim().min(3, t("entry.error.sentenceMin")),
-      translation_pt: z.string().optional(),
-      source_citation: z.string().trim().max(500).optional(),
-    });
+    const exampleSchema = z
+      .object({
+        sentence_original: z.string().trim().min(3, t("entry.error.sentenceMin")),
+        translation_pt: z.string().optional(),
+        has_source: z.boolean().default(false),
+        source_authors: z.string().trim().max(255).optional(),
+        source_title: z.string().trim().max(400).optional(),
+        source_publication_year: z.string().trim().optional(),
+        source_edition_label: z.string().trim().max(120).optional(),
+        source_pages: z.string().trim().max(120).optional(),
+        source_citation: z.string().trim().max(500).optional(),
+      })
+      .superRefine((values, ctx) => {
+        if (!values.has_source) {
+          return;
+        }
+        if (!values.source_authors && !values.source_title && !values.source_citation) {
+          ctx.addIssue({
+            path: ["source_title"],
+            code: "custom",
+            message: t("submit.error.sourceNeedAuthorTitleOrCitation"),
+          });
+        }
+        if (!values.source_publication_year) {
+          return;
+        }
+        const parsedYear = Number(values.source_publication_year);
+        const isValidYear = Number.isInteger(parsedYear) && parsedYear >= 1 && parsedYear <= 3000;
+        if (!isValidYear) {
+          ctx.addIssue({
+            path: ["source_publication_year"],
+            code: "custom",
+            message: t("submit.error.sourceInvalidYear"),
+          });
+        }
+      });
     const parsed = exampleSchema.safeParse(payload);
     if (!parsed.success) {
       applyZodErrors(parsed.error, exampleEditForm.setError);
       return;
     }
+    const normalizedSource = normalizeSourcePayload(parsed.data);
     updateExampleMutation.mutate({
       exampleId: editingExampleId,
       payload: {
         sentence_original: parsed.data.sentence_original.trim(),
         translation_pt: normalizeOptionalField(parsed.data.translation_pt),
-        source_citation: normalizeOptionalField(parsed.data.source_citation),
+        source_citation: normalizedSource.source_citation,
+        source: normalizedSource.source,
       },
     });
   });
@@ -697,22 +898,64 @@ export function EntryDetailPage() {
 
   const onEntryEditSubmit = entryEditForm.handleSubmit((payload) => {
     entryEditForm.clearErrors();
-    const editSchema = z.object({
-      headword: z.string().trim().min(1, t("submit.error.headwordRequired")),
-      gloss_pt: z.string().trim().min(1, t("submit.error.glossRequired")),
-      gloss_en: z.string().optional(),
-      part_of_speech: z.string().optional(),
-      short_definition: z.string().optional(),
-      source_citation: z.string().trim().max(500).optional(),
-      morphology_notes: z.string().optional(),
-      edit_summary: z.string().trim().min(3, t("entry.error.editSummaryMin")),
-    });
+    const editSchema = z
+      .object({
+        headword: z.string().trim().min(1, t("submit.error.headwordRequired")),
+        gloss_pt: z.string().trim().min(1, t("submit.error.glossRequired")),
+        gloss_en: z.string().optional(),
+        part_of_speech: z.string().optional(),
+        short_definition: z.string().optional(),
+        has_source: z.boolean().default(false),
+        source_authors: z.string().trim().max(255).optional(),
+        source_title: z.string().trim().max(400).optional(),
+        source_publication_year: z.string().trim().optional(),
+        source_edition_label: z.string().trim().max(120).optional(),
+        source_pages: z.string().trim().max(120).optional(),
+        source_citation: z.string().trim().max(500).optional(),
+        morphology_notes: z.string().optional(),
+        edit_summary: z.string().trim().min(3, t("entry.error.editSummaryMin")),
+      })
+      .superRefine((values, ctx) => {
+        if (!values.has_source) {
+          return;
+        }
+        if (!values.source_authors && !values.source_title && !values.source_citation) {
+          ctx.addIssue({
+            path: ["source_title"],
+            code: "custom",
+            message: t("submit.error.sourceNeedAuthorTitleOrCitation"),
+          });
+        }
+        if (!values.source_publication_year) {
+          return;
+        }
+        const parsedYear = Number(values.source_publication_year);
+        const isValidYear = Number.isInteger(parsedYear) && parsedYear >= 1 && parsedYear <= 3000;
+        if (!isValidYear) {
+          ctx.addIssue({
+            path: ["source_publication_year"],
+            code: "custom",
+            message: t("submit.error.sourceInvalidYear"),
+          });
+        }
+      });
     const parsed = editSchema.safeParse(payload);
     if (!parsed.success) {
       applyZodErrors(parsed.error, entryEditForm.setError);
       return;
     }
-    updateEntryMutation.mutate(parsed.data);
+    const normalizedSource = normalizeSourcePayload(parsed.data);
+    updateEntryMutation.mutate({
+      headword: parsed.data.headword.trim(),
+      gloss_pt: parsed.data.gloss_pt.trim(),
+      gloss_en: parsed.data.gloss_en,
+      part_of_speech: parsed.data.part_of_speech,
+      short_definition: parsed.data.short_definition,
+      source: normalizedSource.source,
+      source_citation: normalizedSource.source_citation,
+      morphology_notes: parsed.data.morphology_notes,
+      edit_summary: parsed.data.edit_summary.trim(),
+    });
   });
 
   const updateMentionContextFromInput = (value: string, caret: number | null) => {
@@ -772,12 +1015,51 @@ export function EntryDetailPage() {
   };
   const showMentionSuggestions = mentionContext !== null;
 
+  const applySourceSuggestionToEntryEdit = (source: SourceSuggestion) => {
+    entryEditForm.setValue("source_authors", source.authors ?? "");
+    entryEditForm.setValue("source_title", source.title ?? "");
+    entryEditForm.setValue(
+      "source_publication_year",
+      source.publication_year !== null ? String(source.publication_year) : "",
+    );
+    entryEditForm.setValue("source_edition_label", source.edition_label ?? "");
+  };
+
+  const applySourceSuggestionToExampleCreate = (source: SourceSuggestion) => {
+    exampleForm.setValue("source_authors", source.authors ?? "");
+    exampleForm.setValue("source_title", source.title ?? "");
+    exampleForm.setValue(
+      "source_publication_year",
+      source.publication_year !== null ? String(source.publication_year) : "",
+    );
+    exampleForm.setValue("source_edition_label", source.edition_label ?? "");
+  };
+
+  const applySourceSuggestionToExampleEdit = (source: SourceSuggestion) => {
+    exampleEditForm.setValue("source_authors", source.authors ?? "");
+    exampleEditForm.setValue("source_title", source.title ?? "");
+    exampleEditForm.setValue(
+      "source_publication_year",
+      source.publication_year !== null ? String(source.publication_year) : "",
+    );
+    exampleEditForm.setValue("source_edition_label", source.edition_label ?? "");
+  };
+
   const startEditingExample = (example: EntryExample) => {
     setEditingExampleId(example.id);
     updateExampleMutation.reset();
     exampleEditForm.reset({
       sentence_original: example.sentence_original ?? "",
       translation_pt: example.translation_pt ?? "",
+      has_source: Boolean(example.source || example.source_citation),
+      source_authors: example.source?.authors ?? "",
+      source_title: example.source?.title ?? "",
+      source_publication_year:
+        example.source?.publication_year !== null && example.source?.publication_year !== undefined
+          ? String(example.source.publication_year)
+          : "",
+      source_edition_label: example.source?.edition_label ?? "",
+      source_pages: example.source?.pages ?? "",
       source_citation: example.source_citation ?? "",
     });
   };
@@ -788,6 +1070,12 @@ export function EntryDetailPage() {
     exampleEditForm.reset({
       sentence_original: "",
       translation_pt: "",
+      has_source: false,
+      source_authors: "",
+      source_title: "",
+      source_publication_year: "",
+      source_edition_label: "",
+      source_pages: "",
       source_citation: "",
     });
   };
@@ -1098,11 +1386,91 @@ export function EntryDetailPage() {
               </label>
               <Textarea id="edit_short_definition" {...entryEditForm.register("short_definition")} />
             </div>
-            <div>
-              <label className="mb-1 block text-sm font-medium" htmlFor="edit_source_citation">
-                {t("entry.sourceIfApplicableOptional", { optional: t("form.optional") })}
+            <div className="rounded-md border border-brand-100 bg-brand-50/30 p-3">
+              <label className="inline-flex items-center gap-2 text-sm font-medium text-slate-900">
+                <input type="checkbox" {...entryEditForm.register("has_source")} />
+                {t("submit.sourceToggle")}
               </label>
-              <Input id="edit_source_citation" {...entryEditForm.register("source_citation")} />
+              <p className="mt-1 text-xs text-slate-600">{t("submit.help.sourceCitation")}</p>
+              {entryHasSource ? (
+                <div className="mt-3 space-y-3">
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <div>
+                      <label className="mb-1 block text-sm font-medium" htmlFor="edit_source_authors">
+                        {t("submit.sourceAuthors")} ({t("form.optional")})
+                      </label>
+                      <Input id="edit_source_authors" {...entryEditForm.register("source_authors")} />
+                    </div>
+                    <div>
+                      <label className="mb-1 block text-sm font-medium" htmlFor="edit_source_title">
+                        {t("submit.sourceTitle")} ({t("form.optional")})
+                      </label>
+                      <Input id="edit_source_title" {...entryEditForm.register("source_title")} />
+                      {entryEditForm.formState.errors.source_title?.message ? (
+                        <p className="mt-1 text-xs text-red-700">
+                          {entryEditForm.formState.errors.source_title.message}
+                        </p>
+                      ) : null}
+                    </div>
+                  </div>
+                  <div className="grid gap-3 sm:grid-cols-3">
+                    <div>
+                      <label className="mb-1 block text-sm font-medium" htmlFor="edit_source_publication_year">
+                        {t("submit.sourceYear")} ({t("form.optional")})
+                      </label>
+                      <Input
+                        id="edit_source_publication_year"
+                        inputMode="numeric"
+                        placeholder="2024"
+                        {...entryEditForm.register("source_publication_year")}
+                      />
+                      {entryEditForm.formState.errors.source_publication_year?.message ? (
+                        <p className="mt-1 text-xs text-red-700">
+                          {entryEditForm.formState.errors.source_publication_year.message}
+                        </p>
+                      ) : null}
+                    </div>
+                    <div>
+                      <label className="mb-1 block text-sm font-medium" htmlFor="edit_source_edition_label">
+                        {t("submit.sourceEdition")} ({t("form.optional")})
+                      </label>
+                      <Input
+                        id="edit_source_edition_label"
+                        {...entryEditForm.register("source_edition_label")}
+                      />
+                    </div>
+                    <div>
+                      <label className="mb-1 block text-sm font-medium" htmlFor="edit_source_pages">
+                        {t("submit.sourcePages")} ({t("form.optional")})
+                      </label>
+                      <Input id="edit_source_pages" placeholder="22-24" {...entryEditForm.register("source_pages")} />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-sm font-medium" htmlFor="edit_source_citation">
+                      {t("entry.sourceIfApplicableOptional", { optional: t("form.optional") })}
+                    </label>
+                    <Input id="edit_source_citation" {...entryEditForm.register("source_citation")} />
+                  </div>
+                  {entrySourceSuggestionsQuery.data && entrySourceSuggestionsQuery.data.length > 0 ? (
+                    <div className="rounded-md border border-brand-200 bg-white p-2">
+                      <p className="text-xs font-semibold text-brand-900">{t("submit.sourceSuggestionsTitle")}</p>
+                      <div className="mt-2 flex flex-wrap gap-2">
+                        {entrySourceSuggestionsQuery.data.map((source) => (
+                          <button
+                            key={`${source.work_id}-${source.edition_id}`}
+                            type="button"
+                            className="rounded-full border border-brand-200 px-3 py-1 text-xs text-brand-800 hover:border-brand-500 hover:bg-brand-50"
+                            onClick={() => applySourceSuggestionToEntryEdit(source)}
+                          >
+                            {source.citation}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  ) : null}
+                </div>
+              ) : null}
             </div>
             <div>
               <label className="mb-1 block text-sm font-medium" htmlFor="edit_morphology_notes">
@@ -1134,6 +1502,15 @@ export function EntryDetailPage() {
                     gloss_en: entry.gloss_en ?? "",
                     part_of_speech: entry.part_of_speech ?? "",
                     short_definition: entry.short_definition ?? "",
+                    has_source: Boolean(entry.source || entry.source_citation),
+                    source_authors: entry.source?.authors ?? "",
+                    source_title: entry.source?.title ?? "",
+                    source_publication_year:
+                      entry.source?.publication_year !== null && entry.source?.publication_year !== undefined
+                        ? String(entry.source.publication_year)
+                        : "",
+                    source_edition_label: entry.source?.edition_label ?? "",
+                    source_pages: entry.source?.pages ?? "",
                     source_citation: entry.source_citation ?? "",
                     morphology_notes: entry.morphology_notes ?? "",
                     edit_summary: "",
@@ -1194,6 +1571,7 @@ export function EntryDetailPage() {
               const isEditingThisExample = editingExampleId === example.id;
               const canApproveExample = example.status !== "approved";
               const canRejectExample = example.status !== "rejected";
+              const displayedExampleSourceCitation = example.source?.citation ?? example.source_citation;
 
               return (
                 <article key={example.id} className="rounded-md border border-brand-100 p-3">
@@ -1206,9 +1584,9 @@ export function EntryDetailPage() {
                       {t("entry.translationPt")}: {example.translation_pt}
                     </p>
                   ) : null}
-                  {example.source_citation ? (
+                  {displayedExampleSourceCitation ? (
                     <p className="mt-1 text-xs text-slate-600">
-                      {t("entry.exampleSource")}: {example.source_citation}
+                      {t("entry.exampleSource")}: {displayedExampleSourceCitation}
                     </p>
                   ) : null}
                   {(example.status === "rejected" || example.status === "hidden") &&
@@ -1347,17 +1725,125 @@ export function EntryDetailPage() {
                           {...exampleEditForm.register("translation_pt")}
                         />
                       </div>
-                      <div>
-                        <label
-                          className="mb-1 block text-sm font-medium"
-                          htmlFor={`example_source_citation_${example.id}`}
-                        >
-                          {t("entry.sourceIfApplicableOptional", { optional: t("form.optional") })}
+                      <div className="rounded-md border border-brand-100 bg-brand-50/30 p-3">
+                        <label className="inline-flex items-center gap-2 text-sm font-medium text-slate-900">
+                          <input type="checkbox" {...exampleEditForm.register("has_source")} />
+                          {t("submit.sourceToggle")}
                         </label>
-                        <Input
-                          id={`example_source_citation_${example.id}`}
-                          {...exampleEditForm.register("source_citation")}
-                        />
+                        <p className="mt-1 text-xs text-slate-600">{t("submit.help.sourceCitation")}</p>
+                        {exampleEditHasSource ? (
+                          <div className="mt-3 space-y-3">
+                            <div className="grid gap-3 sm:grid-cols-2">
+                              <div>
+                                <label
+                                  className="mb-1 block text-sm font-medium"
+                                  htmlFor={`example_source_authors_${example.id}`}
+                                >
+                                  {t("submit.sourceAuthors")} ({t("form.optional")})
+                                </label>
+                                <Input
+                                  id={`example_source_authors_${example.id}`}
+                                  {...exampleEditForm.register("source_authors")}
+                                />
+                              </div>
+                              <div>
+                                <label
+                                  className="mb-1 block text-sm font-medium"
+                                  htmlFor={`example_source_title_${example.id}`}
+                                >
+                                  {t("submit.sourceTitle")} ({t("form.optional")})
+                                </label>
+                                <Input
+                                  id={`example_source_title_${example.id}`}
+                                  {...exampleEditForm.register("source_title")}
+                                />
+                                {exampleEditForm.formState.errors.source_title?.message ? (
+                                  <p className="mt-1 text-xs text-red-700">
+                                    {exampleEditForm.formState.errors.source_title.message}
+                                  </p>
+                                ) : null}
+                              </div>
+                            </div>
+                            <div className="grid gap-3 sm:grid-cols-3">
+                              <div>
+                                <label
+                                  className="mb-1 block text-sm font-medium"
+                                  htmlFor={`example_source_publication_year_${example.id}`}
+                                >
+                                  {t("submit.sourceYear")} ({t("form.optional")})
+                                </label>
+                                <Input
+                                  id={`example_source_publication_year_${example.id}`}
+                                  inputMode="numeric"
+                                  placeholder="2024"
+                                  {...exampleEditForm.register("source_publication_year")}
+                                />
+                                {exampleEditForm.formState.errors.source_publication_year?.message ? (
+                                  <p className="mt-1 text-xs text-red-700">
+                                    {exampleEditForm.formState.errors.source_publication_year.message}
+                                  </p>
+                                ) : null}
+                              </div>
+                              <div>
+                                <label
+                                  className="mb-1 block text-sm font-medium"
+                                  htmlFor={`example_source_edition_label_${example.id}`}
+                                >
+                                  {t("submit.sourceEdition")} ({t("form.optional")})
+                                </label>
+                                <Input
+                                  id={`example_source_edition_label_${example.id}`}
+                                  {...exampleEditForm.register("source_edition_label")}
+                                />
+                              </div>
+                              <div>
+                                <label
+                                  className="mb-1 block text-sm font-medium"
+                                  htmlFor={`example_source_pages_${example.id}`}
+                                >
+                                  {t("submit.sourcePages")} ({t("form.optional")})
+                                </label>
+                                <Input
+                                  id={`example_source_pages_${example.id}`}
+                                  placeholder="22-24"
+                                  {...exampleEditForm.register("source_pages")}
+                                />
+                              </div>
+                            </div>
+                            <div>
+                              <label
+                                className="mb-1 block text-sm font-medium"
+                                htmlFor={`example_source_citation_${example.id}`}
+                              >
+                                {t("entry.sourceIfApplicableOptional", { optional: t("form.optional") })}
+                              </label>
+                              <Input
+                                id={`example_source_citation_${example.id}`}
+                                {...exampleEditForm.register("source_citation")}
+                              />
+                            </div>
+                            {exampleEditSourceSuggestionsQuery.data &&
+                            exampleEditSourceSuggestionsQuery.data.length > 0 ? (
+                              <div className="rounded-md border border-brand-200 bg-white p-2">
+                                <p className="text-xs font-semibold text-brand-900">
+                                  {t("submit.sourceSuggestionsTitle")}
+                                </p>
+                                <div className="mt-2 flex flex-wrap gap-2">
+                                  {exampleEditSourceSuggestionsQuery.data.map((source) => (
+                                    <button
+                                      key={`${source.work_id}-${source.edition_id}`}
+                                      type="button"
+                                      className="rounded-full border border-brand-200 px-3 py-1 text-xs text-brand-800 hover:border-brand-500 hover:bg-brand-50"
+                                      onClick={() => applySourceSuggestionToExampleEdit(source)}
+                                    >
+                                      {source.citation}
+                                    </button>
+                                  ))}
+                                </div>
+                              </div>
+                            ) : null}
+                          </div>
+                        ) : null}
                       </div>
                       {updateExampleMutation.error instanceof ApiError ? (
                         <p className="text-sm text-red-700">
@@ -1594,11 +2080,88 @@ export function EntryDetailPage() {
               </label>
               <Input id="translation_pt" {...exampleForm.register("translation_pt")} />
             </div>
-            <div>
-              <label className="mb-1 block text-sm font-medium" htmlFor="source_citation">
-                {t("entry.sourceIfApplicableOptional", { optional: t("form.optional") })}
+            <div className="rounded-md border border-brand-100 bg-brand-50/30 p-3">
+              <label className="inline-flex items-center gap-2 text-sm font-medium text-slate-900">
+                <input type="checkbox" {...exampleForm.register("has_source")} />
+                {t("submit.sourceToggle")}
               </label>
-              <Input id="source_citation" {...exampleForm.register("source_citation")} />
+              <p className="mt-1 text-xs text-slate-600">{t("submit.help.sourceCitation")}</p>
+              {exampleHasSource ? (
+                <div className="mt-3 space-y-3">
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <div>
+                      <label className="mb-1 block text-sm font-medium" htmlFor="example_source_authors">
+                        {t("submit.sourceAuthors")} ({t("form.optional")})
+                      </label>
+                      <Input id="example_source_authors" {...exampleForm.register("source_authors")} />
+                    </div>
+                    <div>
+                      <label className="mb-1 block text-sm font-medium" htmlFor="example_source_title">
+                        {t("submit.sourceTitle")} ({t("form.optional")})
+                      </label>
+                      <Input id="example_source_title" {...exampleForm.register("source_title")} />
+                      {exampleForm.formState.errors.source_title?.message ? (
+                        <p className="mt-1 text-xs text-red-700">
+                          {exampleForm.formState.errors.source_title.message}
+                        </p>
+                      ) : null}
+                    </div>
+                  </div>
+                  <div className="grid gap-3 sm:grid-cols-3">
+                    <div>
+                      <label className="mb-1 block text-sm font-medium" htmlFor="example_source_publication_year">
+                        {t("submit.sourceYear")} ({t("form.optional")})
+                      </label>
+                      <Input
+                        id="example_source_publication_year"
+                        inputMode="numeric"
+                        placeholder="2024"
+                        {...exampleForm.register("source_publication_year")}
+                      />
+                      {exampleForm.formState.errors.source_publication_year?.message ? (
+                        <p className="mt-1 text-xs text-red-700">
+                          {exampleForm.formState.errors.source_publication_year.message}
+                        </p>
+                      ) : null}
+                    </div>
+                    <div>
+                      <label className="mb-1 block text-sm font-medium" htmlFor="example_source_edition_label">
+                        {t("submit.sourceEdition")} ({t("form.optional")})
+                      </label>
+                      <Input id="example_source_edition_label" {...exampleForm.register("source_edition_label")} />
+                    </div>
+                    <div>
+                      <label className="mb-1 block text-sm font-medium" htmlFor="example_source_pages">
+                        {t("submit.sourcePages")} ({t("form.optional")})
+                      </label>
+                      <Input id="example_source_pages" placeholder="22-24" {...exampleForm.register("source_pages")} />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-sm font-medium" htmlFor="source_citation">
+                      {t("entry.sourceIfApplicableOptional", { optional: t("form.optional") })}
+                    </label>
+                    <Input id="source_citation" {...exampleForm.register("source_citation")} />
+                  </div>
+                  {exampleSourceSuggestionsQuery.data && exampleSourceSuggestionsQuery.data.length > 0 ? (
+                    <div className="rounded-md border border-brand-200 bg-white p-2">
+                      <p className="text-xs font-semibold text-brand-900">{t("submit.sourceSuggestionsTitle")}</p>
+                      <div className="mt-2 flex flex-wrap gap-2">
+                        {exampleSourceSuggestionsQuery.data.map((source) => (
+                          <button
+                            key={`${source.work_id}-${source.edition_id}`}
+                            type="button"
+                            className="rounded-full border border-brand-200 px-3 py-1 text-xs text-brand-800 hover:border-brand-500 hover:bg-brand-50"
+                            onClick={() => applySourceSuggestionToExampleCreate(source)}
+                          >
+                            {source.citation}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  ) : null}
+                </div>
+              ) : null}
             </div>
             {createExampleMutation.error instanceof ApiError ? (
               <p className="text-sm text-red-700">{getLocalizedApiErrorMessage(createExampleMutation.error, t)}</p>

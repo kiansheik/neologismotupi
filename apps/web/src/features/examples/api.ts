@@ -1,5 +1,6 @@
 import { apiFetch } from "@/lib/api";
 import type { ExampleVersion } from "@/lib/types";
+import type { EntrySourceInput } from "@/features/entries/api";
 
 export interface ReportExamplePayload {
   reason_code: string;
@@ -15,6 +16,7 @@ export interface UpdateExamplePayload {
   translation_pt?: string | null;
   translation_en?: string | null;
   source_citation?: string | null;
+  source?: EntrySourceInput | null;
   usage_note?: string | null;
   context_tag?: string | null;
   edit_summary?: string | null;

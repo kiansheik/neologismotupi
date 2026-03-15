@@ -45,6 +45,11 @@ def serialize_example(
             "translation_pt": example.translation_pt,
             "translation_en": example.translation_en,
             "source_citation": example.source_citation,
+            "source": _serialize_source_fields(
+                source_edition=example.source_edition,
+                source_pages=example.source_pages,
+                source_citation=example.source_citation,
+            ),
             "usage_note": example.usage_note,
             "context_tag": example.context_tag,
             "status": example.status,
@@ -190,28 +195,41 @@ def serialize_entry_detail(
 
 
 def _serialize_entry_source(entry: Entry) -> EntrySourceOut | None:
-    if entry.source_edition is None or entry.source_edition.work is None:
+    return _serialize_source_fields(
+        source_edition=entry.source_edition,
+        source_pages=entry.source_pages,
+        source_citation=entry.source_citation,
+    )
+
+
+def _serialize_source_fields(
+    *,
+    source_edition,
+    source_pages: str | None,
+    source_citation: str | None,
+) -> EntrySourceOut | None:
+    if source_edition is None or source_edition.work is None:
         return None
 
-    work = entry.source_edition.work
+    work = source_edition.work
     citation = build_source_citation(
         authors=work.authors,
         title=work.title,
-        publication_year=entry.source_edition.publication_year,
-        edition_label=entry.source_edition.edition_label,
-        pages=entry.source_pages,
-        fallback=entry.source_citation,
+        publication_year=source_edition.publication_year,
+        edition_label=source_edition.edition_label,
+        pages=source_pages,
+        fallback=source_citation,
     )
     if citation is None:
         return None
 
     return EntrySourceOut(
         work_id=work.id,
-        edition_id=entry.source_edition.id,
+        edition_id=source_edition.id,
         authors=work.authors,
         title=work.title,
-        publication_year=entry.source_edition.publication_year,
-        edition_label=entry.source_edition.edition_label,
-        pages=entry.source_pages,
+        publication_year=source_edition.publication_year,
+        edition_label=source_edition.edition_label,
+        pages=source_pages,
         citation=citation,
     )

@@ -78,6 +78,7 @@ export interface Example {
   translation_pt: string | null;
   translation_en: string | null;
   source_citation: string | null;
+  source?: SourceRecord | null;
   usage_note: string | null;
   context_tag: string | null;
   status: ExampleStatus;

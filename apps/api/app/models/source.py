@@ -8,7 +8,7 @@ from app.db import Base
 from app.models.mixins import TimestampMixin, UUIDPrimaryKeyMixin
 
 if TYPE_CHECKING:
-    from app.models.entry import Entry
+    from app.models.entry import Entry, Example
 
 
 class SourceWork(Base, UUIDPrimaryKeyMixin, TimestampMixin):
@@ -54,3 +54,4 @@ class SourceEdition(Base, UUIDPrimaryKeyMixin, TimestampMixin):
 
     work: Mapped[SourceWork] = relationship(back_populates="editions")
     entries: Mapped[list["Entry"]] = relationship(back_populates="source_edition")
+    examples: Mapped[list["Example"]] = relationship(back_populates="source_edition")

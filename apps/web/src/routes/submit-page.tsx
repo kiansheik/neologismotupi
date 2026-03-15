@@ -211,36 +211,6 @@ export function SubmitPage() {
       <h1 className="text-xl font-semibold text-brand-900">{t("submit.title")}</h1>
       <p className="mt-1 text-xs text-slate-600">{t("form.requiredLegend")}</p>
       <p className="mt-1 text-xs text-slate-600">{t("submit.onlyRequired")}</p>
-      <div className="mt-3 rounded-md border border-brand-200 bg-brand-50/40 p-3">
-        <h2 className="text-sm font-semibold text-brand-900">{t("submit.exampleTitle")}</h2>
-        <div className="mt-2 space-y-2 text-xs text-slate-700">
-          <p>
-            <span className="font-semibold">{t("submit.exampleHeadword")}:</span>{" "}
-            <Link className="text-brand-700 underline" to="/entries/morupisara">
-              morupisara
-            </Link>
-          </p>
-          <p>
-            <span className="font-semibold">{t("submit.exampleGloss")}:</span> elevador
-          </p>
-          <p>
-            <span className="font-semibold">{t("submit.examplePartOfSpeech")}:</span>{" "}
-            {partOfSpeechLabel("noun", t)}
-          </p>
-          <p>
-            <span className="font-semibold">{t("submit.exampleDefinition")}:</span> Uma máquina que sobe e
-            desce entre andares.
-          </p>
-          <p>
-            <span className="font-semibold">{t("submit.exampleSource")}:</span>{" "}
-            {t("submit.exampleSourceEmpty")}
-          </p>
-          <p>
-            <span className="font-semibold">{t("entry.morphology")}:</span>{" "}
-            Mor - gente; upir - subir; saba - instrumental; o que faz pessoas subirem.
-          </p>
-        </div>
-      </div>
       <form
         className="mt-4 space-y-3"
         onSubmit={(event) => {
@@ -252,7 +222,7 @@ export function SubmitPage() {
             {t("submit.headword")} *
           </label>
           <p className="mb-1 text-xs text-slate-600">{t("submit.help.headword")}</p>
-          <Input id="headword" {...form.register("headword")} />
+          <Input id="headword" placeholder="bebesara" {...form.register("headword")} />
           {form.formState.errors.headword?.message ? (
             <p className="mt-1 text-xs text-red-700">{form.formState.errors.headword.message}</p>
           ) : null}
@@ -289,7 +259,7 @@ export function SubmitPage() {
               <label className="mb-1 block text-sm font-medium" htmlFor="gloss_pt">
                 {t("submit.glossPt")} *
               </label>
-              <Input id="gloss_pt" {...form.register("gloss_pt")} />
+              <Input id="gloss_pt" placeholder="avião" {...form.register("gloss_pt")} />
               {form.formState.errors.gloss_pt?.message ? (
                 <p className="mt-1 text-xs text-red-700">{form.formState.errors.gloss_pt.message}</p>
               ) : null}
@@ -328,7 +298,11 @@ export function SubmitPage() {
             {t("submit.definition")} ({t("form.optional")})
           </label>
           <p className="mb-1 text-xs text-slate-600">{t("submit.help.definition")}</p>
-          <Textarea id="short_definition" {...form.register("short_definition")} />
+          <Textarea
+            id="short_definition"
+            placeholder="veículo de se locomover voando"
+            {...form.register("short_definition")}
+          />
         </div>
 
         <div className="rounded-md border border-brand-100 bg-brand-50/30 p-3">
@@ -345,13 +319,17 @@ export function SubmitPage() {
                   <label className="mb-1 block text-sm font-medium" htmlFor="source_authors">
                     {t("submit.sourceAuthors")} ({t("form.optional")})
                   </label>
-                  <Input id="source_authors" {...form.register("source_authors")} />
+                  <Input
+                    id="source_authors"
+                    placeholder="JOSÉ ROMILDO ARAÚJO DA SILVA (GUYRAAKANGA POTIGUARA)"
+                    {...form.register("source_authors")}
+                  />
                 </div>
                 <div>
                   <label className="mb-1 block text-sm font-medium" htmlFor="source_title">
                     {t("submit.sourceTitle")} ({t("form.optional")})
                   </label>
-                  <Input id="source_title" {...form.register("source_title")} />
+                  <Input id="source_title" placeholder="Tupi Potiguara Kuapa" {...form.register("source_title")} />
                   {form.formState.errors.source_title?.message ? (
                     <p className="mt-1 text-xs text-red-700">{form.formState.errors.source_title.message}</p>
                   ) : null}
@@ -379,13 +357,13 @@ export function SubmitPage() {
                   <label className="mb-1 block text-sm font-medium" htmlFor="source_edition_label">
                     {t("submit.sourceEdition")} ({t("form.optional")})
                   </label>
-                  <Input id="source_edition_label" {...form.register("source_edition_label")} />
+                  <Input id="source_edition_label" placeholder="1ª Edição" {...form.register("source_edition_label")} />
                 </div>
                 <div>
                   <label className="mb-1 block text-sm font-medium" htmlFor="source_pages">
                     {t("submit.sourcePages")} ({t("form.optional")})
                   </label>
-                  <Input id="source_pages" placeholder="22-24" {...form.register("source_pages")} />
+                  <Input id="source_pages" placeholder="119" {...form.register("source_pages")} />
                 </div>
               </div>
 
@@ -415,7 +393,11 @@ export function SubmitPage() {
             {t("submit.morphologyNotes")} ({t("form.optional")})
           </label>
           <p className="mb-1 text-xs text-slate-600">{t("submit.help.morphologyNotes")}</p>
-          <Textarea id="morphology_notes" {...form.register("morphology_notes")} />
+          <Textarea
+            id="morphology_notes"
+            placeholder="bebé - voar; sara - agente; o que voa"
+            {...form.register("morphology_notes")}
+          />
         </div>
 
         {createMutation.error instanceof ApiError ? (

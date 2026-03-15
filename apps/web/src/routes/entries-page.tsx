@@ -34,7 +34,6 @@ export function EntriesPage() {
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState("");
   const [partOfSpeech, setPartOfSpeech] = useState("");
-  const [source, setSource] = useState("");
   const [sort, setSort] = useState<"alphabetical" | "recent" | "score" | "most_examples">(
     "recent",
   );
@@ -47,24 +46,22 @@ export function EntriesPage() {
     const timer = window.setTimeout(() => {
       trackEvent("entries_filter_changed", {
         has_search: search.trim().length > 0,
-        has_source_search: source.trim().length > 0,
         status: status || "all",
         part_of_speech: partOfSpeech || "all",
         sort,
       });
     }, 350);
     return () => window.clearTimeout(timer);
-  }, [partOfSpeech, search, sort, source, status]);
+  }, [partOfSpeech, search, sort, status]);
 
   const filters = useMemo(
     () => ({
       search,
-      source,
       status,
       part_of_speech: partOfSpeech,
       sort,
     }),
-    [search, source, status, partOfSpeech, sort],
+    [search, status, partOfSpeech, sort],
   );
 
   const { data, isPending, isFetchingNextPage, hasNextPage, fetchNextPage } = useInfiniteQuery({
@@ -138,18 +135,12 @@ export function EntriesPage() {
         <p className="mt-1 text-sm text-slate-700">
           Base comunitária de Tupi moderno para quem quer aprender, usar e revitalizar a língua no dia a dia.
         </p>
-        <div className="mt-3 grid gap-3 md:grid-cols-5">
+        <div className="mt-3 grid gap-3 md:grid-cols-4">
           <Input
             aria-label={t("entries.searchAria")}
             value={search}
             placeholder={t("entries.searchPlaceholder")}
             onChange={(event) => setSearch(event.target.value)}
-          />
-          <Input
-            aria-label={t("entries.sourceSearchAria")}
-            value={source}
-            placeholder={t("entries.sourcePlaceholder")}
-            onChange={(event) => setSource(event.target.value)}
           />
           <select
             className="rounded-md border border-brand-300 bg-white px-3 py-2 text-sm"

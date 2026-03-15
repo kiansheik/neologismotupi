@@ -50,6 +50,8 @@ def snapshot_example(example: Example) -> dict:
         "translation_pt": example.translation_pt,
         "translation_en": example.translation_en,
         "source_citation": example.source_citation,
+        "source_edition_id": str(example.source_edition_id) if example.source_edition_id else None,
+        "source_pages": example.source_pages,
         "usage_note": example.usage_note,
         "context_tag": example.context_tag,
         "status": example.status.value,

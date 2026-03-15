@@ -360,6 +360,37 @@ async def test_add_example(client):
 
 
 @pytest.mark.asyncio
+async def test_add_example_with_structured_source(client):
+    await register_user(client, "example-structured-owner@example.com", "Example Structured Owner")
+    entry = await create_entry(client, "example-source-entry")
+
+    response = await client.post(
+        f"/api/entries/{entry['id']}/examples",
+        json={
+            "sentence_original": "A fonte estruturada aparece no exemplo.",
+            "translation_pt": "A fonte estruturada aparece no exemplo.",
+            "source": {
+                "authors": "José de Anchieta",
+                "title": "Arte de Gramática",
+                "publication_year": 1595,
+                "edition_label": "edição de estudo",
+                "pages": "12-13",
+            },
+        },
+    )
+    assert response.status_code == 201, response.text
+    payload = response.json()
+    assert payload["source"] is not None
+    assert payload["source"]["authors"] == "José de Anchieta"
+    assert payload["source"]["title"] == "Arte de Gramática"
+    assert payload["source"]["publication_year"] == 1595
+    assert payload["source"]["edition_label"] == "edição de estudo"
+    assert payload["source"]["pages"] == "12-13"
+    assert "p. 12-13" in payload["source"]["citation"]
+    assert payload["source_citation"] == payload["source"]["citation"]
+
+
+@pytest.mark.asyncio
 async def test_edit_example_creates_version_history(client):
     await register_user(client, "example-editor@example.com", "Example Editor")
     entry = await create_entry(client, "example-edit-entry")
@@ -380,7 +411,12 @@ async def test_edit_example_creates_version_history(client):
         json={
             "sentence_original": "Frase revisada de exemplo.",
             "translation_pt": "Tradução revisada.",
-            "source_citation": "Fonte revisada",
+            "source": {
+                "authors": "Anchieta",
+                "title": "Arte de Gramática",
+                "publication_year": 1595,
+                "pages": "77",
+            },
             "edit_summary": "ajuste de clareza",
         },
     )
@@ -388,7 +424,12 @@ async def test_edit_example_creates_version_history(client):
     edited = edit_response.json()
     assert edited["sentence_original"] == "Frase revisada de exemplo."
     assert edited["translation_pt"] == "Tradução revisada."
-    assert edited["source_citation"] == "Fonte revisada"
+    assert edited["source"] is not None
+    assert edited["source"]["authors"] == "Anchieta"
+    assert edited["source"]["title"] == "Arte de Gramática"
+    assert edited["source"]["pages"] == "77"
+    assert "p. 77" in edited["source"]["citation"]
+    assert edited["source_citation"] == edited["source"]["citation"]
 
     versions_response = await client.get(f"/api/examples/{example_id}/versions")
     assert versions_response.status_code == 200, versions_response.text

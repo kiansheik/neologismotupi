@@ -176,6 +176,8 @@ export const ptBR = {
   "submit.error.glossRequired": "A glosa é obrigatória.",
   "submit.error.definitionMin": "A definição deve ter pelo menos 3 caracteres.",
   "submit.error.sourceNeedAuthorOrTitle": "Informe ao menos autor(es) ou título da obra.",
+  "submit.error.sourceNeedAuthorTitleOrCitation":
+    "Informe ao menos autor(es), título da obra ou uma citação livre de fonte.",
   "submit.error.sourceInvalidYear": "O ano da fonte deve ser um número entre 1 e 3000.",
 
   "entry.loading": "Carregando verbete...",
@@ -583,6 +585,8 @@ export const enUS: Record<TranslationKey, string> = {
   "submit.error.glossRequired": "Gloss is required.",
   "submit.error.definitionMin": "Definition must be at least 3 characters.",
   "submit.error.sourceNeedAuthorOrTitle": "Provide at least author(s) or work title.",
+  "submit.error.sourceNeedAuthorTitleOrCitation":
+    "Provide at least author(s), work title, or a free-form source citation.",
   "submit.error.sourceInvalidYear": "Source year must be a number between 1 and 3000.",
 
   "entry.loading": "Loading entry...",
