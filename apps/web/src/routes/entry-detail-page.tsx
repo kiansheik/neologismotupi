@@ -38,6 +38,7 @@ type ExampleForm = {
   source_publication_year?: string;
   source_edition_label?: string;
   source_pages?: string;
+  source_url?: string;
 };
 
 type CommentForm = {
@@ -60,6 +61,7 @@ type EntryEditForm = {
   source_publication_year: string;
   source_edition_label: string;
   source_pages: string;
+  source_url: string;
   source_citation: string;
   morphology_notes: string;
   edit_summary: string;
@@ -100,6 +102,7 @@ type SourceFormValues = {
   source_publication_year?: string;
   source_edition_label?: string;
   source_pages?: string;
+  source_url?: string;
   source_citation?: string;
 };
 
@@ -110,6 +113,7 @@ function normalizeSourcePayload(values: SourceFormValues): {
     publication_year?: number;
     edition_label?: string;
     pages?: string;
+    url?: string;
   } | null;
   source_citation: string | null;
 } {
@@ -123,6 +127,7 @@ function normalizeSourcePayload(values: SourceFormValues): {
   const publicationYear = publicationYearRaw ? Number(publicationYearRaw) : undefined;
   const editionLabel = normalizeOptionalField(values.source_edition_label);
   const pages = normalizeOptionalField(values.source_pages);
+  const sourceUrl = normalizeOptionalField(values.source_url);
   const sourceCitation = normalizeOptionalField(values.source_citation);
 
   if (!authors && !title) {
@@ -136,6 +141,7 @@ function normalizeSourcePayload(values: SourceFormValues): {
       publication_year: publicationYear,
       edition_label: editionLabel ?? undefined,
       pages: pages ?? undefined,
+      url: sourceUrl ?? undefined,
     },
     source_citation: sourceCitation,
   };
@@ -254,6 +260,40 @@ function historyActionLabel(actionType: string | null, t: TranslateFn): string {
     default:
       return actionType || t("entry.history.moderationAction");
   }
+}
+
+function SourceCitation({
+  citation,
+  workId,
+  firstUrl,
+  t,
+}: {
+  citation: string;
+  workId?: string | null;
+  firstUrl?: string | null;
+  t: TranslateFn;
+}) {
+  return (
+    <span className="inline-flex flex-wrap items-center gap-2">
+      {workId ? (
+        <Link className="text-brand-700 hover:underline" to={`/sources/${workId}`}>
+          {citation}
+        </Link>
+      ) : (
+        <span>{citation}</span>
+      )}
+      {firstUrl ? (
+        <a
+          href={firstUrl}
+          target="_blank"
+          rel="noreferrer"
+          className="text-xs text-brand-700 hover:underline"
+        >
+          {t("entry.openMirror")}
+        </a>
+      ) : null}
+    </span>
+  );
 }
 
 function ExampleVersionHistory({
@@ -499,6 +539,7 @@ export function EntryDetailPage() {
       source_publication_year: "",
       source_edition_label: "",
       source_pages: "",
+      source_url: "",
       source_citation: "",
     },
   });
@@ -512,6 +553,7 @@ export function EntryDetailPage() {
       source_publication_year: "",
       source_edition_label: "",
       source_pages: "",
+      source_url: "",
       source_citation: "",
     },
   });
@@ -541,6 +583,7 @@ export function EntryDetailPage() {
       source_publication_year: "",
       source_edition_label: "",
       source_pages: "",
+      source_url: "",
       source_citation: "",
       morphology_notes: "",
       edit_summary: "",
@@ -656,6 +699,7 @@ export function EntryDetailPage() {
           : "",
       source_edition_label: entry.source?.edition_label ?? "",
       source_pages: entry.source?.pages ?? "",
+      source_url: entry.source?.urls?.[0] ?? "",
       source_citation: entry.source_citation ?? "",
       morphology_notes: entry.morphology_notes ?? "",
       edit_summary: "",
@@ -768,6 +812,7 @@ export function EntryDetailPage() {
         source_publication_year: z.string().trim().optional(),
         source_edition_label: z.string().trim().max(120).optional(),
         source_pages: z.string().trim().max(120).optional(),
+        source_url: z.string().trim().max(2048).optional(),
         source_citation: z.string().trim().max(500).optional(),
       })
       .superRefine((values, ctx) => {
@@ -781,6 +826,13 @@ export function EntryDetailPage() {
             message: t("submit.error.sourceNeedAuthorTitleOrCitation"),
           });
         }
+        if (values.source_url && !values.source_authors && !values.source_title) {
+          ctx.addIssue({
+            path: ["source_url"],
+            code: "custom",
+            message: t("submit.error.sourceNeedAuthorOrTitle"),
+          });
+        }
         if (!values.source_publication_year) {
           return;
         }
@@ -791,6 +843,13 @@ export function EntryDetailPage() {
             path: ["source_publication_year"],
             code: "custom",
             message: t("submit.error.sourceInvalidYear"),
+          });
+        }
+        if (values.source_url && !/^https?:\/\//i.test(values.source_url)) {
+          ctx.addIssue({
+            path: ["source_url"],
+            code: "custom",
+            message: t("submit.error.sourceInvalidUrl"),
           });
         }
       });
@@ -823,6 +882,7 @@ export function EntryDetailPage() {
         source_publication_year: z.string().trim().optional(),
         source_edition_label: z.string().trim().max(120).optional(),
         source_pages: z.string().trim().max(120).optional(),
+        source_url: z.string().trim().max(2048).optional(),
         source_citation: z.string().trim().max(500).optional(),
       })
       .superRefine((values, ctx) => {
@@ -836,6 +896,13 @@ export function EntryDetailPage() {
             message: t("submit.error.sourceNeedAuthorTitleOrCitation"),
           });
         }
+        if (values.source_url && !values.source_authors && !values.source_title) {
+          ctx.addIssue({
+            path: ["source_url"],
+            code: "custom",
+            message: t("submit.error.sourceNeedAuthorOrTitle"),
+          });
+        }
         if (!values.source_publication_year) {
           return;
         }
@@ -846,6 +913,13 @@ export function EntryDetailPage() {
             path: ["source_publication_year"],
             code: "custom",
             message: t("submit.error.sourceInvalidYear"),
+          });
+        }
+        if (values.source_url && !/^https?:\/\//i.test(values.source_url)) {
+          ctx.addIssue({
+            path: ["source_url"],
+            code: "custom",
+            message: t("submit.error.sourceInvalidUrl"),
           });
         }
       });
@@ -911,6 +985,7 @@ export function EntryDetailPage() {
         source_publication_year: z.string().trim().optional(),
         source_edition_label: z.string().trim().max(120).optional(),
         source_pages: z.string().trim().max(120).optional(),
+        source_url: z.string().trim().max(2048).optional(),
         source_citation: z.string().trim().max(500).optional(),
         morphology_notes: z.string().optional(),
         edit_summary: z.string().trim().min(3, t("entry.error.editSummaryMin")),
@@ -926,6 +1001,13 @@ export function EntryDetailPage() {
             message: t("submit.error.sourceNeedAuthorTitleOrCitation"),
           });
         }
+        if (values.source_url && !values.source_authors && !values.source_title) {
+          ctx.addIssue({
+            path: ["source_url"],
+            code: "custom",
+            message: t("submit.error.sourceNeedAuthorOrTitle"),
+          });
+        }
         if (!values.source_publication_year) {
           return;
         }
@@ -936,6 +1018,13 @@ export function EntryDetailPage() {
             path: ["source_publication_year"],
             code: "custom",
             message: t("submit.error.sourceInvalidYear"),
+          });
+        }
+        if (values.source_url && !/^https?:\/\//i.test(values.source_url)) {
+          ctx.addIssue({
+            path: ["source_url"],
+            code: "custom",
+            message: t("submit.error.sourceInvalidUrl"),
           });
         }
       });
@@ -1023,6 +1112,7 @@ export function EntryDetailPage() {
       source.publication_year !== null ? String(source.publication_year) : "",
     );
     entryEditForm.setValue("source_edition_label", source.edition_label ?? "");
+    entryEditForm.setValue("source_url", "");
   };
 
   const applySourceSuggestionToExampleCreate = (source: SourceSuggestion) => {
@@ -1033,6 +1123,7 @@ export function EntryDetailPage() {
       source.publication_year !== null ? String(source.publication_year) : "",
     );
     exampleForm.setValue("source_edition_label", source.edition_label ?? "");
+    exampleForm.setValue("source_url", "");
   };
 
   const applySourceSuggestionToExampleEdit = (source: SourceSuggestion) => {
@@ -1043,6 +1134,7 @@ export function EntryDetailPage() {
       source.publication_year !== null ? String(source.publication_year) : "",
     );
     exampleEditForm.setValue("source_edition_label", source.edition_label ?? "");
+    exampleEditForm.setValue("source_url", "");
   };
 
   const startEditingExample = (example: EntryExample) => {
@@ -1060,6 +1152,7 @@ export function EntryDetailPage() {
           : "",
       source_edition_label: example.source?.edition_label ?? "",
       source_pages: example.source?.pages ?? "",
+      source_url: example.source?.urls?.[0] ?? "",
       source_citation: example.source_citation ?? "",
     });
   };
@@ -1076,6 +1169,7 @@ export function EntryDetailPage() {
       source_publication_year: "",
       source_edition_label: "",
       source_pages: "",
+      source_url: "",
       source_citation: "",
     });
   };
@@ -1129,6 +1223,8 @@ export function EntryDetailPage() {
   const canApproveEntry = entry.status !== "approved";
   const canRejectEntry = entry.status !== "rejected";
   const displayedSourceCitation = entry.source?.citation ?? entry.source_citation ?? null;
+  const entrySourceWorkId = entry.source?.work_id ?? null;
+  const entrySourceFirstUrl = entry.source?.urls?.[0] ?? null;
 
   return (
     <section className="space-y-4">
@@ -1180,7 +1276,12 @@ export function EntryDetailPage() {
         {displayedSourceCitation ? (
           <p className="mt-2 text-sm text-slate-700">
             <span className="font-semibold text-slate-900">{t("entry.sourceCitation")}:</span>{" "}
-            {displayedSourceCitation}
+            <SourceCitation
+              citation={displayedSourceCitation}
+              workId={entrySourceWorkId}
+              firstUrl={entrySourceFirstUrl}
+              t={t}
+            />
           </p>
         ) : null}
         <p className="mt-3 text-xs text-slate-500">
@@ -1447,6 +1548,15 @@ export function EntryDetailPage() {
                     </div>
                   </div>
                   <div>
+                    <label className="mb-1 block text-sm font-medium" htmlFor="edit_source_url">
+                      {t("submit.sourceUrl")} ({t("form.optional")})
+                    </label>
+                    <Input id="edit_source_url" placeholder="https://..." {...entryEditForm.register("source_url")} />
+                    {entryEditForm.formState.errors.source_url?.message ? (
+                      <p className="mt-1 text-xs text-red-700">{entryEditForm.formState.errors.source_url.message}</p>
+                    ) : null}
+                  </div>
+                  <div>
                     <label className="mb-1 block text-sm font-medium" htmlFor="edit_source_citation">
                       {t("entry.sourceIfApplicableOptional", { optional: t("form.optional") })}
                     </label>
@@ -1511,6 +1621,7 @@ export function EntryDetailPage() {
                         : "",
                     source_edition_label: entry.source?.edition_label ?? "",
                     source_pages: entry.source?.pages ?? "",
+                    source_url: entry.source?.urls?.[0] ?? "",
                     source_citation: entry.source_citation ?? "",
                     morphology_notes: entry.morphology_notes ?? "",
                     edit_summary: "",
@@ -1572,6 +1683,8 @@ export function EntryDetailPage() {
               const canApproveExample = example.status !== "approved";
               const canRejectExample = example.status !== "rejected";
               const displayedExampleSourceCitation = example.source?.citation ?? example.source_citation;
+              const exampleSourceWorkId = example.source?.work_id ?? null;
+              const exampleSourceFirstUrl = example.source?.urls?.[0] ?? null;
 
               return (
                 <article key={example.id} className="rounded-md border border-brand-100 p-3">
@@ -1586,7 +1699,13 @@ export function EntryDetailPage() {
                   ) : null}
                   {displayedExampleSourceCitation ? (
                     <p className="mt-1 text-xs text-slate-600">
-                      {t("entry.exampleSource")}: {displayedExampleSourceCitation}
+                      {t("entry.exampleSource")}:{" "}
+                      <SourceCitation
+                        citation={displayedExampleSourceCitation}
+                        workId={exampleSourceWorkId}
+                        firstUrl={exampleSourceFirstUrl}
+                        t={t}
+                      />
                     </p>
                   ) : null}
                   {(example.status === "rejected" || example.status === "hidden") &&
@@ -1809,6 +1928,24 @@ export function EntryDetailPage() {
                                   {...exampleEditForm.register("source_pages")}
                                 />
                               </div>
+                            </div>
+                            <div>
+                              <label
+                                className="mb-1 block text-sm font-medium"
+                                htmlFor={`example_source_url_${example.id}`}
+                              >
+                                {t("submit.sourceUrl")} ({t("form.optional")})
+                              </label>
+                              <Input
+                                id={`example_source_url_${example.id}`}
+                                placeholder="https://..."
+                                {...exampleEditForm.register("source_url")}
+                              />
+                              {exampleEditForm.formState.errors.source_url?.message ? (
+                                <p className="mt-1 text-xs text-red-700">
+                                  {exampleEditForm.formState.errors.source_url.message}
+                                </p>
+                              ) : null}
                             </div>
                             <div>
                               <label
@@ -2136,6 +2273,15 @@ export function EntryDetailPage() {
                       </label>
                       <Input id="example_source_pages" placeholder="22-24" {...exampleForm.register("source_pages")} />
                     </div>
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-sm font-medium" htmlFor="example_source_url">
+                      {t("submit.sourceUrl")} ({t("form.optional")})
+                    </label>
+                    <Input id="example_source_url" placeholder="https://..." {...exampleForm.register("source_url")} />
+                    {exampleForm.formState.errors.source_url?.message ? (
+                      <p className="mt-1 text-xs text-red-700">{exampleForm.formState.errors.source_url.message}</p>
+                    ) : null}
                   </div>
                   <div>
                     <label className="mb-1 block text-sm font-medium" htmlFor="source_citation">

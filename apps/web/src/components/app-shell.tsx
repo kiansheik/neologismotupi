@@ -38,6 +38,7 @@ export function AppShell() {
     normalizedPath === "/entries" ||
     normalizedPath === "/about" ||
     normalizedPath.startsWith("/entries/") ||
+    normalizedPath.startsWith("/sources/") ||
     normalizedPath.startsWith("/profiles/");
   const noindexRoutes = new Set([
     "/login",

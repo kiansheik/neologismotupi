@@ -9,6 +9,7 @@ from app.models.mixins import TimestampMixin, UUIDPrimaryKeyMixin
 
 if TYPE_CHECKING:
     from app.models.entry import Entry, Example
+    from app.models.user import User
 
 
 class SourceWork(Base, UUIDPrimaryKeyMixin, TimestampMixin):
@@ -26,6 +27,10 @@ class SourceWork(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     normalized_title: Mapped[str | None] = mapped_column(String(400), nullable=True, index=True)
 
     editions: Mapped[list["SourceEdition"]] = relationship(
+        back_populates="work",
+        cascade="all, delete-orphan",
+    )
+    links: Mapped[list["SourceLink"]] = relationship(
         back_populates="work",
         cascade="all, delete-orphan",
     )
@@ -55,3 +60,27 @@ class SourceEdition(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     work: Mapped[SourceWork] = relationship(back_populates="editions")
     entries: Mapped[list["Entry"]] = relationship(back_populates="source_edition")
     examples: Mapped[list["Example"]] = relationship(back_populates="source_edition")
+
+
+class SourceLink(Base, UUIDPrimaryKeyMixin, TimestampMixin):
+    __tablename__ = "source_links"
+    __table_args__ = (
+        UniqueConstraint("work_id", "normalized_url", name="uq_source_links_work_normalized_url"),
+    )
+
+    work_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid,
+        ForeignKey("source_works.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    url: Mapped[str] = mapped_column(String(2048), nullable=False)
+    normalized_url: Mapped[str] = mapped_column(String(2048), nullable=False, index=True)
+    created_by_user_id: Mapped[uuid.UUID | None] = mapped_column(
+        Uuid,
+        ForeignKey("users.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+
+    work: Mapped[SourceWork] = relationship(back_populates="links")
+    created_by_user: Mapped["User | None"] = relationship(foreign_keys=[created_by_user_id])

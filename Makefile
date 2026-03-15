@@ -12,12 +12,14 @@ DEPLOY_API_URL ?= https://api.academiatupi.com
 DEPLOY_SMOKE_ORIGIN ?= https://neo.academiatupi.com
 DEPLOY_SMOKE_RETRIES ?= 60
 DEPLOY_SMOKE_SLEEP_SECONDS ?= 2
+DEPLOY_DB_USER ?= nheenga
+DEPLOY_DB_NAME ?= nheenga_prod
 
 API_DIR := apps/api
 WEB_DIR := apps/web
 API_ENV_FILE ?= .env
 
-.PHONY: help bootstrap-macos bootstrap-linux install dev dev-web dev-api web-build prod-check prod-migrate db-create db-migrate db-reset db-rebuild seed test-email db-backup db-dump-docker db-restore-dump migrate-legacy-entry-source deploy-migrate-legacy-entry-source deploy-full deploy-daily deploy-reset deploy-smoke deploy-ssh-all deploy-email-test deploy-smtp-logs deploy-api-logs deploy-api-logs-follow bootstrap-admin change-user-password test test-web test-api test-e2e lint format
+.PHONY: help bootstrap-macos bootstrap-linux install dev dev-web dev-api web-build prod-check prod-migrate db-create db-migrate db-reset db-rebuild seed test-email db-backup db-dump-docker db-restore-dump migrate-legacy-entry-source deploy-migrate-legacy-entry-source deploy-full deploy-daily deploy-reset deploy-smoke deploy-ssh-all deploy-email-test deploy-smtp-logs deploy-api-logs deploy-api-logs-follow deploy-db-psql bootstrap-admin change-user-password test test-web test-api test-e2e lint format
 
 help:
 	@echo "Available targets:"
@@ -49,6 +51,7 @@ help:
 	@echo "  make deploy-smtp-logs [DEPLOY_HOST=...] [DEPLOY_USER=...] [DEPLOY_PATH=...] [SSH_IDENTITY=...]"
 	@echo "  make deploy-api-logs [DEPLOY_HOST=...] [DEPLOY_USER=...] [DEPLOY_PATH=...] [SSH_IDENTITY=...]"
 	@echo "  make deploy-api-logs-follow [DEPLOY_HOST=...] [DEPLOY_USER=...] [DEPLOY_PATH=...] [SSH_IDENTITY=...]"
+	@echo "  make deploy-db-psql [DEPLOY_DB_USER=nheenga] [DEPLOY_DB_NAME=nheenga_prod] [DEPLOY_HOST=...] [DEPLOY_USER=...] [DEPLOY_PATH=...] [SSH_IDENTITY=...]"
 	@echo "  make deploy-ssh-all DEPLOY_HOST=<host> [DEPLOY_USER=root] [DEPLOY_PATH=/srv/nheenga-neologismos] [DEPLOY_DB_DUMP=/path/file.sql.gz] [DEPLOY_SEED_CSV=/path/neologisms.csv] [DEPLOY_MODE=full|daily] [DEPLOY_API_URL=https://api.example.com] [DEPLOY_SMOKE_ORIGIN=https://neo.example.com] [SSH_IDENTITY=~/.ssh/id_ed25519] [DEPLOY_RESET_STACK=1] [DEPLOY_RESET_VOLUMES=1]"
 	@echo "  make bootstrap-admin EMAIL=<email> PASSWORD=<password> [DISPLAY_NAME=<name>]  # Create/update first admin"
 	@echo "  make change-user-password <email> <new_password>  # Update a user's password"
@@ -221,6 +224,10 @@ deploy-api-logs:
 deploy-api-logs-follow:
 	@ssh -i "$(SSH_IDENTITY)" "$(DEPLOY_USER)@$(DEPLOY_HOST)" \
 		"cd '$(DEPLOY_PATH)' && docker compose -f deploy/docker-compose.remote.yml --env-file deploy/env/stack.env logs -f --tail=180 api"
+
+deploy-db-psql:
+	@ssh -t -i "$(SSH_IDENTITY)" "$(DEPLOY_USER)@$(DEPLOY_HOST)" \
+		"cd '$(DEPLOY_PATH)' && docker compose -f deploy/docker-compose.remote.yml --env-file deploy/env/stack.env exec postgres sh -lc 'psql -U \"$(DEPLOY_DB_USER)\" -d \"$(DEPLOY_DB_NAME)\"'"
 
 bootstrap-admin:
 	@EMAIL_INPUT="$${EMAIL:-}"; \

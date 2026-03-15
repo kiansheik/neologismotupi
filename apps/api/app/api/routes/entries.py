@@ -102,10 +102,13 @@ async def _load_entry_with_relations(db: SessionDep, entry_id: uuid.UUID) -> Ent
         .options(
             selectinload(Entry.tags).selectinload(EntryTag.tag),
             selectinload(Entry.versions),
-            selectinload(Entry.examples).selectinload(Example.source_edition).selectinload(SourceEdition.work),
+            selectinload(Entry.examples)
+            .selectinload(Example.source_edition)
+            .selectinload(SourceEdition.work)
+            .selectinload(SourceWork.links),
             selectinload(Entry.comments).selectinload(EntryComment.author).selectinload(User.profile),
             selectinload(Entry.proposer).selectinload(User.profile),
-            selectinload(Entry.source_edition).selectinload(SourceEdition.work),
+            selectinload(Entry.source_edition).selectinload(SourceEdition.work).selectinload(SourceWork.links),
         )
     )
     return (await db.execute(stmt)).scalar_one_or_none()
@@ -117,6 +120,7 @@ async def _apply_entry_source_fields(
     entry: Entry,
     source_payload: SourceInput | None,
     source_citation_fallback: str | None,
+    actor_user_id: uuid.UUID | None = None,
 ) -> None:
     if source_payload is None:
         entry.source_edition_id = None
@@ -124,7 +128,11 @@ async def _apply_entry_source_fields(
         entry.source_citation = clean_source_text(source_citation_fallback, max_length=500)
         return
 
-    source_edition, source_work = await get_or_create_source_edition(db, source=source_payload)
+    source_edition, source_work = await get_or_create_source_edition(
+        db,
+        source=source_payload,
+        created_by_user_id=actor_user_id,
+    )
     source_pages = clean_source_text(source_payload.pages, max_length=120)
 
     entry.source_edition_id = source_edition.id
@@ -145,6 +153,7 @@ async def _apply_example_source_fields(
     example: Example,
     source_payload: SourceInput | None,
     source_citation_fallback: str | None,
+    actor_user_id: uuid.UUID | None = None,
 ) -> None:
     if source_payload is None:
         example.source_edition_id = None
@@ -152,7 +161,11 @@ async def _apply_example_source_fields(
         example.source_citation = clean_source_text(source_citation_fallback, max_length=500)
         return
 
-    source_edition, source_work = await get_or_create_source_edition(db, source=source_payload)
+    source_edition, source_work = await get_or_create_source_edition(
+        db,
+        source=source_payload,
+        created_by_user_id=actor_user_id,
+    )
     source_pages = clean_source_text(source_payload.pages, max_length=120)
 
     example.source_edition_id = source_edition.id
@@ -585,10 +598,13 @@ async def get_entry(
         .options(
             selectinload(Entry.tags).selectinload(EntryTag.tag),
             selectinload(Entry.versions),
-            selectinload(Entry.examples).selectinload(Example.source_edition).selectinload(SourceEdition.work),
+            selectinload(Entry.examples)
+            .selectinload(Example.source_edition)
+            .selectinload(SourceEdition.work)
+            .selectinload(SourceWork.links),
             selectinload(Entry.comments).selectinload(EntryComment.author).selectinload(User.profile),
             selectinload(Entry.proposer).selectinload(User.profile),
-            selectinload(Entry.source_edition).selectinload(SourceEdition.work),
+            selectinload(Entry.source_edition).selectinload(SourceEdition.work).selectinload(SourceWork.links),
         )
     )
     entry = (await db.execute(stmt)).scalar_one_or_none()
@@ -706,6 +722,7 @@ async def create_entry(
         entry=entry,
         source_payload=payload.source,
         source_citation_fallback=payload.source_citation,
+        actor_user_id=user.id,
     )
 
     await set_entry_tags(db, entry, payload.tag_ids)
@@ -790,6 +807,7 @@ async def update_entry(
             entry=entry,
             source_payload=payload.source,
             source_citation_fallback=source_citation_fallback,
+            actor_user_id=user.id,
         )
         changed = True
     elif "source_citation" in payload.model_fields_set:
@@ -1074,6 +1092,7 @@ async def create_example(
         example=example,
         source_payload=payload.source,
         source_citation_fallback=payload.source_citation,
+        actor_user_id=user.id,
     )
     await create_example_version(
         db,
@@ -1088,7 +1107,11 @@ async def create_example(
         await db.execute(
             select(Example)
             .where(Example.id == example.id)
-            .options(selectinload(Example.source_edition).selectinload(SourceEdition.work))
+            .options(
+                selectinload(Example.source_edition)
+                .selectinload(SourceEdition.work)
+                .selectinload(SourceWork.links)
+            )
         )
     ).scalar_one_or_none()
     if created_example is None:
@@ -1228,6 +1251,7 @@ async def update_example(
             example=example,
             source_payload=payload.source,
             source_citation_fallback=source_citation_fallback,
+            actor_user_id=user.id,
         )
         changed = True
     elif "source_citation" in payload.model_fields_set:
@@ -1259,7 +1283,11 @@ async def update_example(
         await db.execute(
             select(Example)
             .where(Example.id == example.id)
-            .options(selectinload(Example.source_edition).selectinload(SourceEdition.work))
+            .options(
+                selectinload(Example.source_edition)
+                .selectinload(SourceEdition.work)
+                .selectinload(SourceWork.links)
+            )
         )
     ).scalar_one_or_none()
     if updated_example is None:

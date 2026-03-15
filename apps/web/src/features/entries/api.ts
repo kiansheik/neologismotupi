@@ -22,6 +22,7 @@ export interface EntrySourceInput {
   publication_year?: number;
   edition_label?: string;
   pages?: string;
+  url?: string;
 }
 
 export interface CreateEntryPayload {

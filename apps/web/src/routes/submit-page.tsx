@@ -32,6 +32,7 @@ type SubmitForm = {
   source_publication_year?: string;
   source_edition_label?: string;
   source_pages?: string;
+  source_url?: string;
   morphology_notes?: string;
   force_submit: boolean;
 };
@@ -55,6 +56,7 @@ export function SubmitPage() {
       source_publication_year: "",
       source_edition_label: "",
       source_pages: "",
+      source_url: "",
       morphology_notes: "",
       force_submit: false,
     },
@@ -99,6 +101,7 @@ export function SubmitPage() {
       source.publication_year !== null ? String(source.publication_year) : "",
     );
     form.setValue("source_edition_label", source.edition_label ?? "");
+    form.setValue("source_url", "");
   };
 
   const createMutation = useMutation({
@@ -136,6 +139,7 @@ export function SubmitPage() {
       source_publication_year: z.string().trim().optional(),
       source_edition_label: z.string().trim().max(120).optional(),
       source_pages: z.string().trim().max(120).optional(),
+      source_url: z.string().trim().max(2048).optional(),
       morphology_notes: z.string().optional(),
       force_submit: z.boolean().default(false),
     }).superRefine((values, ctx) => {
@@ -145,6 +149,13 @@ export function SubmitPage() {
       if (!values.source_authors && !values.source_title) {
         ctx.addIssue({
           path: ["source_title"],
+          code: "custom",
+          message: t("submit.error.sourceNeedAuthorOrTitle"),
+        });
+      }
+      if (values.source_url && !values.source_authors && !values.source_title) {
+        ctx.addIssue({
+          path: ["source_url"],
           code: "custom",
           message: t("submit.error.sourceNeedAuthorOrTitle"),
         });
@@ -160,6 +171,13 @@ export function SubmitPage() {
           path: ["source_publication_year"],
           code: "custom",
           message: t("submit.error.sourceInvalidYear"),
+        });
+      }
+      if (values.source_url && !/^https?:\/\//i.test(values.source_url)) {
+        ctx.addIssue({
+          path: ["source_url"],
+          code: "custom",
+          message: t("submit.error.sourceInvalidUrl"),
         });
       }
     });
@@ -187,6 +205,7 @@ export function SubmitPage() {
               publication_year: publicationYear,
               edition_label: parsed.data.source_edition_label || undefined,
               pages: parsed.data.source_pages || undefined,
+              url: parsed.data.source_url || undefined,
             }
           : undefined,
       morphology_notes: parsed.data.morphology_notes,
@@ -365,6 +384,16 @@ export function SubmitPage() {
                   </label>
                   <Input id="source_pages" placeholder="119" {...form.register("source_pages")} />
                 </div>
+              </div>
+
+              <div>
+                <label className="mb-1 block text-sm font-medium" htmlFor="source_url">
+                  {t("submit.sourceUrl")} ({t("form.optional")})
+                </label>
+                <Input id="source_url" placeholder="https://..." {...form.register("source_url")} />
+                {form.formState.errors.source_url?.message ? (
+                  <p className="mt-1 text-xs text-red-700">{form.formState.errors.source_url.message}</p>
+                ) : null}
               </div>
 
               {sourceSuggestionsQuery.data && sourceSuggestionsQuery.data.length > 0 ? (

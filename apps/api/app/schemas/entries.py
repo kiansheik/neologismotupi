@@ -30,11 +30,15 @@ class SourceInput(BaseModel):
     publication_year: int | None = Field(default=None, ge=1, le=3000)
     edition_label: str | None = Field(default=None, max_length=120)
     pages: str | None = Field(default=None, max_length=120)
+    url: str | None = Field(default=None, max_length=2048)
 
     @model_validator(mode="after")
     def validate_minimum_fields(self) -> "SourceInput":
         if not (self.authors and self.authors.strip()) and not (self.title and self.title.strip()):
             raise ValueError("Source requires at least authors or title")
+        cleaned_url = self.url.strip() if self.url else None
+        if cleaned_url and not (cleaned_url.startswith("http://") or cleaned_url.startswith("https://")):
+            raise ValueError("Source URL must start with http:// or https://")
         return self
 
 
@@ -46,6 +50,7 @@ class EntrySourceOut(BaseModel):
     publication_year: int | None
     edition_label: str | None
     pages: str | None
+    urls: list[str] = Field(default_factory=list)
     citation: str
 
 

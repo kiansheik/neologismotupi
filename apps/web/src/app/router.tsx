@@ -10,6 +10,7 @@ import { ModerationPage } from "@/routes/moderation-page";
 import { ProfilePage } from "@/routes/profile-page";
 import { RecoverAccountPage } from "@/routes/recover-account-page";
 import { ResetPasswordPage } from "@/routes/reset-password-page";
+import { SourceDetailPage } from "@/routes/source-detail-page";
 import { SignupPage } from "@/routes/signup-page";
 import { SubmitPage } from "@/routes/submit-page";
 import { VerifyEmailPage } from "@/routes/verify-email-page";
@@ -23,6 +24,7 @@ export const router = createBrowserRouter([
       { path: "entries", element: <EntriesPage /> },
       { path: "about", element: <AboutPage /> },
       { path: "entries/:slug", element: <EntryDetailPage /> },
+      { path: "sources/:workId", element: <SourceDetailPage /> },
       { path: "profiles/:userId", element: <ProfilePage /> },
       { path: "submit", element: <SubmitPage /> },
       { path: "login", element: <LoginPage /> },

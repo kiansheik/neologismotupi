@@ -24,6 +24,7 @@ export interface SourceRecord {
   publication_year: number | null;
   edition_label: string | null;
   pages: string | null;
+  urls: string[];
   citation: string;
 }
 
@@ -139,6 +140,50 @@ export interface SourceSuggestion {
   publication_year: number | null;
   edition_label: string | null;
   citation: string;
+}
+
+export interface SourceLink {
+  id: string;
+  url: string;
+  created_at: string;
+}
+
+export interface SourceEditionStats {
+  edition_id: string;
+  publication_year: number | null;
+  edition_label: string | null;
+  entry_count: number;
+  example_count: number;
+}
+
+export interface SourceEntryRef {
+  id: string;
+  slug: string;
+  headword: string;
+  status: EntryStatus;
+  created_at: string;
+}
+
+export interface SourceExampleRef {
+  id: string;
+  entry_id: string;
+  entry_slug: string;
+  entry_headword: string;
+  sentence_original: string;
+  status: ExampleStatus;
+  created_at: string;
+}
+
+export interface SourceDetail {
+  work_id: string;
+  authors: string | null;
+  title: string | null;
+  links: SourceLink[];
+  editions: SourceEditionStats[];
+  entries_count: number;
+  examples_count: number;
+  entries: SourceEntryRef[];
+  examples: SourceExampleRef[];
 }
 
 export interface EntryListResponse {

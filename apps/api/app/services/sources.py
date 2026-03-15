@@ -1,11 +1,12 @@
 import uuid
+from urllib.parse import urlsplit, urlunsplit
 
 from sqlalchemy import String, cast, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.utils import collapse_whitespace, normalize_text
 from app.models.entry import Entry
-from app.models.source import SourceEdition, SourceWork
+from app.models.source import SourceEdition, SourceLink, SourceWork
 from app.schemas.entries import SourceInput
 
 
@@ -26,6 +27,31 @@ def normalize_source_text(value: str | None) -> str | None:
         return None
     normalized = normalize_text(cleaned)
     return normalized or None
+
+
+def clean_source_url(value: str | None) -> str | None:
+    cleaned = clean_source_text(value, max_length=2048)
+    if cleaned is None:
+        return None
+    parts = urlsplit(cleaned)
+    if parts.scheme not in {"http", "https"} or not parts.netloc:
+        return None
+    return cleaned
+
+
+def normalize_source_url(value: str | None) -> str | None:
+    cleaned = clean_source_url(value)
+    if cleaned is None:
+        return None
+    parts = urlsplit(cleaned)
+    scheme = parts.scheme.lower()
+    netloc = parts.netloc.lower()
+    if scheme == "http" and netloc.endswith(":80"):
+        netloc = netloc[:-3]
+    if scheme == "https" and netloc.endswith(":443"):
+        netloc = netloc[:-4]
+    path = parts.path.rstrip("/") or "/"
+    return urlunsplit((scheme, netloc, path, parts.query, ""))
 
 
 def build_source_citation(
@@ -74,11 +100,13 @@ async def get_or_create_source_edition(
     db: AsyncSession,
     *,
     source: SourceInput,
+    created_by_user_id: uuid.UUID | None = None,
 ) -> tuple[SourceEdition, SourceWork]:
     authors = clean_source_text(source.authors, max_length=255)
     title = clean_source_text(source.title, max_length=400)
     publication_year = source.publication_year
     edition_label = clean_source_text(source.edition_label, max_length=120)
+    source_url = clean_source_url(source.url)
 
     normalized_authors = normalize_source_text(authors)
     normalized_title = normalize_source_text(title)
@@ -123,7 +151,54 @@ async def get_or_create_source_edition(
     elif not edition.edition_label and edition_label:
         edition.edition_label = edition_label
 
+    if source_url:
+        await get_or_create_source_link(
+            db,
+            work_id=work.id,
+            url=source_url,
+            created_by_user_id=created_by_user_id,
+        )
+
     return edition, work
+
+
+async def get_or_create_source_link(
+    db: AsyncSession,
+    *,
+    work_id: uuid.UUID,
+    url: str,
+    created_by_user_id: uuid.UUID | None = None,
+) -> SourceLink | None:
+    cleaned_url = clean_source_url(url)
+    normalized_url = normalize_source_url(cleaned_url)
+    if cleaned_url is None or normalized_url is None:
+        return None
+
+    link = (
+        await db.execute(
+            select(SourceLink).where(
+                SourceLink.work_id == work_id,
+                SourceLink.normalized_url == normalized_url,
+            )
+        )
+    ).scalar_one_or_none()
+
+    if link is None:
+        link = SourceLink(
+            work_id=work_id,
+            url=cleaned_url,
+            normalized_url=normalized_url,
+            created_by_user_id=created_by_user_id,
+        )
+        db.add(link)
+        await db.flush()
+        return link
+
+    if link.url != cleaned_url:
+        link.url = cleaned_url
+    if link.created_by_user_id is None and created_by_user_id is not None:
+        link.created_by_user_id = created_by_user_id
+    return link
 
 
 type SourceSuggestionRow = tuple[
