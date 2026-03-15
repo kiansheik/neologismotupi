@@ -15,6 +15,7 @@ from app.api.routes import (
     example_router,
     meta_router,
     moderation_router,
+    sources_router,
     users_router,
 )
 from app.config import get_settings
@@ -76,6 +77,7 @@ def create_app() -> FastAPI:
     app.include_router(comment_router, prefix="/api")
     app.include_router(moderation_router, prefix="/api")
     app.include_router(meta_router, prefix="/api")
+    app.include_router(sources_router, prefix="/api")
     app.include_router(users_router, prefix="/api")
 
     @app.get("/healthz")

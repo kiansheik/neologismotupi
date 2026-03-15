@@ -9,10 +9,19 @@ export interface ListEntriesParams {
   status?: string;
   topic?: string;
   part_of_speech?: string;
+  source?: string;
   region?: string;
   proposer_user_id?: string;
   mine?: boolean;
   sort?: "alphabetical" | "recent" | "score" | "most_examples";
+}
+
+export interface EntrySourceInput {
+  authors?: string;
+  title?: string;
+  publication_year?: number;
+  edition_label?: string;
+  pages?: string;
 }
 
 export interface CreateEntryPayload {
@@ -22,6 +31,7 @@ export interface CreateEntryPayload {
   part_of_speech?: string;
   short_definition?: string;
   source_citation?: string;
+  source?: EntrySourceInput;
   morphology_notes?: string;
   tag_ids?: string[];
   force_submit?: boolean;
@@ -34,6 +44,7 @@ export interface UpdateEntryPayload {
   part_of_speech?: string;
   short_definition?: string;
   source_citation?: string | null;
+  source?: EntrySourceInput | null;
   morphology_notes?: string;
   tag_ids?: string[];
   edit_summary?: string;

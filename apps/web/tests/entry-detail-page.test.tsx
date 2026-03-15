@@ -124,9 +124,9 @@ describe("EntryDetailPage", () => {
     renderWithRoute(<EntryDetailPage />, "/entries/:slug", "/entries/entry-one");
 
     await user.click(await screen.findByRole("button", { name: "Editar verbete" }));
-    await user.clear(screen.getByLabelText("Verbete"));
-    await user.type(screen.getByLabelText("Verbete"), "entry one edited");
-    await user.type(screen.getByLabelText("Resumo da edição"), "Ajuste de revisão");
+    await user.clear(screen.getByLabelText(/Verbete/i));
+    await user.type(screen.getByLabelText(/Verbete/i), "entry one edited");
+    await user.type(screen.getByLabelText(/Resumo da edição/i), "Ajuste de revisão");
 
     await user.click(screen.getByRole("button", { name: "Salvar edição" }));
 

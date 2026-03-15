@@ -16,6 +16,17 @@ export interface EntryAuthor {
   badges?: UserBadgeKind[];
 }
 
+export interface SourceRecord {
+  work_id: string;
+  edition_id: string;
+  authors: string | null;
+  title: string | null;
+  publication_year: number | null;
+  edition_label: string | null;
+  pages: string | null;
+  citation: string;
+}
+
 export interface EntrySummary {
   id: string;
   slug: string;
@@ -106,6 +117,7 @@ export interface EntryComment {
 
 export interface EntryDetail extends EntrySummary {
   source_citation?: string | null;
+  source?: SourceRecord | null;
   morphology_notes: string | null;
   approved_at: string | null;
   approved_by_user_id: string | null;
@@ -116,6 +128,16 @@ export interface EntryDetail extends EntrySummary {
   history_events?: EntryHistoryEvent[];
   examples: Example[];
   comments: EntryComment[];
+}
+
+export interface SourceSuggestion {
+  work_id: string;
+  edition_id: string;
+  authors: string | null;
+  title: string | null;
+  publication_year: number | null;
+  edition_label: string | null;
+  citation: string;
 }
 
 export interface EntryListResponse {

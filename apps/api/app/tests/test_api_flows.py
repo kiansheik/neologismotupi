@@ -117,6 +117,71 @@ async def test_entry_source_citation_is_detail_only(client):
 
 
 @pytest.mark.asyncio
+async def test_create_entry_with_structured_source_and_filter(client):
+    await register_user(client, "structured-source-owner@example.com", "Structured Source Owner")
+    response = await client.post(
+        "/api/entries",
+        json={
+            "headword": "source-structured-entry",
+            "gloss_pt": "fonte estruturada",
+            "short_definition": "Entrada com fonte estruturada",
+            "source": {
+                "authors": "José de Anchieta",
+                "title": "Arte de Gramática da Língua Mais Usada na Costa do Brasil",
+                "publication_year": 1595,
+                "edition_label": "edição crítica",
+                "pages": "22-24",
+            },
+            "force_submit": True,
+            "tag_ids": [],
+        },
+    )
+    assert response.status_code == 201, response.text
+    created = response.json()
+
+    assert created["source"] is not None
+    assert created["source"]["authors"] == "José de Anchieta"
+    assert created["source"]["title"] == "Arte de Gramática da Língua Mais Usada na Costa do Brasil"
+    assert created["source"]["publication_year"] == 1595
+    assert created["source"]["edition_label"] == "edição crítica"
+    assert created["source"]["pages"] == "22-24"
+    assert "p. 22-24" in created["source"]["citation"]
+    assert created["source_citation"] == created["source"]["citation"]
+
+    list_response = await client.get("/api/entries", params={"source": "Anchieta"})
+    assert list_response.status_code == 200, list_response.text
+    ids = {item["id"] for item in list_response.json()["items"]}
+    assert created["id"] in ids
+
+
+@pytest.mark.asyncio
+async def test_sources_autocomplete_lists_existing_source(client):
+    await register_user(client, "source-autocomplete-owner@example.com", "Source Autocomplete Owner")
+    create_response = await client.post(
+        "/api/entries",
+        json={
+            "headword": "source-autocomplete-entry",
+            "gloss_pt": "fonte autocomplete",
+            "short_definition": "Entrada para testar autocomplete de fonte",
+            "source": {
+                "authors": "Padre Antônio Vieira",
+                "title": "Sermões",
+                "publication_year": 1679,
+            },
+            "force_submit": True,
+            "tag_ids": [],
+        },
+    )
+    assert create_response.status_code == 201, create_response.text
+
+    suggestions_response = await client.get("/api/sources", params={"query": "Vieira"})
+    assert suggestions_response.status_code == 200, suggestions_response.text
+    suggestions = suggestions_response.json()
+    assert len(suggestions) >= 1
+    assert any(suggestion["authors"] == "Padre Antônio Vieira" for suggestion in suggestions)
+
+
+@pytest.mark.asyncio
 async def test_create_entry_uses_gloss_when_definition_is_blank(client):
     await register_user(client, "creator-blank@example.com", "Creator Blank")
 

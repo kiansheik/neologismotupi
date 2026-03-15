@@ -2,7 +2,7 @@ import uuid
 from datetime import datetime
 from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 from app.core.enums import EntryStatus, ExampleStatus, ReportReasonCode, TagType
 from app.schemas.badges import UserBadgeKind
@@ -22,6 +22,31 @@ class EntryAuthorOut(BaseModel):
     display_name: str
     reputation_score: int
     badges: list[UserBadgeKind] = Field(default_factory=list)
+
+
+class SourceInput(BaseModel):
+    authors: str | None = Field(default=None, max_length=255)
+    title: str | None = Field(default=None, max_length=400)
+    publication_year: int | None = Field(default=None, ge=1, le=3000)
+    edition_label: str | None = Field(default=None, max_length=120)
+    pages: str | None = Field(default=None, max_length=120)
+
+    @model_validator(mode="after")
+    def validate_minimum_fields(self) -> "SourceInput":
+        if not (self.authors and self.authors.strip()) and not (self.title and self.title.strip()):
+            raise ValueError("Source requires at least authors or title")
+        return self
+
+
+class EntrySourceOut(BaseModel):
+    work_id: uuid.UUID
+    edition_id: uuid.UUID
+    authors: str | None
+    title: str | None
+    publication_year: int | None
+    edition_label: str | None
+    pages: str | None
+    citation: str
 
 
 class EntrySummaryOut(BaseModel):
@@ -120,6 +145,7 @@ class EntryCommentOut(BaseModel):
 
 class EntryDetailOut(EntrySummaryOut):
     source_citation: str | None
+    source: EntrySourceOut | None = None
     morphology_notes: str | None
     approved_at: datetime | None
     approved_by_user_id: uuid.UUID | None
@@ -154,6 +180,7 @@ class EntryCreate(BaseModel):
     part_of_speech: str | None = Field(default=None, max_length=64)
     short_definition: str | None = None
     source_citation: str | None = Field(default=None, max_length=500)
+    source: SourceInput | None = None
     morphology_notes: str | None = None
     tag_ids: list[uuid.UUID] = Field(default_factory=list)
     force_submit: bool = False
@@ -167,6 +194,7 @@ class EntryUpdate(BaseModel):
     part_of_speech: str | None = Field(default=None, max_length=64)
     short_definition: str | None = Field(default=None, min_length=3)
     source_citation: str | None = Field(default=None, max_length=500)
+    source: SourceInput | None = None
     morphology_notes: str | None = None
     tag_ids: list[uuid.UUID] | None = None
     edit_summary: str | None = Field(default=None, max_length=280)

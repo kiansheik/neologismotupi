@@ -8,6 +8,9 @@ const { listEntriesMock, createEntryMock } = vi.hoisted(() => ({
   listEntriesMock: vi.fn(),
   createEntryMock: vi.fn(),
 }));
+const { listSourcesMock } = vi.hoisted(() => ({
+  listSourcesMock: vi.fn(),
+}));
 
 vi.mock("react-router-dom", async () => {
   const actual = await vi.importActual<typeof import("react-router-dom")>("react-router-dom");
@@ -37,8 +40,13 @@ vi.mock("@/features/entries/api", () => ({
   createEntry: createEntryMock,
 }));
 
+vi.mock("@/features/sources/api", () => ({
+  listSources: listSourcesMock,
+}));
+
 describe("SubmitPage", () => {
   beforeEach(() => {
+    listSourcesMock.mockResolvedValue([]);
     listEntriesMock.mockResolvedValue({
       items: [
         {
@@ -72,7 +80,7 @@ describe("SubmitPage", () => {
     const user = userEvent.setup();
     renderWithProviders(<SubmitPage />);
 
-    const headwordInput = screen.getByLabelText("Verbete");
+    const headwordInput = screen.getByLabelText(/Verbete/i);
     await user.type(headwordInput, "new");
 
     await waitFor(() => {
@@ -123,7 +131,7 @@ describe("SubmitPage", () => {
     const user = userEvent.setup();
     renderWithProviders(<SubmitPage />);
 
-    const headwordInput = screen.getByLabelText("Verbete");
+    const headwordInput = screen.getByLabelText(/Verbete/i);
     await user.type(headwordInput, "mba'eoby");
 
     await waitFor(() => {

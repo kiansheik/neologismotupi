@@ -12,8 +12,10 @@ from app.core.utils import collapse_whitespace, normalize_text, slugify
 from app.db import AsyncSessionLocal
 from app.models.entry import Entry, EntryTag, Example, Tag
 from app.models.user import Profile, User
+from app.schemas.entries import SourceInput
 from app.security import hash_password
 from app.services.entries import create_entry_version
+from app.services.sources import build_source_citation, get_or_create_source_edition
 
 PRIMARY_SEED_CSV_PATH = Path.home() / "nhe-enga" / "neologisms.csv"
 LEGACY_SEED_CSV_PATH = Path.home() / "code" / "nhe-enga" / "neologisms.csv"
@@ -240,6 +242,8 @@ async def _seed_from_csv(
         if source_date:
             source_citation_parts.append(source_date)
         source_citation = " · ".join(source_citation_parts) if source_citation_parts else None
+        source_date_parsed = _parse_timestamp(source_date)
+        source_year = source_date_parsed.year if source_date_parsed else None
 
         morphology_parts: list[str] = []
         bases = _clean(row.get("Verbete(s) Base(s)"))
@@ -292,6 +296,8 @@ async def _seed_from_csv(
             part_of_speech=_map_part_of_speech(row.get("Categoria Gramatical")),
             short_definition=short_definition,
             source_citation=source_citation,
+            source_edition_id=None,
+            source_pages=None,
             morphology_notes=morphology_notes,
             status=EntryStatus.approved,
             proposer_user_id=proposer.id,
@@ -302,6 +308,24 @@ async def _seed_from_csv(
         )
         db.add(entry)
         await db.flush()
+
+        if source:
+            source_input = SourceInput(
+                title=source,
+                publication_year=source_year,
+                pages=source_page,
+            )
+            source_edition, source_work = await get_or_create_source_edition(db, source=source_input)
+            entry.source_edition_id = source_edition.id
+            entry.source_pages = _clean(source_page, limit=120)
+            entry.source_citation = build_source_citation(
+                authors=source_work.authors,
+                title=source_work.title,
+                publication_year=source_edition.publication_year,
+                edition_label=source_edition.edition_label,
+                pages=entry.source_pages,
+                fallback=source_citation,
+            )
 
         grammar_tag = await _get_or_create_tag(
             db,

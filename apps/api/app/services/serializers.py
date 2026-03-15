@@ -8,11 +8,13 @@ from app.schemas.entries import (
     EntryAuthorOut,
     EntryDetailOut,
     EntryHistoryEventOut,
+    EntrySourceOut,
     EntrySummaryOut,
     EntryVersionOut,
     ExampleOut,
     TagOut,
 )
+from app.services.sources import build_source_citation
 from app.services.user_badges import UserBadgeLeaders, resolve_user_badges
 
 type ModerationContext = tuple[str | None, str | None, datetime | None]
@@ -172,6 +174,7 @@ def serialize_entry_detail(
     payload = {
         **serialize_entry_summary(entry, badge_leaders).model_dump(),
         "source_citation": entry.source_citation,
+        "source": _serialize_entry_source(entry),
         "morphology_notes": entry.morphology_notes,
         "approved_at": entry.approved_at,
         "approved_by_user_id": entry.approved_by_user_id,
@@ -184,3 +187,31 @@ def serialize_entry_detail(
         "comments": [serialize_entry_comment(comment, badge_leaders) for comment in comments or []],
     }
     return EntryDetailOut.model_validate(payload)
+
+
+def _serialize_entry_source(entry: Entry) -> EntrySourceOut | None:
+    if entry.source_edition is None or entry.source_edition.work is None:
+        return None
+
+    work = entry.source_edition.work
+    citation = build_source_citation(
+        authors=work.authors,
+        title=work.title,
+        publication_year=entry.source_edition.publication_year,
+        edition_label=entry.source_edition.edition_label,
+        pages=entry.source_pages,
+        fallback=entry.source_citation,
+    )
+    if citation is None:
+        return None
+
+    return EntrySourceOut(
+        work_id=work.id,
+        edition_id=entry.source_edition.id,
+        authors=work.authors,
+        title=work.title,
+        publication_year=entry.source_edition.publication_year,
+        edition_label=entry.source_edition.edition_label,
+        pages=entry.source_pages,
+        citation=citation,
+    )

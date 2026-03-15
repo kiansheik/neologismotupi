@@ -17,6 +17,8 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { useCurrentUser } from "@/features/auth/hooks";
 import { createEntry, listEntries } from "@/features/entries/api";
+import { listSources } from "@/features/sources/api";
+import type { SourceSuggestion } from "@/lib/types";
 
 type SubmitForm = {
   headword: string;
@@ -24,7 +26,12 @@ type SubmitForm = {
   gloss_en?: string;
   part_of_speech?: string;
   short_definition?: string;
-  source_citation?: string;
+  has_source: boolean;
+  source_authors?: string;
+  source_title?: string;
+  source_publication_year?: string;
+  source_edition_label?: string;
+  source_pages?: string;
   morphology_notes?: string;
   force_submit: boolean;
 };
@@ -42,13 +49,25 @@ export function SubmitPage() {
       gloss_en: "",
       part_of_speech: "",
       short_definition: "",
-      source_citation: "",
+      has_source: false,
+      source_authors: "",
+      source_title: "",
+      source_publication_year: "",
+      source_edition_label: "",
+      source_pages: "",
       morphology_notes: "",
       force_submit: false,
     },
   });
 
   const watchedHeadword = form.watch("headword");
+  const hasSource = form.watch("has_source");
+  const watchedSourceAuthors = form.watch("source_authors");
+  const watchedSourceTitle = form.watch("source_title");
+  const sourceLookupQuery = useMemo(
+    () => [watchedSourceAuthors, watchedSourceTitle].map((value) => value?.trim() ?? "").join(" ").trim(),
+    [watchedSourceAuthors, watchedSourceTitle],
+  );
 
   const duplicateQuery = useQuery({
     queryKey: ["duplicates", watchedHeadword],
@@ -59,14 +78,31 @@ export function SubmitPage() {
     enabled: watchedHeadword.trim().length >= 2,
   });
 
+  const sourceSuggestionsQuery = useQuery({
+    queryKey: ["source-suggestions", sourceLookupQuery],
+    queryFn: () => listSources({ query: sourceLookupQuery, limit: 8 }),
+    enabled: hasSource && sourceLookupQuery.length >= 2,
+    staleTime: 30_000,
+  });
+
   const candidateDuplicates = useMemo(() => {
     const merged = [...(duplicateQuery.data ?? []), ...possibleDuplicates];
     const dedupedById = new Map(merged.map((entry) => [entry.id, entry]));
     return Array.from(dedupedById.values());
   }, [duplicateQuery.data, possibleDuplicates]);
 
+  const applySourceSuggestion = (source: SourceSuggestion) => {
+    form.setValue("source_authors", source.authors ?? "");
+    form.setValue("source_title", source.title ?? "");
+    form.setValue(
+      "source_publication_year",
+      source.publication_year !== null ? String(source.publication_year) : "",
+    );
+    form.setValue("source_edition_label", source.edition_label ?? "");
+  };
+
   const createMutation = useMutation({
-    mutationFn: (payload: SubmitForm) => createEntry(payload),
+    mutationFn: (payload: Parameters<typeof createEntry>[0]) => createEntry(payload),
     onSuccess: (entry) => {
       trackEvent("entry_submitted", {
         part_of_speech: entry.part_of_speech ?? "unknown",
@@ -94,16 +130,68 @@ export function SubmitPage() {
       gloss_en: z.string().trim().max(255).optional(),
       part_of_speech: z.string().optional(),
       short_definition: z.string().trim().optional(),
-      source_citation: z.string().trim().max(500).optional(),
+      has_source: z.boolean().default(false),
+      source_authors: z.string().trim().max(255).optional(),
+      source_title: z.string().trim().max(400).optional(),
+      source_publication_year: z.string().trim().optional(),
+      source_edition_label: z.string().trim().max(120).optional(),
+      source_pages: z.string().trim().max(120).optional(),
       morphology_notes: z.string().optional(),
       force_submit: z.boolean().default(false),
+    }).superRefine((values, ctx) => {
+      if (!values.has_source) {
+        return;
+      }
+      if (!values.source_authors && !values.source_title) {
+        ctx.addIssue({
+          path: ["source_title"],
+          code: "custom",
+          message: t("submit.error.sourceNeedAuthorOrTitle"),
+        });
+      }
+      if (!values.source_publication_year) {
+        return;
+      }
+      const parsedYear = Number(values.source_publication_year);
+      const isValidYear =
+        Number.isInteger(parsedYear) && parsedYear >= 1 && parsedYear <= 3000;
+      if (!isValidYear) {
+        ctx.addIssue({
+          path: ["source_publication_year"],
+          code: "custom",
+          message: t("submit.error.sourceInvalidYear"),
+        });
+      }
     });
     const parsed = schema.safeParse(payload);
     if (!parsed.success) {
       applyZodErrors(parsed.error, form.setError);
       return;
     }
-    createMutation.mutate(parsed.data);
+
+    const publicationYear = parsed.data.source_publication_year
+      ? Number(parsed.data.source_publication_year)
+      : undefined;
+
+    createMutation.mutate({
+      headword: parsed.data.headword,
+      gloss_pt: parsed.data.gloss_pt,
+      gloss_en: parsed.data.gloss_en,
+      part_of_speech: parsed.data.part_of_speech,
+      short_definition: parsed.data.short_definition,
+      source:
+        parsed.data.has_source && (parsed.data.source_authors || parsed.data.source_title)
+          ? {
+              authors: parsed.data.source_authors || undefined,
+              title: parsed.data.source_title || undefined,
+              publication_year: publicationYear,
+              edition_label: parsed.data.source_edition_label || undefined,
+              pages: parsed.data.source_pages || undefined,
+            }
+          : undefined,
+      morphology_notes: parsed.data.morphology_notes,
+      force_submit: parsed.data.force_submit,
+    });
   });
 
   if (!currentUser) {
@@ -243,12 +331,83 @@ export function SubmitPage() {
           <Textarea id="short_definition" {...form.register("short_definition")} />
         </div>
 
-        <div>
-          <label className="mb-1 block text-sm font-medium" htmlFor="source_citation">
-            {t("submit.sourceIfApplicableOptional", { optional: t("form.optional") })}
+        <div className="rounded-md border border-brand-100 bg-brand-50/30 p-3">
+          <label className="inline-flex items-center gap-2 text-sm font-medium text-slate-900">
+            <input type="checkbox" {...form.register("has_source")} />
+            {t("submit.sourceToggle")}
           </label>
-          <p className="mb-1 text-xs text-slate-600">{t("submit.help.sourceCitation")}</p>
-          <Input id="source_citation" {...form.register("source_citation")} />
+          <p className="mt-1 text-xs text-slate-600">{t("submit.help.sourceCitation")}</p>
+
+          {hasSource ? (
+            <div className="mt-3 space-y-3">
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div>
+                  <label className="mb-1 block text-sm font-medium" htmlFor="source_authors">
+                    {t("submit.sourceAuthors")} ({t("form.optional")})
+                  </label>
+                  <Input id="source_authors" {...form.register("source_authors")} />
+                </div>
+                <div>
+                  <label className="mb-1 block text-sm font-medium" htmlFor="source_title">
+                    {t("submit.sourceTitle")} ({t("form.optional")})
+                  </label>
+                  <Input id="source_title" {...form.register("source_title")} />
+                  {form.formState.errors.source_title?.message ? (
+                    <p className="mt-1 text-xs text-red-700">{form.formState.errors.source_title.message}</p>
+                  ) : null}
+                </div>
+              </div>
+
+              <div className="grid gap-3 sm:grid-cols-3">
+                <div>
+                  <label className="mb-1 block text-sm font-medium" htmlFor="source_publication_year">
+                    {t("submit.sourceYear")} ({t("form.optional")})
+                  </label>
+                  <Input
+                    id="source_publication_year"
+                    inputMode="numeric"
+                    placeholder="2024"
+                    {...form.register("source_publication_year")}
+                  />
+                  {form.formState.errors.source_publication_year?.message ? (
+                    <p className="mt-1 text-xs text-red-700">
+                      {form.formState.errors.source_publication_year.message}
+                    </p>
+                  ) : null}
+                </div>
+                <div>
+                  <label className="mb-1 block text-sm font-medium" htmlFor="source_edition_label">
+                    {t("submit.sourceEdition")} ({t("form.optional")})
+                  </label>
+                  <Input id="source_edition_label" {...form.register("source_edition_label")} />
+                </div>
+                <div>
+                  <label className="mb-1 block text-sm font-medium" htmlFor="source_pages">
+                    {t("submit.sourcePages")} ({t("form.optional")})
+                  </label>
+                  <Input id="source_pages" placeholder="22-24" {...form.register("source_pages")} />
+                </div>
+              </div>
+
+              {sourceSuggestionsQuery.data && sourceSuggestionsQuery.data.length > 0 ? (
+                <div className="rounded-md border border-brand-200 bg-white p-2">
+                  <p className="text-xs font-semibold text-brand-900">{t("submit.sourceSuggestionsTitle")}</p>
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    {sourceSuggestionsQuery.data.map((source) => (
+                      <button
+                        key={`${source.work_id}-${source.edition_id}`}
+                        type="button"
+                        className="rounded-full border border-brand-200 px-3 py-1 text-xs text-brand-800 hover:border-brand-500 hover:bg-brand-50"
+                        onClick={() => applySourceSuggestion(source)}
+                      >
+                        {source.citation}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
+            </div>
+          ) : null}
         </div>
 
         <div>

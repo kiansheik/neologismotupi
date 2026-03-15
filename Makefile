@@ -17,7 +17,7 @@ API_DIR := apps/api
 WEB_DIR := apps/web
 API_ENV_FILE ?= .env
 
-.PHONY: help bootstrap-macos bootstrap-linux install dev dev-web dev-api web-build prod-check prod-migrate db-create db-migrate db-reset db-rebuild seed test-email db-backup db-dump-docker db-restore-dump deploy-full deploy-daily deploy-reset deploy-smoke deploy-ssh-all deploy-email-test deploy-smtp-logs deploy-api-logs deploy-api-logs-follow bootstrap-admin change-user-password test test-web test-api test-e2e lint format
+.PHONY: help bootstrap-macos bootstrap-linux install dev dev-web dev-api web-build prod-check prod-migrate db-create db-migrate db-reset db-rebuild seed test-email db-backup db-dump-docker db-restore-dump migrate-legacy-entry-source deploy-migrate-legacy-entry-source deploy-full deploy-daily deploy-reset deploy-smoke deploy-ssh-all deploy-email-test deploy-smtp-logs deploy-api-logs deploy-api-logs-follow bootstrap-admin change-user-password test test-web test-api test-e2e lint format
 
 help:
 	@echo "Available targets:"
@@ -39,6 +39,8 @@ help:
 	@echo "  make db-backup        # Create a compressed PostgreSQL backup"
 	@echo "  make db-dump-docker   # Dump local Docker postgres to backups/"
 	@echo "  make db-restore-dump DUMP_FILE=<file> DATABASE_URL=<url>  # Restore dump into target DB"
+	@echo "  make migrate-legacy-entry-source [APPLY=1] [ACTOR_EMAIL=...] [BEFORE_SLUG=mongaturondara] [BEFORE_DATE=YYYY-MM-DD] [LIMIT=100]"
+	@echo "  make deploy-migrate-legacy-entry-source [APPLY=1] [ACTOR_EMAIL=...] [BEFORE_SLUG=mongaturondara] [BEFORE_DATE=YYYY-MM-DD] [LIMIT=100]"
 	@echo "  make deploy-daily     # Fast daily deploy: API build/migrate/restart + smoke checks (no seed/reset)"
 	@echo "  make deploy-full      # Full stack deploy: API+Postgres+Caddy + migrate + smoke checks"
 	@echo "  make deploy-reset DEPLOY_SEED_CSV=/abs/path/neologisms.csv  # Destructive reset + reseed"
@@ -129,6 +131,26 @@ db-dump-docker:
 
 db-restore-dump:
 	@bash scripts/restore-postgres-from-dump.sh
+
+migrate-legacy-entry-source:
+	@cd $(API_DIR) && set -a; [ -f .env ] && . ./.env; set +a; \
+	uv run python -m app.core.migrate_legacy_entry_source \
+		--actor-email "$(if $(ACTOR_EMAIL),$(ACTOR_EMAIL),kiansheik3128@gmail.com)" \
+		$(if $(BEFORE_SLUG),--before-slug "$(BEFORE_SLUG)",) \
+		$(if $(BEFORE_DATE),--before-date "$(BEFORE_DATE)",) \
+		$(if $(LIMIT),--limit "$(LIMIT)",) \
+		$(if $(filter 1,$(APPLY)),--apply,)
+
+deploy-migrate-legacy-entry-source:
+	@ssh -i "$(SSH_IDENTITY)" "$(DEPLOY_USER)@$(DEPLOY_HOST)" \
+		"cd '$(DEPLOY_PATH)' && \
+		docker compose -f deploy/docker-compose.remote.yml --env-file deploy/env/stack.env exec -T api \
+		uv run python -m app.core.migrate_legacy_entry_source \
+		--actor-email '$(if $(ACTOR_EMAIL),$(ACTOR_EMAIL),kiansheik3128@gmail.com)' \
+		$(if $(BEFORE_SLUG),--before-slug '$(BEFORE_SLUG)',) \
+		$(if $(BEFORE_DATE),--before-date '$(BEFORE_DATE)',) \
+		$(if $(LIMIT),--limit '$(LIMIT)',) \
+		$(if $(filter 1,$(APPLY)),--apply,)"
 
 deploy-ssh-all:
 	@bash scripts/deploy-ssh-all.sh

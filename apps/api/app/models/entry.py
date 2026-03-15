@@ -23,6 +23,7 @@ from app.models.mixins import TimestampMixin, UUIDPrimaryKeyMixin
 
 if TYPE_CHECKING:
     from app.models.discussion import EntryComment
+    from app.models.source import SourceEdition
     from app.models.user import User
 
 
@@ -37,6 +38,13 @@ class Entry(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     part_of_speech: Mapped[str | None] = mapped_column(String(64), nullable=True)
     short_definition: Mapped[str] = mapped_column(Text, nullable=False)
     source_citation: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    source_edition_id: Mapped[uuid.UUID | None] = mapped_column(
+        Uuid,
+        ForeignKey("source_editions.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+    source_pages: Mapped[str | None] = mapped_column(String(120), nullable=True)
     morphology_notes: Mapped[str | None] = mapped_column(Text, nullable=True)
     status: Mapped[EntryStatus] = mapped_column(
         Enum(EntryStatus, native_enum=False), default=EntryStatus.pending, index=True, nullable=False
@@ -75,6 +83,7 @@ class Entry(Base, UUIDPrimaryKeyMixin, TimestampMixin):
         cascade="all, delete-orphan",
     )
     tags: Mapped[list["EntryTag"]] = relationship(back_populates="entry", cascade="all, delete-orphan")
+    source_edition: Mapped["SourceEdition | None"] = relationship(back_populates="entries")
 
 
 class EntryVersion(Base, UUIDPrimaryKeyMixin):

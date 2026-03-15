@@ -1,6 +1,7 @@
 from app.models.discussion import CommentVote, EntryComment, Notification, NotificationPreference
 from app.models.entry import Entry, EntryTag, EntryVersion, Example, ExampleVersion, ExampleVote, Tag, Vote
 from app.models.moderation import ModerationAction, RateLimitEvent, Report
+from app.models.source import SourceEdition, SourceWork
 from app.models.user import EmailActionToken, Profile, Session, User
 
 __all__ = [
@@ -20,6 +21,8 @@ __all__ = [
     "RateLimitEvent",
     "Report",
     "Session",
+    "SourceEdition",
+    "SourceWork",
     "Tag",
     "User",
     "Vote",

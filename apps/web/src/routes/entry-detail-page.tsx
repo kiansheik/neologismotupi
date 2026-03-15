@@ -840,6 +840,7 @@ export function EntryDetailPage() {
         }));
   const canApproveEntry = entry.status !== "approved";
   const canRejectEntry = entry.status !== "rejected";
+  const displayedSourceCitation = entry.source?.citation ?? entry.source_citation ?? null;
 
   return (
     <section className="space-y-4">
@@ -888,10 +889,10 @@ export function EntryDetailPage() {
             {entry.morphology_notes}
           </p>
         ) : null}
-        {entry.source_citation ? (
+        {displayedSourceCitation ? (
           <p className="mt-2 text-sm text-slate-700">
             <span className="font-semibold text-slate-900">{t("entry.sourceCitation")}:</span>{" "}
-            {entry.source_citation}
+            {displayedSourceCitation}
           </p>
         ) : null}
         <p className="mt-3 text-xs text-slate-500">

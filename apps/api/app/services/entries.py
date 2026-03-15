@@ -35,6 +35,8 @@ def snapshot_entry(entry: Entry) -> dict:
         "part_of_speech": entry.part_of_speech,
         "short_definition": entry.short_definition,
         "source_citation": entry.source_citation,
+        "source_edition_id": str(entry.source_edition_id) if entry.source_edition_id else None,
+        "source_pages": entry.source_pages,
         "morphology_notes": entry.morphology_notes,
         "status": entry.status.value,
         "updated_at": datetime.now(UTC).isoformat(),

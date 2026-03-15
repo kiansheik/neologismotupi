@@ -13,10 +13,11 @@ from app.core.deps import SessionDep, get_current_user, get_current_user_optiona
 from app.core.enums import EntryStatus, ExampleStatus, ReportStatus, ReportTargetType
 from app.core.errors import raise_api_error
 from app.core.permissions import can_edit_entry, can_edit_example, is_moderator
-from app.core.utils import collapse_whitespace, slugify
+from app.core.utils import collapse_whitespace, normalize_text, slugify
 from app.models.discussion import CommentVote, EntryComment
 from app.models.entry import Entry, EntryTag, EntryVersion, Example, ExampleVersion, ExampleVote, Tag, Vote
 from app.models.moderation import ModerationAction, Report
+from app.models.source import SourceEdition, SourceWork
 from app.models.user import Profile, User
 from app.schemas.entries import (
     CommentCreate,
@@ -35,6 +36,7 @@ from app.schemas.entries import (
     ExampleUpdate,
     ExampleVersionOut,
     ReportCreate,
+    SourceInput,
     VoteOut,
     VoteRequest,
 )
@@ -73,6 +75,11 @@ from app.services.serializers import (
     serialize_entry_summary,
     serialize_example,
 )
+from app.services.sources import (
+    build_source_citation,
+    clean_source_text,
+    get_or_create_source_edition,
+)
 from app.services.user_badges import get_user_badge_leaders
 
 router = APIRouter(prefix="/entries", tags=["entries"])
@@ -98,9 +105,38 @@ async def _load_entry_with_relations(db: SessionDep, entry_id: uuid.UUID) -> Ent
             selectinload(Entry.examples),
             selectinload(Entry.comments).selectinload(EntryComment.author).selectinload(User.profile),
             selectinload(Entry.proposer).selectinload(User.profile),
+            selectinload(Entry.source_edition).selectinload(SourceEdition.work),
         )
     )
     return (await db.execute(stmt)).scalar_one_or_none()
+
+
+async def _apply_entry_source_fields(
+    db: SessionDep,
+    *,
+    entry: Entry,
+    source_payload: SourceInput | None,
+    source_citation_fallback: str | None,
+) -> None:
+    if source_payload is None:
+        entry.source_edition_id = None
+        entry.source_pages = None
+        entry.source_citation = clean_source_text(source_citation_fallback, max_length=500)
+        return
+
+    source_edition, source_work = await get_or_create_source_edition(db, source=source_payload)
+    source_pages = clean_source_text(source_payload.pages, max_length=120)
+
+    entry.source_edition_id = source_edition.id
+    entry.source_pages = source_pages
+    entry.source_citation = build_source_citation(
+        authors=source_work.authors,
+        title=source_work.title,
+        publication_year=source_edition.publication_year,
+        edition_label=source_edition.edition_label,
+        pages=source_pages,
+        fallback=source_citation_fallback,
+    )
 
 
 def _extract_moderation_context(action: ModerationAction | None) -> ModerationContext | None:
@@ -405,6 +441,7 @@ async def list_entries(
     topic: str | None = None,
     part_of_speech: str | None = None,
     region: str | None = None,
+    source: str | None = None,
     proposer_user_id: uuid.UUID | None = None,
     mine: bool = False,
     sort: Literal["alphabetical", "recent", "newest", "score", "most_examples"] = "recent",
@@ -456,6 +493,31 @@ async def list_entries(
         if region:
             conditions.append(Tag.slug == region)
 
+    if source and collapse_whitespace(source):
+        cleaned_source = collapse_whitespace(source)
+        normalized_source = normalize_text(cleaned_source)
+        source_pattern = f"%{cleaned_source}%"
+        normalized_source_pattern = f"%{normalized_source}%"
+
+        stmt = stmt.join(SourceEdition, SourceEdition.id == Entry.source_edition_id).join(
+            SourceWork,
+            SourceWork.id == SourceEdition.work_id,
+        )
+        count_stmt = count_stmt.join(SourceEdition, SourceEdition.id == Entry.source_edition_id).join(
+            SourceWork,
+            SourceWork.id == SourceEdition.work_id,
+        )
+        conditions.append(
+            or_(
+                SourceWork.authors.ilike(source_pattern),
+                SourceWork.title.ilike(source_pattern),
+                SourceEdition.edition_label.ilike(source_pattern),
+                SourceWork.normalized_authors.ilike(normalized_source_pattern),
+                SourceWork.normalized_title.ilike(normalized_source_pattern),
+                Entry.source_citation.ilike(source_pattern),
+            )
+        )
+
     if conditions:
         stmt = stmt.where(and_(*conditions))
         count_stmt = count_stmt.where(and_(*conditions))
@@ -498,6 +560,7 @@ async def get_entry(
             selectinload(Entry.examples),
             selectinload(Entry.comments).selectinload(EntryComment.author).selectinload(User.profile),
             selectinload(Entry.proposer).selectinload(User.profile),
+            selectinload(Entry.source_edition).selectinload(SourceEdition.work),
         )
     )
     entry = (await db.execute(stmt)).scalar_one_or_none()
@@ -599,11 +662,9 @@ async def create_entry(
         gloss_en=payload.gloss_en,
         part_of_speech=payload.part_of_speech,
         short_definition=short_definition,
-        source_citation=(
-            collapse_whitespace(payload.source_citation)
-            if payload.source_citation is not None and not is_effectively_empty(payload.source_citation)
-            else None
-        ),
+        source_citation=None,
+        source_edition_id=None,
+        source_pages=None,
         morphology_notes=payload.morphology_notes,
         status=status_value,
         proposer_user_id=user.id,
@@ -612,6 +673,12 @@ async def create_entry(
     )
     db.add(entry)
     await db.flush()
+    await _apply_entry_source_fields(
+        db,
+        entry=entry,
+        source_payload=payload.source,
+        source_citation_fallback=payload.source_citation,
+    )
 
     await set_entry_tags(db, entry, payload.tag_ids)
     await create_entry_version(db, entry=entry, edited_by_user_id=user.id, edit_summary="Initial submission")
@@ -688,12 +755,17 @@ async def update_entry(
             entry.short_definition = collapse_whitespace(payload.short_definition)
         changed = True
 
-    if payload.source_citation is not None:
-        entry.source_citation = (
-            collapse_whitespace(payload.source_citation)
-            if not is_effectively_empty(payload.source_citation)
-            else None
+    if "source" in payload.model_fields_set:
+        source_citation_fallback = payload.source_citation if "source_citation" in payload.model_fields_set else None
+        await _apply_entry_source_fields(
+            db,
+            entry=entry,
+            source_payload=payload.source,
+            source_citation_fallback=source_citation_fallback,
         )
+        changed = True
+    elif "source_citation" in payload.model_fields_set:
+        entry.source_citation = clean_source_text(payload.source_citation, max_length=500)
         changed = True
 
     if payload.morphology_notes is not None:
