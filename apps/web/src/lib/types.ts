@@ -1,4 +1,9 @@
-export type EntryStatus = "pending" | "approved" | "disputed" | "rejected" | "archived";
+export type EntryStatus =
+  | "pending"
+  | "approved"
+  | "disputed"
+  | "rejected"
+  | "archived";
 export type ExampleStatus = "pending" | "approved" | "hidden" | "rejected";
 export type UserBadgeKind = "founder" | "top_contributor" | "karma_leader";
 
@@ -161,7 +166,14 @@ export interface SourceEntryRef {
   id: string;
   slug: string;
   headword: string;
+  gloss_pt: string | null;
+  part_of_speech: string | null;
+  short_definition: string;
   status: EntryStatus;
+  score_cache: number;
+  example_count_cache: number;
+  proposer_user_id: string;
+  proposer_display_name: string | null;
   created_at: string;
 }
 

@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link, useParams } from "react-router-dom";
 
+import { EntryBrowser } from "@/components/entry-browser";
 import { Card } from "@/components/ui/card";
 import { StatusBadge } from "@/components/status-badge";
 import { getSourceDetail } from "@/features/sources/api";
@@ -8,7 +9,11 @@ import { formatDate, formatDateTime } from "@/i18n/formatters";
 import { useI18n } from "@/i18n";
 import { buildAbsoluteUrl, useSeo } from "@/lib/seo";
 
-function buildSourceTitle(authors: string | null, title: string | null, fallback: string): string {
+function buildSourceTitle(
+  authors: string | null,
+  title: string | null,
+  fallback: string,
+): string {
   if (authors && title) {
     return `${authors} - ${title}`;
   }
@@ -75,11 +80,16 @@ export function SourceDetailPage() {
       </Card>
 
       <Card>
-        <h2 className="text-lg font-semibold text-brand-900">{t("source.editions")}</h2>
+        <h2 className="text-lg font-semibold text-brand-900">
+          {t("source.editions")}
+        </h2>
         {source.editions.length ? (
           <ul className="mt-3 space-y-2 text-sm text-slate-700">
             {source.editions.map((edition) => (
-              <li key={edition.edition_id} className="rounded-md border border-brand-100 px-3 py-2">
+              <li
+                key={edition.edition_id}
+                className="rounded-md border border-brand-100 px-3 py-2"
+              >
                 <p className="font-medium text-slate-900">
                   {edition.publication_year ?? t("source.yearUnknown")}
                   {edition.edition_label ? ` - ${edition.edition_label}` : ""}
@@ -91,7 +101,9 @@ export function SourceDetailPage() {
                 </p>
                 {edition.links.length ? (
                   <div className="mt-2">
-                    <p className="text-xs font-semibold text-slate-700">{t("source.mirrors")}</p>
+                    <p className="text-xs font-semibold text-slate-700">
+                      {t("source.mirrors")}
+                    </p>
                     <ul className="mt-1 list-disc space-y-1 pl-5 text-xs text-slate-600">
                       {edition.links.map((link) => (
                         <li key={link.id}>
@@ -104,7 +116,9 @@ export function SourceDetailPage() {
                             {link.url}
                           </a>
                           <span className="ml-2 text-slate-500">
-                            {t("source.linkAdded", { date: formatDateTime(link.created_at, locale) })}
+                            {t("source.linkAdded", {
+                              date: formatDateTime(link.created_at, locale),
+                            })}
                           </span>
                         </li>
                       ))}
@@ -115,42 +129,37 @@ export function SourceDetailPage() {
             ))}
           </ul>
         ) : (
-          <p className="mt-2 text-sm text-slate-600">{t("source.noEditions")}</p>
+          <p className="mt-2 text-sm text-slate-600">
+            {t("source.noEditions")}
+          </p>
         )}
       </Card>
 
-      <Card>
-        <h2 className="text-lg font-semibold text-brand-900">{t("source.entries")}</h2>
-        {source.entries.length ? (
-          <ul className="mt-3 space-y-2 text-sm text-slate-700">
-            {source.entries.map((entry) => (
-              <li key={entry.id} className="rounded-md border border-brand-100 px-3 py-2">
-                <div className="flex flex-wrap items-center gap-2">
-                  <Link className="font-medium text-brand-700 hover:underline" to={`/entries/${entry.slug}`}>
-                    {entry.headword}
-                  </Link>
-                  <StatusBadge status={entry.status} />
-                </div>
-                <p className="mt-1 text-xs text-slate-500">
-                  {t("source.firstRegistered", { date: formatDate(entry.created_at, locale) })}
-                </p>
-              </li>
-            ))}
-          </ul>
-        ) : (
-          <p className="mt-2 text-sm text-slate-600">{t("source.noEntries")}</p>
-        )}
-      </Card>
+      <EntryBrowser
+        compact
+        queryKey={`source-${source.work_id}`}
+        title={t("source.entries")}
+        emptyMessage={t("source.noEntries")}
+        scope={{ source_work_id: source.work_id }}
+      />
 
       <Card>
-        <h2 className="text-lg font-semibold text-brand-900">{t("source.examples")}</h2>
+        <h2 className="text-lg font-semibold text-brand-900">
+          {t("source.examples")}
+        </h2>
         {source.examples.length ? (
           <ul className="mt-3 space-y-2 text-sm text-slate-700">
             {source.examples.map((example) => (
-              <li key={example.id} className="rounded-md border border-brand-100 px-3 py-2">
+              <li
+                key={example.id}
+                className="rounded-md border border-brand-100 px-3 py-2"
+              >
                 <p className="text-slate-800">{example.sentence_original}</p>
                 <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-slate-600">
-                  <Link className="text-brand-700 hover:underline" to={`/entries/${example.entry_slug}`}>
+                  <Link
+                    className="text-brand-700 hover:underline"
+                    to={`/entries/${example.entry_slug}`}
+                  >
                     {t("source.inEntry", { headword: example.entry_headword })}
                   </Link>
                   <StatusBadge status={example.status} />
@@ -160,7 +169,9 @@ export function SourceDetailPage() {
             ))}
           </ul>
         ) : (
-          <p className="mt-2 text-sm text-slate-600">{t("source.noExamples")}</p>
+          <p className="mt-2 text-sm text-slate-600">
+            {t("source.noExamples")}
+          </p>
         )}
       </Card>
     </section>

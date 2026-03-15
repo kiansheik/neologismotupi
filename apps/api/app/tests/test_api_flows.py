@@ -173,6 +173,12 @@ async def test_create_entry_with_structured_source_and_filter(client):
     ids = {item["id"] for item in list_response.json()["items"]}
     assert created["id"] in ids
 
+    work_id = created["source"]["work_id"]
+    scoped_response = await client.get("/api/entries", params={"source_work_id": work_id})
+    assert scoped_response.status_code == 200, scoped_response.text
+    scoped_ids = {item["id"] for item in scoped_response.json()["items"]}
+    assert created["id"] in scoped_ids
+
 
 @pytest.mark.asyncio
 async def test_sources_autocomplete_lists_existing_source(client):

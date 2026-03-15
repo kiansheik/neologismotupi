@@ -1,16 +1,23 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link, useParams } from "react-router-dom";
 
-import { StatusBadge } from "@/components/status-badge";
+import { EntryBrowser } from "@/components/entry-browser";
 import { Card } from "@/components/ui/card";
 import { UserBadge } from "@/components/user-badge";
 import { getPublicUser } from "@/features/auth/api";
-import { listEntries } from "@/features/entries/api";
-import { formatDate, formatRelativeOrDate, formatTimeSince } from "@/i18n/formatters";
+import {
+  formatDate,
+  formatRelativeOrDate,
+  formatTimeSince,
+} from "@/i18n/formatters";
 import { useI18n } from "@/i18n";
 import { buildProfileLinks } from "@/lib/profile-links";
 import { buildAbsoluteUrl, useSeo } from "@/lib/seo";
-import { badgeEmoji, badgeLabelKey, resolveUserBadges } from "@/lib/user-badges";
+import {
+  badgeEmoji,
+  badgeLabelKey,
+  resolveUserBadges,
+} from "@/lib/user-badges";
 
 export function ProfilePage() {
   const { t, locale } = useI18n();
@@ -19,12 +26,6 @@ export function ProfilePage() {
   const userQuery = useQuery({
     queryKey: ["public-user", userId],
     queryFn: () => getPublicUser(String(userId)),
-    enabled: Boolean(userId),
-  });
-
-  const entriesQuery = useQuery({
-    queryKey: ["user-entries", userId],
-    queryFn: () => listEntries({ page: 1, page_size: 50, proposer_user_id: String(userId), sort: "recent" }),
     enabled: Boolean(userId),
   });
 
@@ -74,13 +75,22 @@ export function ProfilePage() {
     <section className="space-y-4">
       <Card>
         <div className="flex flex-wrap items-center gap-2">
-          <h1 className="text-xl font-semibold text-brand-900">{profile.display_name}</h1>
-          <UserBadge displayName={profile.display_name} badges={profile.badges} />
+          <h1 className="text-xl font-semibold text-brand-900">
+            {profile.display_name}
+          </h1>
+          <UserBadge
+            displayName={profile.display_name}
+            badges={profile.badges}
+          />
         </div>
-        <p className="mt-1 text-sm text-slate-600">{t("reputation.label", { score: profile.reputation_score })}</p>
+        <p className="mt-1 text-sm text-slate-600">
+          {t("reputation.label", { score: profile.reputation_score })}
+        </p>
         {profileBadges.length ? (
           <div className="mt-2">
-            <p className="text-xs font-medium uppercase tracking-wide text-slate-500">{t("profile.badgesTitle")}</p>
+            <p className="text-xs font-medium uppercase tracking-wide text-slate-500">
+              {t("profile.badgesTitle")}
+            </p>
             <ul className="mt-1 flex flex-wrap items-center gap-2">
               {profileBadges.map((badge) => (
                 <li
@@ -94,14 +104,20 @@ export function ProfilePage() {
             </ul>
           </div>
         ) : null}
-        {profile.role_label ? <p className="mt-1 text-sm text-slate-700">{profile.role_label}</p> : null}
+        {profile.role_label ? (
+          <p className="mt-1 text-sm text-slate-700">{profile.role_label}</p>
+        ) : null}
         {profile.affiliation_label ? (
           <p className="text-sm text-slate-700">{profile.affiliation_label}</p>
         ) : null}
-        {profile.bio ? <p className="mt-2 text-sm text-slate-700">{profile.bio}</p> : null}
+        {profile.bio ? (
+          <p className="mt-2 text-sm text-slate-700">{profile.bio}</p>
+        ) : null}
         {profileLinks.length ? (
           <div className="mt-3">
-            <p className="text-xs font-medium uppercase tracking-wide text-slate-500">{t("profile.linksTitle")}</p>
+            <p className="text-xs font-medium uppercase tracking-wide text-slate-500">
+              {t("profile.linksTitle")}
+            </p>
             <ul className="mt-1 flex flex-wrap gap-2">
               {profileLinks.map((link) => (
                 <li key={link.key}>
@@ -122,15 +138,25 @@ export function ProfilePage() {
 
         <div className="mt-3 grid gap-2 sm:grid-cols-2">
           <div className="rounded-md border border-brand-100 bg-brand-50/30 px-3 py-2">
-            <p className="text-xs font-medium uppercase tracking-wide text-slate-500">{t("profile.totalEntries")}</p>
-            <p className="text-base font-semibold text-brand-900">{stats?.total_entries ?? 0}</p>
+            <p className="text-xs font-medium uppercase tracking-wide text-slate-500">
+              {t("profile.totalEntries")}
+            </p>
+            <p className="text-base font-semibold text-brand-900">
+              {stats?.total_entries ?? 0}
+            </p>
           </div>
           <div className="rounded-md border border-brand-100 bg-brand-50/30 px-3 py-2">
-            <p className="text-xs font-medium uppercase tracking-wide text-slate-500">{t("profile.totalComments")}</p>
-            <p className="text-base font-semibold text-brand-900">{stats?.total_comments ?? 0}</p>
+            <p className="text-xs font-medium uppercase tracking-wide text-slate-500">
+              {t("profile.totalComments")}
+            </p>
+            <p className="text-base font-semibold text-brand-900">
+              {stats?.total_comments ?? 0}
+            </p>
           </div>
           <div className="rounded-md border border-brand-100 bg-brand-50/30 px-3 py-2">
-            <p className="text-xs font-medium uppercase tracking-wide text-slate-500">{t("profile.lastActive")}</p>
+            <p className="text-xs font-medium uppercase tracking-wide text-slate-500">
+              {t("profile.lastActive")}
+            </p>
             <p className="text-sm text-slate-700">
               {stats?.last_active_at
                 ? formatRelativeOrDate(stats.last_active_at, locale)
@@ -138,7 +164,9 @@ export function ProfilePage() {
             </p>
           </div>
           <div className="rounded-md border border-brand-100 bg-brand-50/30 px-3 py-2">
-            <p className="text-xs font-medium uppercase tracking-wide text-slate-500">{t("profile.lastSeen")}</p>
+            <p className="text-xs font-medium uppercase tracking-wide text-slate-500">
+              {t("profile.lastSeen")}
+            </p>
             <p className="text-sm text-slate-700">
               {stats?.last_seen_at
                 ? formatRelativeOrDate(stats.last_seen_at, locale)
@@ -147,32 +175,22 @@ export function ProfilePage() {
           </div>
         </div>
         <p className="mt-2 text-sm text-slate-700">
-          <span className="font-medium text-slate-900">{t("profile.submittingSince")}:</span>{" "}
+          <span className="font-medium text-slate-900">
+            {t("profile.submittingSince")}:
+          </span>{" "}
           {stats?.submitting_since_at
             ? `${formatTimeSince(stats.submitting_since_at, locale)} (${formatDate(stats.submitting_since_at, locale)})`
             : t("profile.notAvailable")}
         </p>
       </Card>
 
-      <Card>
-        <h2 className="text-lg font-semibold text-brand-900">{t("profile.submissionsTitle")}</h2>
-        <div className="mt-3 space-y-2">
-          {entriesQuery.data?.items.length ? (
-            entriesQuery.data.items.map((entry) => (
-              <article key={entry.id} className="rounded-md border border-brand-100 p-3">
-                <div className="flex items-center justify-between gap-2">
-                  <Link className="text-brand-800 hover:underline" to={`/entries/${entry.slug}`}>
-                    {entry.headword}
-                  </Link>
-                  <StatusBadge status={entry.status} />
-                </div>
-              </article>
-            ))
-          ) : (
-            <p className="text-sm text-slate-600">{t("profile.noSubmissions")}</p>
-          )}
-        </div>
-      </Card>
+      <EntryBrowser
+        compact
+        queryKey={`profile-${userId}`}
+        title={t("profile.submissionsTitle")}
+        emptyMessage={t("profile.noSubmissions")}
+        scope={{ proposer_user_id: userId }}
+      />
     </section>
   );
 }

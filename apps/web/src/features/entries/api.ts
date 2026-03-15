@@ -10,6 +10,7 @@ export interface ListEntriesParams {
   topic?: string;
   part_of_speech?: string;
   source?: string;
+  source_work_id?: string;
   region?: string;
   proposer_user_id?: string;
   mine?: boolean;
@@ -70,7 +71,9 @@ export interface CreateReportPayload {
   free_text?: string;
 }
 
-export function listEntries(params: ListEntriesParams): Promise<EntryListResponse> {
+export function listEntries(
+  params: ListEntriesParams,
+): Promise<EntryListResponse> {
   return apiFetch<EntryListResponse>(withQuery("/entries", params));
 }
 
@@ -82,11 +85,20 @@ export function createEntry(payload: CreateEntryPayload): Promise<EntryDetail> {
   return apiFetch<EntryDetail>("/entries", { method: "POST", body: payload });
 }
 
-export function updateEntry(entryId: string, payload: UpdateEntryPayload): Promise<EntryDetail> {
-  return apiFetch<EntryDetail>(`/entries/${entryId}`, { method: "PATCH", body: payload });
+export function updateEntry(
+  entryId: string,
+  payload: UpdateEntryPayload,
+): Promise<EntryDetail> {
+  return apiFetch<EntryDetail>(`/entries/${entryId}`, {
+    method: "PATCH",
+    body: payload,
+  });
 }
 
-export function voteEntry(entryId: string, payload: VotePayload): Promise<{ score_cache: number }> {
+export function voteEntry(
+  entryId: string,
+  payload: VotePayload,
+): Promise<{ score_cache: number }> {
   return apiFetch<{ score_cache: number }>(`/entries/${entryId}/vote`, {
     method: "POST",
     body: payload,
@@ -98,9 +110,15 @@ export function deleteVote(entryId: string): Promise<void> {
 }
 
 export function createExample(entryId: string, payload: CreateExamplePayload) {
-  return apiFetch(`/entries/${entryId}/examples`, { method: "POST", body: payload });
+  return apiFetch(`/entries/${entryId}/examples`, {
+    method: "POST",
+    body: payload,
+  });
 }
 
 export function reportEntry(entryId: string, payload: CreateReportPayload) {
-  return apiFetch(`/entries/${entryId}/reports`, { method: "POST", body: payload });
+  return apiFetch(`/entries/${entryId}/reports`, {
+    method: "POST",
+    body: payload,
+  });
 }

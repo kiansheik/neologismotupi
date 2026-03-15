@@ -482,6 +482,7 @@ async def list_entries(
     part_of_speech: str | None = None,
     region: str | None = None,
     source: str | None = None,
+    source_work_id: uuid.UUID | None = None,
     proposer_user_id: uuid.UUID | None = None,
     mine: bool = False,
     sort: Literal["alphabetical", "recent", "newest", "score", "most_examples"] = "recent",
@@ -533,12 +534,8 @@ async def list_entries(
         if region:
             conditions.append(Tag.slug == region)
 
-    if source and collapse_whitespace(source):
-        cleaned_source = collapse_whitespace(source)
-        normalized_source = normalize_text(cleaned_source)
-        source_pattern = f"%{cleaned_source}%"
-        normalized_source_pattern = f"%{normalized_source}%"
-
+    source_query = collapse_whitespace(source) if source else None
+    if source_query or source_work_id is not None:
         stmt = stmt.join(SourceEdition, SourceEdition.id == Entry.source_edition_id).join(
             SourceWork,
             SourceWork.id == SourceEdition.work_id,
@@ -547,6 +544,15 @@ async def list_entries(
             SourceWork,
             SourceWork.id == SourceEdition.work_id,
         )
+
+    if source_work_id is not None:
+        conditions.append(SourceWork.id == source_work_id)
+
+    if source_query:
+        normalized_source = normalize_text(source_query)
+        source_pattern = f"%{source_query}%"
+        normalized_source_pattern = f"%{normalized_source}%"
+
         conditions.append(
             or_(
                 SourceWork.authors.ilike(source_pattern),

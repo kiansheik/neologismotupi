@@ -9,6 +9,7 @@ from app.core.enums import EntryStatus, ExampleStatus
 from app.core.errors import raise_api_error
 from app.models.entry import Entry, Example
 from app.models.source import SourceEdition, SourceLink, SourceWork
+from app.models.user import Profile
 from app.schemas.sources import (
     SourceDetailOut,
     SourceEditionStatsOut,
@@ -160,10 +161,18 @@ async def get_source_detail(
                 Entry.id,
                 Entry.slug,
                 Entry.headword,
+                Entry.gloss_pt,
+                Entry.part_of_speech,
+                Entry.short_definition,
                 Entry.status,
+                Entry.score_cache,
+                Entry.example_count_cache,
+                Entry.proposer_user_id,
+                Profile.display_name,
                 Entry.created_at,
             )
             .join(SourceEdition, SourceEdition.id == Entry.source_edition_id)
+            .outerjoin(Profile, Profile.user_id == Entry.proposer_user_id)
             .where(
                 SourceEdition.work_id == work_id,
                 Entry.status != EntryStatus.rejected,
@@ -221,10 +230,30 @@ async def get_source_detail(
                 id=entry_id,
                 slug=slug,
                 headword=headword,
+                gloss_pt=gloss_pt,
+                part_of_speech=part_of_speech,
+                short_definition=short_definition,
                 status=status,
+                score_cache=score_cache,
+                example_count_cache=example_count_cache,
+                proposer_user_id=proposer_user_id,
+                proposer_display_name=proposer_display_name,
                 created_at=created_at,
             )
-            for entry_id, slug, headword, status, created_at in entry_rows
+            for (
+                entry_id,
+                slug,
+                headword,
+                gloss_pt,
+                part_of_speech,
+                short_definition,
+                status,
+                score_cache,
+                example_count_cache,
+                proposer_user_id,
+                proposer_display_name,
+                created_at,
+            ) in entry_rows
         ],
         examples=[
             SourceExampleRefOut(

@@ -35,7 +35,14 @@ class SourceEntryRefOut(BaseModel):
     id: uuid.UUID
     slug: str
     headword: str
+    gloss_pt: str | None
+    part_of_speech: str | None
+    short_definition: str
     status: EntryStatus
+    score_cache: int
+    example_count_cache: int
+    proposer_user_id: uuid.UUID
+    proposer_display_name: str | None
     created_at: datetime
 
 
