@@ -8,11 +8,14 @@ export const ptBR = {
 
   "nav.entries": "Verbetes",
   "nav.submit": "Enviar",
+  "nav.about": "Sobre",
   "nav.moderation": "Moderação",
   "nav.me": "Meu perfil",
   "nav.logout": "Sair",
   "nav.login": "Entrar",
   "nav.signup": "Criar conta",
+  "footer.github": "GitHub",
+  "footer.tagline": "O uso será o melhor mestre.",
 
   "status.pending": "pendente",
   "status.approved": "aprovado",
@@ -129,6 +132,7 @@ export const ptBR = {
   "submit.onlyRequired": "Somente a glosa é obrigatória. Os demais campos são opcionais.",
   "submit.headword": "Verbete",
   "submit.glossPt": "Glosa (PT)",
+  "submit.glossEn": "Glosa (EN)",
   "submit.partOfSpeech": "Classe gramatical",
   "submit.definition": "Definição",
   "submit.sourceIfApplicableOptional": "Fonte (se aplicável) ({optional})",
@@ -136,6 +140,8 @@ export const ptBR = {
   "submit.help.headword": "A forma principal do neologismo, sem explicação longa.",
   "submit.help.glossPt":
     "Campo obrigatório. Use uma palavra ou expressão curta em português que melhor represente o sentido.",
+  "submit.help.glossBlurb":
+    "Glosa é uma palavra ou expressão curta que melhor representa o verbete na língua de destino. Preencha a glosa em português (obrigatória) e, se quiser, a glosa em inglês.",
   "submit.help.partOfSpeech": "Escolha a classe gramatical que melhor representa o uso.",
   "submit.help.definition":
     "Opcional. Descreva o significado do verbete em português, como em um dicionário, sem repetir o próprio termo. Se a glosa já for suficiente, pode deixar em branco.",
@@ -164,6 +170,7 @@ export const ptBR = {
   "entry.loading": "Carregando verbete...",
   "entry.loadError": "Não foi possível carregar o verbete.",
   "entry.submittedBy": "Enviado por",
+  "entry.glossLabel": "Glosa",
   "entry.firstRegistered": "Primeiro registro: {date}",
   "entry.moderationReason": "Motivo da moderação",
   "entry.sourceCitation": "Fonte",
@@ -279,6 +286,8 @@ export const ptBR = {
   "moderation.period.month": "Mês",
   "moderation.approve": "Aprovar",
   "moderation.reject": "Rejeitar",
+  "moderation.approving": "Aprovando...",
+  "moderation.rejecting": "Rejeitando...",
   "moderation.hide": "Ocultar",
   "moderation.reasonRequired": "Informe um motivo para rejeição.",
   "moderation.prompt.entryRejectReason": "Informe o motivo da rejeição do verbete:",
@@ -336,6 +345,30 @@ export const ptBR = {
   "home.submit": "Enviar proposta",
   "home.recent": "Verbetes recentes",
   "home.noEntries": "Ainda não há verbetes.",
+  "about.title": "Sobre",
+  "about.seoDescription":
+    "Nheenga Neologismos é uma plataforma comunitária para registrar, discutir e validar neologismos em Tupi com histórico aberto, karma e revisão transparente.",
+  "about.heading": "Sobre o Nheenga Neologismos",
+  "about.p1":
+    "Este projeto nasceu da necessidade de criar um lugar centralizado para encontrar, registrar e deliberar neologismos em Tupi Antigo, que hoje também é moderno em uso comunitário.",
+  "about.p2":
+    "Aqui, qualquer pessoa pode usar o site gratuitamente para documentar palavras e discutir ideias de uso. Um verbete pode ser rigoroso, com citações e exemplos, ou simples, com uma glosa curta.",
+  "about.p3":
+    "Cada usuário tem karma (reputação), que funciona como um sinal de confiança comunitária. Verbetes são públicos desde o envio. Quando um moderador fluente revisa e verifica um conteúdo, ele recebe o check azul como selo de qualidade.",
+  "about.p4":
+    "Sem check azul não significa conteúdo ruim: a plataforma é comunitária e em evolução constante. A ideia é fortalecer a comunidade Tupi e inspirar outras iniciativas de revitalização linguística.",
+  "about.p5":
+    "O futuro do projeto é incerto, mas brilhante. Vamos criar palavras novas.",
+  "about.motto.quote": "O uso será o melhor mestre",
+  "about.motto.author":
+    "São Padre José de Anchieta, autor da primeira gramática em Tupi.",
+  "about.fundingTitle": "Financiamento, contato e código aberto",
+  "about.fundingBody":
+    "O projeto é financiado pessoalmente por Kian Sheik. Doações via Pix e dúvidas sobre o site podem ser tratadas por e-mail.",
+  "about.contactPrefix": "Contato:",
+  "about.opensourceBody":
+    "O projeto é 100% open-source. Se você tiver boas ideias para melhorar a plataforma, faça um fork no GitHub e contribua.",
+  "about.githubCta": "Ver repositório no GitHub",
 
   "api.unauthenticated": "Autenticação necessária.",
   "api.invalid_credentials": "E-mail ou senha inválidos.",
@@ -371,11 +404,14 @@ export const enUS: Record<TranslationKey, string> = {
 
   "nav.entries": "Entries",
   "nav.submit": "Submit",
+  "nav.about": "About",
   "nav.moderation": "Moderation",
   "nav.me": "Me",
   "nav.logout": "Logout",
   "nav.login": "Login",
   "nav.signup": "Sign up",
+  "footer.github": "GitHub",
+  "footer.tagline": "Use is the best teacher.",
 
   "status.pending": "pending",
   "status.approved": "approved",
@@ -492,6 +528,7 @@ export const enUS: Record<TranslationKey, string> = {
   "submit.onlyRequired": "Only the gloss is required. All other fields are optional.",
   "submit.headword": "Headword",
   "submit.glossPt": "Gloss (PT)",
+  "submit.glossEn": "Gloss (EN)",
   "submit.partOfSpeech": "Part of speech",
   "submit.definition": "Definition",
   "submit.sourceIfApplicableOptional": "Source (if applicable) ({optional})",
@@ -499,6 +536,8 @@ export const enUS: Record<TranslationKey, string> = {
   "submit.help.headword": "The main neologism form, without long explanation.",
   "submit.help.glossPt":
     "Required field. Use a short Portuguese word or phrase that best represents the meaning.",
+  "submit.help.glossBlurb":
+    "A gloss is a short word or phrase that best represents the entry in the target language. Fill Portuguese gloss (required) and optionally English gloss.",
   "submit.help.partOfSpeech": "Choose the grammatical class that best matches usage.",
   "submit.help.definition":
     "Optional. Describe the word in Portuguese as in a dictionary, without self-referencing the term. If the gloss is enough, you can leave it blank.",
@@ -527,6 +566,7 @@ export const enUS: Record<TranslationKey, string> = {
   "entry.loading": "Loading entry...",
   "entry.loadError": "Unable to load entry.",
   "entry.submittedBy": "Submitted by",
+  "entry.glossLabel": "Gloss",
   "entry.firstRegistered": "First registered: {date}",
   "entry.moderationReason": "Moderation reason",
   "entry.sourceCitation": "Source",
@@ -642,6 +682,8 @@ export const enUS: Record<TranslationKey, string> = {
   "moderation.period.month": "Month",
   "moderation.approve": "Approve",
   "moderation.reject": "Reject",
+  "moderation.approving": "Approving...",
+  "moderation.rejecting": "Rejecting...",
   "moderation.hide": "Hide",
   "moderation.reasonRequired": "Please provide a rejection reason.",
   "moderation.prompt.entryRejectReason": "Enter the reason for rejecting this entry:",
@@ -699,6 +741,29 @@ export const enUS: Record<TranslationKey, string> = {
   "home.submit": "Submit a proposal",
   "home.recent": "Recent entries",
   "home.noEntries": "No entries yet.",
+  "about.title": "About",
+  "about.seoDescription":
+    "Nheenga Neologismos is a community platform to register, discuss, and validate Tupi neologisms with open history, karma, and transparent moderation.",
+  "about.heading": "About Nheenga Neologismos",
+  "about.p1":
+    "This project was born from the need for a centralized place to find, register, and deliberate neologisms for Old Tupi, now actively renewed in community use.",
+  "about.p2":
+    "Anyone can use the site for free to document words and discuss usage ideas. Entries can be rigorous with citations and examples, or simple with a short gloss.",
+  "about.p3":
+    "Each user has karma (reputation), which works as a community trust signal. Entries become public immediately. When reviewed by a fluent moderator, content receives a blue checkmark as a quality seal.",
+  "about.p4":
+    "No blue check does not mean bad content: this is community-driven and always evolving. The goal is to support the Tupi community and inspire other revitalization projects.",
+  "about.p5": "The future of the project is uncertain, but bright. Let us make new words.",
+  "about.motto.quote": "Use is the best teacher",
+  "about.motto.author":
+    "Saint Father José de Anchieta, writer of the first grammar in Tupi.",
+  "about.fundingTitle": "Funding, contact, and open source",
+  "about.fundingBody":
+    "This project is personally funded by Kian Sheik. Pix donations and website inquiries can be handled by email.",
+  "about.contactPrefix": "Contact:",
+  "about.opensourceBody":
+    "The project is 100% open source. If you have good ideas to improve the platform, fork it on GitHub and contribute.",
+  "about.githubCta": "View repository on GitHub",
 
   "api.unauthenticated": "Authentication required.",
   "api.invalid_credentials": "Invalid email or password.",

@@ -184,12 +184,18 @@ export function ModerationPage() {
                     <StatusBadge status={entry.status} showPending />
                   </div>
                   <div className="mt-2 flex gap-2">
-                    <Button type="button" onClick={() => approveEntryMutation.mutate(entry.id)}>
-                      {t("moderation.approve")}
+                    <Button
+                      type="button"
+                      className="px-2.5 py-1 text-xs disabled:opacity-35"
+                      onClick={() => approveEntryMutation.mutate(entry.id)}
+                      disabled={approveEntryMutation.isPending}
+                    >
+                      {approveEntryMutation.isPending ? t("moderation.approving") : t("moderation.approve")}
                     </Button>
                     <Button
                       type="button"
                       variant="danger"
+                      className="px-2.5 py-1 text-xs disabled:opacity-35"
                       onClick={() => {
                         const reason = promptRequiredReason(t("moderation.prompt.entryRejectReason"));
                         if (!reason) {
@@ -197,8 +203,9 @@ export function ModerationPage() {
                         }
                         rejectEntryMutation.mutate({ entryId: entry.id, reason });
                       }}
+                      disabled={rejectEntryMutation.isPending}
                     >
-                      {t("moderation.reject")}
+                      {rejectEntryMutation.isPending ? t("moderation.rejecting") : t("moderation.reject")}
                     </Button>
                   </div>
                 </article>
@@ -222,12 +229,18 @@ export function ModerationPage() {
                   </p>
                   <p className="text-sm text-slate-800">{example.sentence_original}</p>
                   <div className="mt-2 flex gap-2">
-                    <Button type="button" onClick={() => approveExampleMutation.mutate(example.id)}>
-                      {t("moderation.approve")}
+                    <Button
+                      type="button"
+                      className="px-2.5 py-1 text-xs disabled:opacity-35"
+                      onClick={() => approveExampleMutation.mutate(example.id)}
+                      disabled={approveExampleMutation.isPending}
+                    >
+                      {approveExampleMutation.isPending ? t("moderation.approving") : t("moderation.approve")}
                     </Button>
                     <Button
                       type="button"
                       variant="danger"
+                      className="px-2.5 py-1 text-xs disabled:opacity-35"
                       onClick={() => {
                         const reason = promptRequiredReason(t("moderation.prompt.exampleRejectReason"));
                         if (!reason) {
@@ -235,8 +248,9 @@ export function ModerationPage() {
                         }
                         rejectExampleMutation.mutate({ exampleId: example.id, reason });
                       }}
+                      disabled={rejectExampleMutation.isPending}
                     >
-                      {t("moderation.reject")}
+                      {rejectExampleMutation.isPending ? t("moderation.rejecting") : t("moderation.reject")}
                     </Button>
                   </div>
                 </article>

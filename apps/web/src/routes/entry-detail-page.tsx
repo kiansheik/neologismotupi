@@ -813,10 +813,18 @@ export function EntryDetailPage() {
     return <p className="text-sm text-red-700">{t("entry.loadError")}</p>;
   }
 
+  const preferredGloss = (() => {
+    const glossPt = entry.gloss_pt?.trim() ?? "";
+    const glossEn = entry.gloss_en?.trim() ?? "";
+    if (locale === "en-US") {
+      return glossEn || glossPt;
+    }
+    return glossPt || glossEn;
+  })();
   const definitionParts = splitEntryDefinition(entry.short_definition);
   const shouldShowGloss =
-    Boolean(entry.gloss_pt?.trim()) &&
-    normalizeComparableText(entry.gloss_pt) !== normalizeComparableText(entry.short_definition);
+    Boolean(preferredGloss) &&
+    normalizeComparableText(preferredGloss) !== normalizeComparableText(entry.short_definition);
   const historyEvents =
     entry.history_events && entry.history_events.length > 0
       ? entry.history_events
@@ -830,6 +838,8 @@ export function EntryDetailPage() {
           actor_display_name: version.edited_by_display_name ?? null,
           created_at: version.created_at,
         }));
+  const canApproveEntry = entry.status !== "approved";
+  const canRejectEntry = entry.status !== "rejected";
 
   return (
     <section className="space-y-4">
@@ -838,6 +848,12 @@ export function EntryDetailPage() {
           <h1 className="text-2xl font-semibold text-brand-900">{entry.headword}</h1>
           <StatusBadge status={entry.status} />
         </div>
+        {shouldShowGloss ? (
+          <p className="mt-2 inline-flex max-w-full flex-wrap items-center gap-1 rounded-md border border-brand-200 bg-brand-50 px-2 py-1 text-sm font-medium text-brand-900">
+            <span className="font-semibold">{t("entry.glossLabel")}:</span>
+            <span>{preferredGloss}</span>
+          </p>
+        ) : null}
         {definitionParts.length <= 1 ? (
           <p className="mt-2 text-sm text-slate-700">{entry.short_definition}</p>
         ) : (
@@ -850,7 +866,6 @@ export function EntryDetailPage() {
             ))}
           </ul>
         )}
-        {shouldShowGloss ? <p className="mt-1 text-sm text-slate-600">{entry.gloss_pt}</p> : null}
         <p className="mt-1 text-sm text-slate-600">
           {t("entry.submittedBy")}{" "}
           <span className="inline-flex flex-wrap items-center gap-1">
@@ -861,7 +876,6 @@ export function EntryDetailPage() {
             <span>· {t("reputation.label", { score: entry.proposer.reputation_score })}</span>
           </span>
         </p>
-        <p className="mt-1 text-sm text-slate-600">{t("entry.firstRegistered", { date: formatDate(entry.created_at, locale) })}</p>
         {(entry.status === "rejected" || entry.status === "disputed") &&
         (entry.moderation_reason || entry.moderation_notes) ? (
           <p className="mt-1 rounded-md border border-red-200 bg-red-50 px-2 py-1 text-sm text-red-800">
@@ -880,6 +894,9 @@ export function EntryDetailPage() {
             {entry.source_citation}
           </p>
         ) : null}
+        <p className="mt-3 text-xs text-slate-500">
+          {t("entry.firstRegistered", { date: formatDate(entry.created_at, locale) })}
+        </p>
 
         <div className="mt-4 flex flex-wrap items-center gap-2">
           <Button
@@ -980,30 +997,37 @@ export function EntryDetailPage() {
 
         {isModerator ? (
           <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-brand-100 pt-4">
-            <Button
-              type="button"
-              onClick={() => approveEntryMutation.mutate()}
-              disabled={approveEntryMutation.isPending || entry.status === "approved"}
-            >
-              {t("entry.approve")}
-            </Button>
-            <Button
-              type="button"
-              variant="danger"
-              onClick={() => {
-                const reason = promptRequiredReason(t("moderation.prompt.entryRejectReason"));
-                if (!reason) {
-                  return;
-                }
-                rejectEntryMutation.mutate(reason);
-              }}
-              disabled={rejectEntryMutation.isPending || entry.status === "rejected"}
-            >
-              {t("entry.reject")}
-            </Button>
+            {canApproveEntry ? (
+              <Button
+                type="button"
+                className="px-2.5 py-1 text-xs disabled:opacity-35"
+                onClick={() => approveEntryMutation.mutate()}
+                disabled={approveEntryMutation.isPending}
+              >
+                {approveEntryMutation.isPending ? t("moderation.approving") : t("entry.approve")}
+              </Button>
+            ) : null}
+            {canRejectEntry ? (
+              <Button
+                type="button"
+                variant="danger"
+                className="px-2.5 py-1 text-xs disabled:opacity-35"
+                onClick={() => {
+                  const reason = promptRequiredReason(t("moderation.prompt.entryRejectReason"));
+                  if (!reason) {
+                    return;
+                  }
+                  rejectEntryMutation.mutate(reason);
+                }}
+                disabled={rejectEntryMutation.isPending}
+              >
+                {rejectEntryMutation.isPending ? t("moderation.rejecting") : t("entry.reject")}
+              </Button>
+            ) : null}
             <Button
               type="button"
               variant="secondary"
+              className="px-2.5 py-1 text-xs"
               onClick={() => {
                 setShowEditForm((current) => !current);
                 trackEvent("entry_moderator_edit_toggled");
@@ -1167,6 +1191,8 @@ export function EntryDetailPage() {
                 currentUser && (isModerator || currentUser.id === example.user_id),
               );
               const isEditingThisExample = editingExampleId === example.id;
+              const canApproveExample = example.status !== "approved";
+              const canRejectExample = example.status !== "rejected";
 
               return (
                 <article key={example.id} className="rounded-md border border-brand-100 p-3">
@@ -1220,33 +1246,44 @@ export function EntryDetailPage() {
                   <div className="mt-2 flex flex-wrap gap-2">
                     {isModerator ? (
                       <>
-                        <Button
-                          type="button"
-                          onClick={() => approveExampleMutation.mutate(example.id)}
-                          disabled={approveExampleMutation.isPending || example.status === "approved"}
-                        >
-                          {t("moderation.approve")}
-                        </Button>
-                        <Button
-                          type="button"
-                          variant="danger"
-                          onClick={() => {
-                            const reason = promptRequiredReason(t("moderation.prompt.exampleRejectReason"));
-                            if (!reason) {
-                              return;
-                            }
-                            rejectExampleMutation.mutate({ exampleId: example.id, reason });
-                          }}
-                          disabled={rejectExampleMutation.isPending || example.status === "rejected"}
-                        >
-                          {t("moderation.reject")}
-                        </Button>
+                        {canApproveExample ? (
+                          <Button
+                            type="button"
+                            className="px-2.5 py-1 text-xs disabled:opacity-35"
+                            onClick={() => approveExampleMutation.mutate(example.id)}
+                            disabled={approveExampleMutation.isPending}
+                          >
+                            {approveExampleMutation.isPending
+                              ? t("moderation.approving")
+                              : t("moderation.approve")}
+                          </Button>
+                        ) : null}
+                        {canRejectExample ? (
+                          <Button
+                            type="button"
+                            variant="danger"
+                            className="px-2.5 py-1 text-xs disabled:opacity-35"
+                            onClick={() => {
+                              const reason = promptRequiredReason(t("moderation.prompt.exampleRejectReason"));
+                              if (!reason) {
+                                return;
+                              }
+                              rejectExampleMutation.mutate({ exampleId: example.id, reason });
+                            }}
+                            disabled={rejectExampleMutation.isPending}
+                          >
+                            {rejectExampleMutation.isPending
+                              ? t("moderation.rejecting")
+                              : t("moderation.reject")}
+                          </Button>
+                        ) : null}
                       </>
                     ) : null}
                     {canEditThisExample ? (
                       <Button
                         type="button"
                         variant="secondary"
+                        className="px-2.5 py-1 text-xs"
                         onClick={() => {
                           if (isEditingThisExample) {
                             cancelEditingExample();
@@ -1263,6 +1300,7 @@ export function EntryDetailPage() {
                       <Button
                         type="button"
                         variant="ghost"
+                        className="px-2.5 py-1 text-xs"
                         onClick={() => reportExampleMutation.mutate(example.id)}
                         disabled={reportExampleMutation.isPending}
                       >

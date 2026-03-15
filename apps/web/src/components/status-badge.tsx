@@ -20,7 +20,6 @@ export function StatusBadge({ status, showPending = false }: Props) {
       <span className="group relative inline-flex">
         <span
           className="inline-flex h-6 w-6 cursor-help items-center justify-center rounded-full bg-sky-600 text-sm font-bold text-white outline-none"
-          title={tooltip}
           aria-label={tooltip}
           aria-describedby={tooltipId}
           tabIndex={0}

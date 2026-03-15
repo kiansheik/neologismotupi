@@ -1,6 +1,7 @@
 import { createBrowserRouter } from "react-router-dom";
 
 import { AppShell } from "@/components/app-shell";
+import { AboutPage } from "@/routes/about-page";
 import { EntriesPage } from "@/routes/entries-page";
 import { EntryDetailPage } from "@/routes/entry-detail-page";
 import { LoginPage } from "@/routes/login-page";
@@ -20,6 +21,7 @@ export const router = createBrowserRouter([
     children: [
       { index: true, element: <EntriesPage /> },
       { path: "entries", element: <EntriesPage /> },
+      { path: "about", element: <AboutPage /> },
       { path: "entries/:slug", element: <EntryDetailPage /> },
       { path: "profiles/:userId", element: <ProfilePage /> },
       { path: "submit", element: <SubmitPage /> },

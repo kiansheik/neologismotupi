@@ -36,6 +36,7 @@ export function AppShell() {
   const hasDedicatedPageSeo =
     normalizedPath === "/" ||
     normalizedPath === "/entries" ||
+    normalizedPath === "/about" ||
     normalizedPath.startsWith("/entries/") ||
     normalizedPath.startsWith("/profiles/");
   const noindexRoutes = new Set([
@@ -176,6 +177,24 @@ export function AppShell() {
       <main className="mx-auto max-w-6xl px-4 py-6">
         <Outlet />
       </main>
+      <footer className="border-t border-[#d8cbb4] bg-[#f8efde]/70">
+        <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-2 px-4 py-3 text-xs text-slate-700">
+          <p>{t("footer.tagline")}</p>
+          <div className="inline-flex items-center gap-3">
+            <Link to="/about" className="text-brand-700 hover:underline">
+              {t("nav.about")}
+            </Link>
+            <a
+              className="text-brand-700 hover:underline"
+              href={(import.meta.env.VITE_GITHUB_URL as string | undefined)?.trim() || "https://github.com/kiansheik/neologismotupi"}
+              target="_blank"
+              rel="noreferrer"
+            >
+              {t("footer.github")}
+            </a>
+          </div>
+        </div>
+      </footer>
     </div>
   );
 }

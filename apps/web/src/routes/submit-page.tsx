@@ -21,6 +21,7 @@ import { createEntry, listEntries } from "@/features/entries/api";
 type SubmitForm = {
   headword: string;
   gloss_pt: string;
+  gloss_en?: string;
   part_of_speech?: string;
   short_definition?: string;
   source_citation?: string;
@@ -38,6 +39,7 @@ export function SubmitPage() {
     defaultValues: {
       headword: "",
       gloss_pt: "",
+      gloss_en: "",
       part_of_speech: "",
       short_definition: "",
       source_citation: "",
@@ -89,6 +91,7 @@ export function SubmitPage() {
     const schema = z.object({
       headword: z.string().trim().min(1, t("submit.error.headwordRequired")),
       gloss_pt: z.string().trim().min(1, t("submit.error.glossRequired")),
+      gloss_en: z.string().trim().max(255).optional(),
       part_of_speech: z.string().optional(),
       short_definition: z.string().trim().optional(),
       source_citation: z.string().trim().max(500).optional(),
@@ -192,14 +195,24 @@ export function SubmitPage() {
         )}
 
         <div>
-          <label className="mb-1 block text-sm font-medium" htmlFor="gloss_pt">
-            {t("submit.glossPt")} *
-          </label>
-          <p className="mb-1 text-xs text-slate-600">{t("submit.help.glossPt")}</p>
-          <Input id="gloss_pt" {...form.register("gloss_pt")} />
-          {form.formState.errors.gloss_pt?.message ? (
-            <p className="mt-1 text-xs text-red-700">{form.formState.errors.gloss_pt.message}</p>
-          ) : null}
+          <p className="mb-2 text-xs text-slate-600">{t("submit.help.glossBlurb")}</p>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div>
+              <label className="mb-1 block text-sm font-medium" htmlFor="gloss_pt">
+                {t("submit.glossPt")} *
+              </label>
+              <Input id="gloss_pt" {...form.register("gloss_pt")} />
+              {form.formState.errors.gloss_pt?.message ? (
+                <p className="mt-1 text-xs text-red-700">{form.formState.errors.gloss_pt.message}</p>
+              ) : null}
+            </div>
+            <div>
+              <label className="mb-1 block text-sm font-medium" htmlFor="gloss_en">
+                {t("submit.glossEn")} ({t("form.optional")})
+              </label>
+              <Input id="gloss_en" {...form.register("gloss_en")} />
+            </div>
+          </div>
         </div>
 
         <div>

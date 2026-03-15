@@ -75,6 +75,7 @@ function buildSitemapXml(siteUrl, entryRoutes) {
   const now = new Date().toISOString();
   const staticRoutes = [
     { path: "/", changefreq: "daily", priority: "1.0", lastmod: now },
+    { path: "/about", changefreq: "monthly", priority: "0.7", lastmod: now },
     { path: "/submit", changefreq: "weekly", priority: "0.6", lastmod: now },
   ];
 
@@ -149,4 +150,3 @@ main().catch((error) => {
   console.error("[seo] Failed to generate SEO files.", error);
   process.exitCode = 1;
 });
-
