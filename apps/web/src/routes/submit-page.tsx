@@ -228,6 +228,10 @@ export function SubmitPage() {
   return (
     <Card>
       <h1 className="text-xl font-semibold text-brand-900">{t("submit.title")}</h1>
+      {/* Orthography Notice */}
+      <div className="mt-2 mb-3 rounded border border-blue-200 bg-blue-50 p-2 text-xs text-blue-900">
+        {t("submit.orthographyNotice")}
+      </div>
       <p className="mt-1 text-xs text-slate-600">{t("form.requiredLegend")}</p>
       <p className="mt-1 text-xs text-slate-600">{t("submit.onlyRequired")}</p>
       <form

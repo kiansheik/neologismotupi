@@ -4,6 +4,7 @@ export const ptBR = {
   "language.en-US": "English (US)",
   "language.tupi-BR": "Tupi Brasil",
   "form.requiredLegend": "Campos com * são obrigatórios.",
+    "submit.orthographyNotice": "Por favor, siga a ortografia de Navarro conforme mostrada no dicionário kiansheik.io/nhe-enga ao enviar verbetes. Os comentários podem ser livres. Todas as entradas devem ser padronizadas e sem caracteres especiais. No futuro, será possível escolher a ortografia preferida para exibição, mas a entrada precisa ser padronizada. Obrigado pela compreensão.",
   "form.optional": "opcional",
 
   "nav.entries": "Verbetes",
@@ -444,6 +445,7 @@ export const enUS: Record<TranslationKey, string> = {
   "language.en-US": "English (US)",
   "language.tupi-BR": "Tupi Brasil",
   "form.requiredLegend": "Fields marked with * are required.",
+    "submit.orthographyNotice": "Please follow the Navarro orthography as shown in the dictionary kiansheik.io/nhe-enga when submitting entries. Comments can be free-form. All inputs must be standardized and without special characters. In the future, you will be able to choose your preferred orthography for display, but input must be standardized. Thank you for understanding.",
   "form.optional": "optional",
 
   "nav.entries": "Entries",
