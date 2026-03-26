@@ -16,7 +16,7 @@ async def main() -> None:
     now = datetime.now(UTC).isoformat()
     await send_email(
         to_email=to_email,
-        subject="Teste de e-mail - Nheenga Neologismos",
+        subject="Teste de e-mail - Dicionário de Tupi",
         body=(
             "Este e-mail confirma que a configuração SMTP está funcionando.\n\n"
             f"Timestamp (UTC): {now}\n"

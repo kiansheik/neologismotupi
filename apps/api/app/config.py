@@ -56,7 +56,7 @@ class Settings(BaseSettings):
     smtp_username: str | None = None
     smtp_password: str | None = None
     smtp_from_email: str | None = None
-    smtp_from_name: str = "Nheenga Neologismos"
+    smtp_from_name: str = "Dicionário de Tupi"
     smtp_use_tls: bool = True
     host_disk_usage_path: str = "/"
 

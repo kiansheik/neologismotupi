@@ -125,7 +125,7 @@ Important:
 Set environment variables in Pages:
 
 - `VITE_API_BASE_URL=https://api.academiatupi.com/api`
-- `VITE_APP_NAME=Nheenga Neologismos`
+- `VITE_APP_NAME=Dicionário de Tupi`
 - `VITE_TURNSTILE_SITE_KEY=<your-site-key-or-empty>`
 - `VITE_GA_MEASUREMENT_ID=G-XXXXXXXXXX`
 

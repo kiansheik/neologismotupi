@@ -32,11 +32,11 @@ export function ProfilePage() {
   const seoProfile = userQuery.data?.profile;
   useSeo({
     title: seoProfile
-      ? `${seoProfile.display_name} | ${import.meta.env.VITE_APP_NAME ?? "Nheenga Neologismos"}`
-      : `${t("profile.loading")} | ${import.meta.env.VITE_APP_NAME ?? "Nheenga Neologismos"}`,
+      ? `${seoProfile.display_name} | ${import.meta.env.VITE_APP_NAME ?? "Dicionário de Tupi"}`
+      : `${t("profile.loading")} | ${import.meta.env.VITE_APP_NAME ?? "Dicionário de Tupi"}`,
     description: seoProfile
       ? `Perfil da comunidade Tupi de ${seoProfile.display_name} com verbetes publicados, comentários e atividade recente.`
-      : "Perfil da comunidade de Tupi moderno.",
+      : "Perfil da comunidade de Tupi.",
     canonicalPath: userId ? `/profiles/${userId}` : "/",
     locale,
     structuredData: seoProfile

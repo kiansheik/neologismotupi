@@ -14,7 +14,7 @@ interface SeoOptions {
 }
 
 const FALLBACK_SITE_URL = "https://neo.academiatupi.com";
-const FALLBACK_SITE_NAME = "Academia Tupi - Nheenga Neologismos";
+const FALLBACK_SITE_NAME = "Academia Tupi - Dicionário de Tupi";
 const STRUCTURED_DATA_ID = "nheenga-structured-data";
 
 function getSiteUrl(): string {

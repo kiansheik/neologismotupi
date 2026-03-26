@@ -9,7 +9,7 @@ const CONTACT_EMAIL = "ksheik@usp.br";
 
 export function AboutPage() {
   const { locale, t } = useI18n();
-  const appName = import.meta.env.VITE_APP_NAME ?? "Nheenga Neologismos";
+  const appName = import.meta.env.VITE_APP_NAME ?? "Dicionário de Tupi";
 
   useSeo({
     title: `${t("about.title")} | ${appName}`,

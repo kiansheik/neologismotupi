@@ -1,7 +1,7 @@
 # Product Spec (MVP)
 
 ## Mission
-Nheenga Neologismos is a community record of proposed and attested contemporary Tupi usage.
+Dicionário de Tupi is a living, community-built dictionary of Tupi usage - historical and contemporary.
 It is not an official dictionary and does not claim institutional authority.
 
 ## User groups

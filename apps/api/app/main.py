@@ -29,9 +29,9 @@ def create_app() -> FastAPI:
     settings = get_settings()
 
     app = FastAPI(
-        title="Nheenga Neologismos API",
+        title="Dicionário de Tupi API",
         version="0.1.0",
-        description="Community-driven platform API for proposed and attested contemporary Tupi usage",
+        description="Community-driven API for a living Tupi dictionary with historical and contemporary usage",
     )
 
     app.add_middleware(

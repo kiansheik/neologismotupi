@@ -153,7 +153,7 @@ export const ptBR = {
   "submit.sourceUrl": "URL",
   "submit.sourceSuggestionsTitle": "Fontes já cadastradas",
   "submit.morphologyNotes": "Etimologia",
-  "submit.help.headword": "A forma principal do neologismo, sem explicação longa.",
+  "submit.help.headword": "A forma principal do verbete (palavra ou expressão), sem explicação longa.",
   "submit.help.glossPt":
     "Campo obrigatório. Use uma palavra ou expressão curta em português que melhor represente o sentido.",
   "submit.help.glossBlurb":
@@ -164,7 +164,7 @@ export const ptBR = {
   "submit.help.sourceCitation":
     "Informe a fonte quando houver (obra, página, link ou referência de atestação).",
   "submit.help.morphologyNotes":
-    "Explique como a palavra foi criada: origem, inspiração, metodologia e escolhas de formação.",
+    "Explique a origem, etimologia ou contexto de uso. Se for um neologismo, descreva como foi criado.",
   "submit.exampleTitle": "Exemplo de verbete com boa avaliação",
   "submit.exampleLoading": "Buscando exemplo...",
   "submit.exampleEmpty": "Ainda não há exemplo disponível para referência.",
@@ -383,19 +383,19 @@ export const ptBR = {
   "source.inEntry": "No verbete: {headword}",
   "source.firstRegistered": "Primeiro registro: {date}",
 
-  "home.title": "Nheenga Neologismos",
+  "home.title": "Dicionário de Tupi",
   "home.subtitle":
-    "Registro comunitário de usos contemporâneos de Tupi propostos e atestados. Esta plataforma não é um dicionário oficial.",
+    "Dicionário vivo e comunitário de Tupi - histórico e contemporâneo - com verbetes propostos, atestados e discutidos publicamente. Não é um dicionário oficial.",
   "home.browse": "Buscar verbetes",
-  "home.submit": "Enviar proposta",
+  "home.submit": "Enviar verbete",
   "home.recent": "Verbetes recentes",
   "home.noEntries": "Ainda não há verbetes.",
   "about.title": "Sobre",
   "about.seoDescription":
-    "Nheenga Neologismos é uma plataforma comunitária para registrar, discutir e validar neologismos em Tupi com histórico aberto, karma e revisão transparente.",
-  "about.heading": "Sobre o Nheenga Neologismos",
+    "Dicionário de Tupi é um dicionário vivo e comunitário, com verbetes históricos e contemporâneos, histórico aberto, karma e moderação transparente.",
+  "about.heading": "Sobre o Dicionário de Tupi",
   "about.p1":
-    "Este projeto nasceu da necessidade de criar um lugar centralizado para encontrar, registrar e deliberar neologismos em Tupi Antigo, que hoje também é moderno em uso comunitário.",
+    "Este projeto nasceu da necessidade de criar um lugar centralizado para registrar e discutir usos de Tupi - históricos, regionais e contemporâneos - com revisão comunitária.",
   "about.p2":
     "Aqui, qualquer pessoa pode usar o site gratuitamente para documentar palavras e discutir ideias de uso. Um verbete pode ser rigoroso, com citações e exemplos, ou simples, com uma glosa curta.",
   "about.p3":
@@ -403,7 +403,7 @@ export const ptBR = {
   "about.p4":
     "Sem check azul não significa conteúdo ruim: a plataforma é comunitária e em evolução constante. A ideia é fortalecer a comunidade Tupi e inspirar outras iniciativas de revitalização linguística.",
   "about.p5":
-    "O futuro do projeto é incerto, mas brilhante. Vamos criar palavras novas.",
+    "O futuro do projeto é incerto, mas brilhante. Vamos manter o dicionário vivo - com palavras antigas, atuais e novas.",
   "about.motto.quote": "O uso será o melhor mestre",
   "about.motto.author":
     "São Padre José de Anchieta, autor da primeira gramática em Tupi.",
@@ -594,7 +594,7 @@ export const enUS: Record<TranslationKey, string> = {
   "submit.sourceUrl": "URL",
   "submit.sourceSuggestionsTitle": "Existing sources",
   "submit.morphologyNotes": "Etymology",
-  "submit.help.headword": "The main neologism form, without long explanation.",
+  "submit.help.headword": "The main headword (word or expression), without a long explanation.",
   "submit.help.glossPt":
     "Required field. Use a short Portuguese word or phrase that best represents the meaning.",
   "submit.help.glossBlurb":
@@ -605,7 +605,7 @@ export const enUS: Record<TranslationKey, string> = {
   "submit.help.sourceCitation":
     "Optional. Add source details when available (work, page, link, or attestation reference).",
   "submit.help.morphologyNotes":
-    "Optional. Explain how the word was built: origin, inspiration, methodology, and formation choices.",
+    "Optional. Explain the origin, etymology, or usage context. If it is a neologism, describe how it was formed.",
   "submit.exampleTitle": "Well-rated entry example",
   "submit.exampleLoading": "Loading example...",
   "submit.exampleEmpty": "No reference example is available yet.",
@@ -824,26 +824,27 @@ export const enUS: Record<TranslationKey, string> = {
   "source.inEntry": "In entry: {headword}",
   "source.firstRegistered": "First registered: {date}",
 
-  "home.title": "Nheenga Neologismos",
+  "home.title": "Dicionário de Tupi",
   "home.subtitle":
-    "Community record of proposed and attested contemporary Tupi usage. This is a community platform, not an official dictionary.",
+    "A living, community-built Tupi dictionary - historical and contemporary - with entries proposed, attested, and discussed in public. It is not an official dictionary.",
   "home.browse": "Browse entries",
-  "home.submit": "Submit a proposal",
+  "home.submit": "Submit an entry",
   "home.recent": "Recent entries",
   "home.noEntries": "No entries yet.",
   "about.title": "About",
   "about.seoDescription":
-    "Nheenga Neologismos is a community platform to register, discuss, and validate Tupi neologisms with open history, karma, and transparent moderation.",
-  "about.heading": "About Nheenga Neologismos",
+    "Dicionário de Tupi is a living, community-run dictionary with historical and contemporary entries, open history, karma, and transparent moderation.",
+  "about.heading": "About Dicionário de Tupi",
   "about.p1":
-    "This project was born from the need for a centralized place to find, register, and deliberate neologisms for Old Tupi, now actively renewed in community use.",
+    "This project was born from the need for a centralized place to register and discuss Tupi usage - historical, regional, and contemporary - with community review.",
   "about.p2":
     "Anyone can use the site for free to document words and discuss usage ideas. Entries can be rigorous with citations and examples, or simple with a short gloss.",
   "about.p3":
     "Each user has karma (reputation), which works as a community trust signal. Entries become public immediately. When reviewed by a fluent moderator, content receives a blue checkmark as a quality seal.",
   "about.p4":
     "No blue check does not mean bad content: this is community-driven and always evolving. The goal is to support the Tupi community and inspire other revitalization projects.",
-  "about.p5": "The future of the project is uncertain, but bright. Let us make new words.",
+  "about.p5":
+    "The future of the project is uncertain, but bright. Let's keep the dictionary alive with old, current, and new words.",
   "about.motto.quote": "Use is the best teacher",
   "about.motto.author":
     "Saint Father José de Anchieta, writer of the first grammar in Tupi.",

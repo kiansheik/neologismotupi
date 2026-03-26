@@ -57,7 +57,7 @@ def _public_url(path: str, token: str) -> str:
 
 async def send_password_reset_email(*, to_email: str, token: str) -> None:
     link = _public_url("/reset-password", token)
-    subject = "Redefinir senha - Nheenga Neologismos"
+    subject = "Redefinir senha - Dicionário de Tupi"
     body = (
         "Recebemos um pedido para redefinir sua senha.\n\n"
         f"Acesse este link para continuar:\n{link}\n\n"
@@ -68,7 +68,7 @@ async def send_password_reset_email(*, to_email: str, token: str) -> None:
 
 async def send_email_verification_email(*, to_email: str, token: str) -> None:
     link = _public_url("/verify-email", token)
-    subject = "Verifique seu e-mail - Nheenga Neologismos"
+    subject = "Verifique seu e-mail - Dicionário de Tupi"
     body = (
         "Precisamos confirmar seu e-mail antes de continuar.\n\n"
         f"Acesse este link para verificar:\n{link}\n\n"

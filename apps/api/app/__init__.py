@@ -1,1 +1,1 @@
-"""Nheenga API package."""
+"""Dicionário de Tupi API package."""

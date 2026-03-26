@@ -1,12 +1,12 @@
-# Nheenga Neologismos
+# Dicionário de Tupi
 
-Community record of proposed and attested contemporary Tupi usage.
+Community-built living dictionary of Tupi usage, historical and contemporary.
 
 ## What this project is
-Nheenga Neologismos is a community platform for collecting, reviewing, and discussing neologism proposals and usage examples. It is not an official dictionary.
+Dicionário de Tupi is a community platform for collecting, reviewing, and discussing Tupi entries and usage examples - historical, contemporary, and newly coined. It is not an official dictionary.
 
 ## Why it exists
-People already create contemporary Tupi usage in classrooms, communities, and online spaces. This project gives those proposals a transparent, versioned, moderateable record.
+People already use, study, and document Tupi in classrooms, communities, archives, and online spaces. This project gives those entries a transparent, versioned, moderateable record.
 
 ## Current MVP scope
 - Account signup/login/logout with httpOnly session cookies.
@@ -217,7 +217,7 @@ SMTP_PORT=587
 SMTP_USERNAME=
 SMTP_PASSWORD=
 SMTP_FROM_EMAIL=
-SMTP_FROM_NAME="Nheenga Neologismos"
+SMTP_FROM_NAME="Dicionário de Tupi"
 SMTP_USE_TLS=true
 VERIFICATION_TOKEN_TTL_MINUTES=30
 PASSWORD_RESET_TOKEN_TTL_MINUTES=30
@@ -274,7 +274,7 @@ Docker deploy stack note (Namecheap relay default):
 ```env
 VITE_API_BASE_URL=http://localhost:8000/api
 VITE_SITE_URL=http://localhost:5173
-VITE_APP_NAME=Nheenga Neologismos
+VITE_APP_NAME=Dicionário de Tupi
 VITE_TURNSTILE_SITE_KEY=
 VITE_GA_MEASUREMENT_ID=
 ```
@@ -295,7 +295,7 @@ Turnstile note:
 ```env
 VITE_API_BASE_URL=https://api.academiatupi.com/api
 VITE_SITE_URL=https://neo.academiatupi.com
-VITE_APP_NAME=Nheenga Neologismos
+VITE_APP_NAME=Dicionário de Tupi
 VITE_TURNSTILE_SITE_KEY=
 VITE_GA_MEASUREMENT_ID=G-XXXXXXXXXX
 ```

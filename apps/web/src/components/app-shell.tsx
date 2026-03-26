@@ -53,7 +53,7 @@ export function AppShell() {
     (route) => normalizedPath === route || normalizedPath.startsWith(`${route}/`),
   );
 
-  let pageTitle = import.meta.env.VITE_APP_NAME ?? "Nheenga Neologismos";
+  let pageTitle = import.meta.env.VITE_APP_NAME ?? "Dicionário de Tupi";
   if (normalizedPath === "/submit") {
     pageTitle = `${t("submit.title")} | ${pageTitle}`;
   } else if (normalizedPath === "/login") {
@@ -65,13 +65,13 @@ export function AppShell() {
   } else if (normalizedPath === "/me") {
     pageTitle = `${t("me.title")} | ${pageTitle}`;
   } else if (normalizedPath === "/" || normalizedPath === "/entries") {
-    pageTitle = `Dicionário vivo de Tupi moderno | ${pageTitle}`;
+    pageTitle = `Dicionário vivo de Tupi | ${pageTitle}`;
   }
 
   useSeo({
     title: pageTitle,
     description:
-      "Comunidade para registrar, buscar e discutir verbetes de Tupi moderno com histórico e moderação transparente.",
+      "Comunidade para registrar, buscar e discutir verbetes de Tupi - históricos e contemporâneos - com histórico aberto e moderação transparente.",
     canonicalPath: normalizedPath,
     noindex: shouldNoindex,
     locale,
@@ -80,7 +80,7 @@ export function AppShell() {
         ? {
             "@context": "https://schema.org",
             "@type": "WebSite",
-            name: import.meta.env.VITE_APP_NAME ?? "Nheenga Neologismos",
+            name: import.meta.env.VITE_APP_NAME ?? "Dicionário de Tupi",
             url: buildAbsoluteUrl("/"),
             inLanguage: "pt-BR",
             potentialAction: {
@@ -110,7 +110,7 @@ export function AppShell() {
       <header className="border-b border-[#d8cbb4] bg-[#f8efde]/95 backdrop-blur">
         <nav className="mx-auto flex max-w-6xl flex-col gap-3 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
           <Link to="/" className="min-w-0 text-base font-semibold text-brand-800 sm:text-lg">
-            {import.meta.env.VITE_APP_NAME ?? "Nheenga Neologismos"}
+            {import.meta.env.VITE_APP_NAME ?? "Dicionário de Tupi"}
           </Link>
           <div className="flex w-full flex-wrap items-center gap-2 text-sm sm:w-auto sm:justify-end">
             <Link

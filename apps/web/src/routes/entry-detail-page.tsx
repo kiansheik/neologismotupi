@@ -393,11 +393,11 @@ export function EntryDetailPage() {
   });
 
   const entryPageTitle = entry
-    ? `${entry.headword} | ${import.meta.env.VITE_APP_NAME ?? "Nheenga Neologismos"}`
-    : `${t("entry.loading")} | ${import.meta.env.VITE_APP_NAME ?? "Nheenga Neologismos"}`;
+    ? `${entry.headword} | ${import.meta.env.VITE_APP_NAME ?? "Dicionário de Tupi"}`
+    : `${t("entry.loading")} | ${import.meta.env.VITE_APP_NAME ?? "Dicionário de Tupi"}`;
   const entryDescription = entry
     ? buildEntryMetaDescription(entry)
-    : "Verbete de Tupi moderno com histórico de revisões, exemplos e validação comunitária.";
+    : "Verbete de Tupi com histórico de revisões, exemplos e validação comunitária.";
   useSeo({
     title: entryPageTitle,
     description: entryDescription,
