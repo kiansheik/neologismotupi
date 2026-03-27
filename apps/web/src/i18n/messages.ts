@@ -290,7 +290,7 @@ export const ptBR = {
 
   "audio.sectionTitle": "Áudio",
   "audio.entryTitle": "Pronúncia do verbete",
-  "audio.entryHelp": "Envie uma gravação de pronúncia para este verbete.",
+  "audio.entryHelp": "Envie uma gravação de pronúncia para este verbete. Diga a palavra apenas uma vez.",
   "audio.exampleTitle": "Pronúncia do exemplo",
   "audio.noSamples": "Ainda não há gravações.",
   "audio.uploadButton": "Enviar áudio",
@@ -796,7 +796,7 @@ export const enUS: Record<TranslationKey, string> = {
 
   "audio.sectionTitle": "Audio",
   "audio.entryTitle": "Entry pronunciation",
-  "audio.entryHelp": "Upload a pronunciation recording for this entry.",
+  "audio.entryHelp": "Upload a pronunciation recording for this entry. Say the word only once.",
   "audio.exampleTitle": "Example pronunciation",
   "audio.noSamples": "No recordings yet.",
   "audio.uploadButton": "Upload audio",
