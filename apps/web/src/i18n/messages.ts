@@ -1009,7 +1009,7 @@ export const enUS: Record<TranslationKey, string> = {
 };
 
 const tupiOverrides: Partial<Record<TranslationKey, string>> = {
-  "language.tupi-BR": "Tupi Brasil",
+  "language.tupi-BR": "Tupi (Pindorama)",
   "language.label": "Nhe'enga",
   "language.pt-BR": "Peronhe'enga (Pindorama)",
   "language.en-US": "English (US)",
@@ -1024,6 +1024,34 @@ const tupiOverrides: Partial<Record<TranslationKey, string>> = {
   "nav.logout": "Esem",
   "nav.login": "Eîké",
   "nav.signup": "Îekuabegûaba monhanga",
+
+  "status.pending": "sanhẽba'e",
+  "status.approved": "temiporu",
+  "status.disputed": "oîomoaîuabo",
+  "status.rejected": "i memûãba'e",
+  "status.archived": "sarombyra",
+  "status.hidden": "i mokanhembyra",
+
+  "entries.title": "Esekar temimondó",
+  "entries.searchAria": "Esekar temimondó",
+  "entries.searchPlaceholder": "Tesekar tupinhe'enga pupé konipó perónhe'enga pupé",
+
+  "entries.allStatuses": "Todos os status",
+  "entries.sort.alphabetical": "Alfabética",
+  "entries.sort.recent": "Recentes",
+  "entries.sort.score": "Pontuação",
+  "entries.sort.mostExamples": "Mais exemplos",
+  "entries.resultsTitle": "Resultados",
+  "entries.loading": "Carregando verbetes...",
+  "entries.loadingMore": "Carregando mais verbetes...",
+  "entries.noMatches": "Nenhum verbete encontrado.",
+  "entries.scoreExamples": "Pontuação: {score} · Exemplos: {examples}",
+  "entries.submittedBy": "Enviado por",
+  "reputation.label": "Karma: {score}",
+  "badge.founder": "Fundador construtor",
+  "badge.topContributor": "Mais dedicado",
+  "badge.karmaLeader": "Mais popular (qualidade)",
+  "badge.community": "Comunidade",  
 };
 
 export const tupiBrasil: Record<TranslationKey, string> = {
