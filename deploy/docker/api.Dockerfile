@@ -5,7 +5,7 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     UV_LINK_MODE=copy
 
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends build-essential ca-certificates curl ffmpeg \
+    && apt-get install -y --no-install-recommends build-essential ca-certificates curl ffmpeg tzdata \
     && rm -rf /var/lib/apt/lists/*
 
 RUN pip install --no-cache-dir uv

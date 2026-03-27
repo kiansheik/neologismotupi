@@ -1,0 +1,10 @@
+[Unit]
+Description=Daily Palavra do Dia newsletter timer
+
+[Timer]
+OnCalendar=*-*-* 10:00:00
+Persistent=true
+Unit=nheenga-word-of-day.service
+
+[Install]
+WantedBy=timers.target

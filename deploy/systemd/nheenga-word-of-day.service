@@ -1,0 +1,15 @@
+[Unit]
+Description=Send Nheenga Palavra do Dia newsletter
+After=network-online.target docker.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=deploy
+Group=deploy
+WorkingDirectory=/srv/nheenga-neologismos
+Environment=API_ENV_FILE=/srv/nheenga-neologismos/apps/api/.env.production
+Environment=COMPOSE_FILE=/srv/nheenga-neologismos/deploy/docker-compose.remote.yml
+Environment=STACK_ENV_FILE=/srv/nheenga-neologismos/deploy/env/stack.env
+Environment=RUN_MODE=auto
+ExecStart=/srv/nheenga-neologismos/scripts/send-word-of-day.sh

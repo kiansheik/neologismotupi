@@ -29,6 +29,24 @@ services:
       smtp-relay:
         condition: service_started
 
+  newsletter-scheduler:
+    build:
+      context: ..
+      dockerfile: deploy/docker/api.Dockerfile
+    restart: unless-stopped
+    env_file:
+      - ./env/api.env
+    environment:
+      APP_RELEASE: ${APP_RELEASE:-}
+      NEWSLETTER_WORD_OF_DAY_TZ: ${NEWSLETTER_WORD_OF_DAY_TZ:-America/Sao_Paulo}
+      NEWSLETTER_WORD_OF_DAY_TIME: ${NEWSLETTER_WORD_OF_DAY_TIME:-10:00}
+    command: ["uv", "run", "python", "-m", "app.core.schedule_word_of_day"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+      smtp-relay:
+        condition: service_started
+
   smtp-relay:
     image: boky/postfix:latest
     restart: unless-stopped
