@@ -1008,7 +1008,25 @@ export const enUS: Record<TranslationKey, string> = {
   "api.request_failed": "Request failed.",
 };
 
+const tupiOverrides: Partial<Record<TranslationKey, string>> = {
+  "language.tupi-BR": "Tupi Brasil",
+  "language.label": "Nhe'enga",
+  "language.pt-BR": "Peronhe'enga (Pindorama)",
+  "language.en-US": "English (US)",
+  "form.requiredLegend": "opá '*' pupendûara i moporypyramamo sekóû.",
+ "form.optional": "nde remimotarybo",
+
+   "nav.entries": "Temimondó",
+  "nav.submit": "Eîmondó",
+  "nav.about": "Asé resé",
+  "nav.moderation": "Moderação",
+  "nav.me": "Xe îekuabegûaba",
+  "nav.logout": "Esem",
+  "nav.login": "Eîké",
+  "nav.signup": "Îekuabegûaba monhanga",
+};
+
 export const tupiBrasil: Record<TranslationKey, string> = {
   ...ptBR,
-  "language.tupi-BR": "Tupi Brasil",
+  ...tupiOverrides,
 };
