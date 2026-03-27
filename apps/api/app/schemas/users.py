@@ -63,3 +63,13 @@ class ProfileUpdateRequest(BaseModel):
     tiktok_handle: str | None = Field(default=None, max_length=120)
     youtube_handle: str | None = Field(default=None, max_length=120)
     bluesky_handle: str | None = Field(default=None, max_length=253)
+
+
+class UserPreferencesOut(BaseModel):
+    preferred_locale: str
+
+    model_config = {"from_attributes": True}
+
+
+class UserPreferencesUpdate(BaseModel):
+    preferred_locale: str | None = Field(default=None, max_length=16)

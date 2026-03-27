@@ -242,6 +242,16 @@ export interface User {
   profile: Profile | null;
 }
 
+export interface UserPreferences {
+  preferred_locale: string;
+}
+
+export interface NewsletterSubscription {
+  newsletter_key: string;
+  is_active: boolean;
+  preferred_locale: string;
+}
+
 export interface PublicUser {
   id: string;
   created_at: string;

@@ -8,6 +8,8 @@ DEPLOY_HOST ?= academiatupi.com
 DEPLOY_USER ?= root
 DEPLOY_PATH ?= /srv/nheenga-neologismos
 SSH_IDENTITY ?= $(HOME)/.ssh/neologismotupi_ed25519
+SSH_PORT ?= 22
+REMOTE_API_ENV_FILE ?= /srv/nheenga-neologismos/apps/api/.env.production
 DEPLOY_API_URL ?= https://api.academiatupi.com
 DEPLOY_SMOKE_ORIGIN ?= https://neo.academiatupi.com
 DEPLOY_SMOKE_RETRIES ?= 60
@@ -19,7 +21,7 @@ API_DIR := apps/api
 WEB_DIR := apps/web
 API_ENV_FILE ?= .env
 
-.PHONY: help bootstrap-macos bootstrap-linux install dev dev-web dev-api web-build prod-check prod-migrate db-create db-migrate db-reset db-rebuild seed test-email db-backup db-dump-docker db-restore-dump migrate-legacy-entry-source deploy-migrate-legacy-entry-source deploy-full deploy-daily deploy-reset deploy-smoke deploy-ssh-all deploy-email-test deploy-smtp-logs deploy-api-logs deploy-api-logs-follow deploy-db-psql bootstrap-admin change-user-password test test-web test-api test-e2e lint format
+.PHONY: help bootstrap-macos bootstrap-linux install dev dev-web dev-api web-build prod-check prod-migrate db-create db-migrate db-reset db-rebuild seed test-email newsletter-word-of-day newsletter-word-of-day-prod db-backup db-backup-prod db-dump-docker db-restore-dump db-restore-docker db-psql-docker migrate-legacy-entry-source deploy-migrate-legacy-entry-source deploy-full deploy-daily deploy-reset deploy-smoke deploy-ssh-all deploy-email-test deploy-smtp-logs deploy-api-logs deploy-api-logs-follow deploy-db-psql bootstrap-admin change-user-password test test-web test-api test-e2e lint format
 
 help:
 	@echo "Available targets:"
@@ -38,9 +40,14 @@ help:
 	@echo "  make db-rebuild       # Reset database and seed from CSV"
 	@echo "  make seed             # Seed from CSV only"
 	@echo "  make test-email TO=<recipient@email>  # Send SMTP test email with current API env"
+	@echo "  make newsletter-word-of-day [DATE=YYYY-MM-DD] [DRY_RUN=1]  # Send Palavra do Dia"
+	@echo "  make newsletter-word-of-day-prod TO=<recipient@email> [DATE=YYYY-MM-DD] [DRY_RUN=1] [DEPLOY_HOST=...] [DEPLOY_USER=...] [DEPLOY_PATH=...] [SSH_IDENTITY=...]"
 	@echo "  make db-backup        # Create a compressed PostgreSQL backup"
+	@echo "  make db-backup-prod   # Backup prod DB over SSH (auto: docker -> host) and download latest dump"
 	@echo "  make db-dump-docker   # Dump local Docker postgres to backups/"
 	@echo "  make db-restore-dump DUMP_FILE=<file> DATABASE_URL=<url>  # Restore dump into target DB"
+	@echo "  make db-restore-docker [DUMP_FILE=<file>] [RESET_DB=1]  # Restore latest backup (prefers prod) into local Docker DB"
+	@echo "  make db-psql-docker   # Open psql REPL for local Docker postgres"
 	@echo "  make migrate-legacy-entry-source [APPLY=1] [ACTOR_EMAIL=...] [BEFORE_SLUG=mongaturondara] [BEFORE_DATE=YYYY-MM-DD] [LIMIT=100]"
 	@echo "  make deploy-migrate-legacy-entry-source [APPLY=1] [ACTOR_EMAIL=...] [BEFORE_SLUG=mongaturondara] [BEFORE_DATE=YYYY-MM-DD] [LIMIT=100]"
 	@echo "  make deploy-daily     # Fast daily deploy: API build/migrate/restart + smoke checks (no seed/reset)"
@@ -126,14 +133,45 @@ test-email:
 	fi
 	@cd $(API_DIR) && set -a; [ -f .env ] && . ./.env; set +a; uv run python -m app.core.send_test_email "$(TO)"
 
+newsletter-word-of-day:
+	@cd $(API_DIR) && set -a; [ -f .env ] && . ./.env; set +a; \
+	uv run python -m app.core.send_word_of_day \
+		$(if $(TO),--to "$(TO)",) \
+		$(if $(DATE),--date "$(DATE)",) \
+		$(if $(filter 1,$(DRY_RUN)),--dry-run,)
+
+newsletter-word-of-day-prod:
+	@DEPLOY_HOST="$(DEPLOY_HOST)" \
+	DEPLOY_USER="$(DEPLOY_USER)" \
+	DEPLOY_PATH="$(DEPLOY_PATH)" \
+	SSH_IDENTITY="$(SSH_IDENTITY)" \
+	SSH_PORT="$(SSH_PORT)" \
+	REMOTE_API_ENV_FILE="$(REMOTE_API_ENV_FILE)" \
+	bash scripts/newsletter-word-of-day-prod.sh
+
 db-backup:
 	@bash scripts/backup-postgres.sh
+
+db-backup-prod:
+	@DEPLOY_HOST="$(DEPLOY_HOST)" \
+	DEPLOY_USER="$(DEPLOY_USER)" \
+	DEPLOY_PATH="$(DEPLOY_PATH)" \
+	SSH_IDENTITY="$(SSH_IDENTITY)" \
+	SSH_PORT="$(SSH_PORT)" \
+	REMOTE_API_ENV_FILE="$(REMOTE_API_ENV_FILE)" \
+	bash scripts/backup-prod-postgres.sh
 
 db-dump-docker:
 	@bash scripts/dump-docker-postgres.sh
 
 db-restore-dump:
 	@bash scripts/restore-postgres-from-dump.sh
+
+db-restore-docker:
+	@bash scripts/restore-docker-postgres.sh
+
+db-psql-docker:
+	@bash scripts/psql-docker.sh
 
 migrate-legacy-entry-source:
 	@cd $(API_DIR) && set -a; [ -f .env ] && . ./.env; set +a; \

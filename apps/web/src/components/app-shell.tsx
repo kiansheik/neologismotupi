@@ -1,9 +1,10 @@
 import { Link, Outlet, useLocation } from "react-router-dom";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { useEffect } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useEffect, useRef } from "react";
 
 import { useCurrentUser } from "@/features/auth/hooks";
 import { logout } from "@/features/auth/api";
+import { getMyPreferences, updateMyPreferences } from "@/features/users/api";
 import { Button } from "@/components/ui/button";
 import { type Locale, useI18n } from "@/i18n";
 import { initAnalytics, trackEvent, trackPageView } from "@/lib/analytics";
@@ -15,6 +16,20 @@ export function AppShell() {
   const queryClient = useQueryClient();
   const { data: user } = useCurrentUser();
   const { locale, setLocale, t } = useI18n();
+  const lastLocaleSync = useRef<{ userId: string; locale: string } | null>(null);
+
+  const updateLocaleMutation = useMutation({
+    mutationFn: updateMyPreferences,
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["user-preferences"] });
+    },
+  });
+
+  const preferencesQuery = useQuery({
+    queryKey: ["user-preferences"],
+    queryFn: getMyPreferences,
+    enabled: Boolean(user),
+  });
 
   useEffect(() => {
     initAnalytics();
@@ -26,11 +41,56 @@ export function AppShell() {
   }, [location.pathname, location.search]);
 
   useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    if (params.get("utm_source") !== "newsletter") {
+      return;
+    }
+    trackEvent("newsletter_visit", {
+      utm_campaign: params.get("utm_campaign") ?? undefined,
+      utm_content: params.get("utm_content") ?? undefined,
+      utm_medium: params.get("utm_medium") ?? undefined,
+    });
+  }, [location.search]);
+
+  useEffect(() => {
     if (!isTurnstileConfigured()) {
       return;
     }
     void preloadTurnstile();
   }, []);
+
+  useEffect(() => {
+    if (!user) {
+      lastLocaleSync.current = null;
+      return;
+    }
+    if (!preferencesQuery.isFetched) {
+      return;
+    }
+    const next = { userId: user.id, locale };
+    if (
+      lastLocaleSync.current &&
+      lastLocaleSync.current.userId === next.userId &&
+      lastLocaleSync.current.locale === next.locale
+    ) {
+      return;
+    }
+    lastLocaleSync.current = next;
+    updateLocaleMutation.mutate({ preferred_locale: locale });
+  }, [locale, preferencesQuery.isFetched, updateLocaleMutation, user?.id]);
+
+  useEffect(() => {
+    if (!user || !preferencesQuery.data?.preferred_locale) {
+      return;
+    }
+    const serverLocale = preferencesQuery.data.preferred_locale as Locale;
+    if (serverLocale === locale) {
+      lastLocaleSync.current = { userId: user.id, locale: serverLocale };
+      return;
+    }
+    lastLocaleSync.current = { userId: user.id, locale: serverLocale };
+    setLocale(serverLocale);
+  }, [preferencesQuery.data?.preferred_locale, user?.id]);
 
   const normalizedPath = location.pathname === "/entries" ? "/" : location.pathname;
   const hasDedicatedPageSeo =
@@ -48,6 +108,7 @@ export function AppShell() {
     "/reset-password",
     "/me",
     "/moderation",
+    "/unsubscribe",
   ]);
   const shouldNoindex = [...noindexRoutes].some(
     (route) => normalizedPath === route || normalizedPath.startsWith(`${route}/`),

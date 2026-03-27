@@ -36,6 +36,7 @@ from app.services.auth_tokens import (
     create_email_action_token,
 )
 from app.services.email_delivery import send_email_verification_email, send_password_reset_email
+from app.services.newsletters import NEWSLETTER_WORD_OF_DAY, get_or_create_subscription, normalize_locale
 from app.services.rate_limit import enforce_rate_limit
 from app.services.user_badges import get_user_badge_leaders, resolve_user_badges
 
@@ -87,12 +88,20 @@ async def register(
         is_active=True,
         is_verified=not settings.require_verified_email,
         is_superuser=is_admin,
+        preferred_locale=normalize_locale(payload.preferred_locale),
     )
     db.add(user)
     await db.flush()
 
     profile = Profile(user_id=user.id, display_name=payload.display_name)
     db.add(profile)
+
+    await get_or_create_subscription(
+        db,
+        user_id=user.id,
+        newsletter_key=NEWSLETTER_WORD_OF_DAY,
+        preferred_locale=user.preferred_locale,
+    )
 
     if settings.require_verified_email and not user.is_verified:
         verification_token = await create_email_action_token(

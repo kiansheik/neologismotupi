@@ -5,6 +5,7 @@ export interface RegisterPayload {
   email: string;
   password: string;
   display_name: string;
+  preferred_locale?: string;
 }
 
 export interface LoginPayload {

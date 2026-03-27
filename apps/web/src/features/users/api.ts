@@ -1,5 +1,5 @@
 import { apiFetch, withQuery } from "@/lib/api";
-import type { MentionUser, Profile } from "@/lib/types";
+import type { MentionUser, Profile, UserPreferences } from "@/lib/types";
 
 export interface UpdateProfilePayload {
   display_name?: string;
@@ -26,6 +26,23 @@ export function resolveMentionUsers(handles: string[]): Promise<MentionUser[]> {
 
 export function updateMyProfile(payload: UpdateProfilePayload): Promise<Profile> {
   return apiFetch<Profile>("/users/me/profile", {
+    method: "PATCH",
+    body: payload,
+  });
+}
+
+export interface UpdatePreferencesPayload {
+  preferred_locale?: string;
+}
+
+export function getMyPreferences(): Promise<UserPreferences> {
+  return apiFetch<UserPreferences>("/users/me/preferences");
+}
+
+export function updateMyPreferences(
+  payload: UpdatePreferencesPayload,
+): Promise<UserPreferences> {
+  return apiFetch<UserPreferences>("/users/me/preferences", {
     method: "PATCH",
     body: payload,
   });

@@ -22,7 +22,7 @@ type SignupForm = {
 export function SignupPage() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const { t } = useI18n();
+  const { locale, t } = useI18n();
 
   const form = useForm<SignupForm>({
     defaultValues: {
@@ -60,7 +60,7 @@ export function SignupPage() {
       applyZodErrors(parsed.error, form.setError);
       return;
     }
-    signupMutation.mutate(parsed.data);
+    signupMutation.mutate({ ...parsed.data, preferred_locale: locale });
   });
 
   return (

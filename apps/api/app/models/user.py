@@ -10,6 +10,7 @@ from app.models.mixins import TimestampMixin, UUIDPrimaryKeyMixin
 
 if TYPE_CHECKING:
     from app.models.discussion import EntryComment, Notification, NotificationPreference
+    from app.models.newsletter import NewsletterDelivery, NewsletterSubscription
 
 
 class User(Base, UUIDPrimaryKeyMixin, TimestampMixin):
@@ -20,6 +21,7 @@ class User(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     is_verified: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     is_superuser: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    preferred_locale: Mapped[str] = mapped_column(String(16), default="pt-BR", nullable=False)
 
     profile: Mapped["Profile"] = relationship(back_populates="user", uselist=False)
     sessions: Mapped[list["Session"]] = relationship(
@@ -42,6 +44,14 @@ class User(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     received_notifications: Mapped[list["Notification"]] = relationship(
         back_populates="recipient",
         foreign_keys="Notification.recipient_user_id",
+        cascade="all, delete-orphan",
+    )
+    newsletter_subscriptions: Mapped[list["NewsletterSubscription"]] = relationship(
+        back_populates="user",
+        cascade="all, delete-orphan",
+    )
+    newsletter_deliveries: Mapped[list["NewsletterDelivery"]] = relationship(
+        back_populates="user",
         cascade="all, delete-orphan",
     )
 

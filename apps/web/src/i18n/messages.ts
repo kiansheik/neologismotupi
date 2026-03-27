@@ -99,6 +99,15 @@ export const ptBR = {
   "me.profile.role": "Função",
   "me.profile.save": "Salvar perfil",
   "me.profile.saved": "Perfil atualizado.",
+  "me.newslettersTitle": "Boletins por e-mail",
+  "me.newslettersDescription": "Receba conteúdos periódicos do dicionário.",
+  "me.newslettersLocaleNote":
+    "O idioma do boletim acompanha o idioma selecionado no topo.",
+  "me.newslettersLoading": "Carregando boletins...",
+  "me.newslettersSaved": "Preferências de boletim salvas.",
+  "me.newsletterWordOfDay": "Palavra do Dia",
+  "me.newsletterWordOfDayHelp":
+    "Um verbete por dia para inspirar novas contribuições.",
 
   "auth.loginTitle": "Entrar",
   "auth.signupTitle": "Criar conta",
@@ -131,6 +140,13 @@ export const ptBR = {
   "auth.error.passwordMin": "A senha deve ter pelo menos 8 caracteres.",
   "auth.error.displayNameMin": "O nome de exibição deve ter pelo menos 2 caracteres.",
   "auth.error.tokenInvalid": "Token inválido ou muito curto.",
+  "unsubscribe.title": "Cancelar inscrição",
+  "unsubscribe.description": "Estamos processando sua solicitação.",
+  "unsubscribe.missingToken": "Token de cancelamento não encontrado.",
+  "unsubscribe.processing": "Processando cancelamento...",
+  "unsubscribe.success": "Sua inscrição foi cancelada.",
+  "unsubscribe.error": "Não foi possível cancelar a inscrição. Tente novamente.",
+  "unsubscribe.backHome": "Voltar ao dicionário",
 
   "submit.title": "Enviar novo verbete",
   "submit.authRequiredPrefix": "Você precisa de uma conta para enviar verbetes.",
@@ -540,6 +556,15 @@ export const enUS: Record<TranslationKey, string> = {
   "me.profile.role": "Role",
   "me.profile.save": "Save profile",
   "me.profile.saved": "Profile updated.",
+  "me.newslettersTitle": "Email newsletters",
+  "me.newslettersDescription": "Receive periodic updates from the dictionary.",
+  "me.newslettersLocaleNote":
+    "Newsletter language follows the language selected in the header.",
+  "me.newslettersLoading": "Loading newsletters...",
+  "me.newslettersSaved": "Newsletter preferences saved.",
+  "me.newsletterWordOfDay": "Word of the Day",
+  "me.newsletterWordOfDayHelp":
+    "One entry per day to inspire new contributions.",
 
   "auth.loginTitle": "Login",
   "auth.signupTitle": "Create account",
@@ -572,6 +597,13 @@ export const enUS: Record<TranslationKey, string> = {
   "auth.error.passwordMin": "Password must be at least 8 characters.",
   "auth.error.displayNameMin": "Display name must be at least 2 characters.",
   "auth.error.tokenInvalid": "Token is invalid or too short.",
+  "unsubscribe.title": "Unsubscribe",
+  "unsubscribe.description": "We're processing your request.",
+  "unsubscribe.missingToken": "Unsubscribe token not found.",
+  "unsubscribe.processing": "Processing unsubscribe...",
+  "unsubscribe.success": "You're unsubscribed.",
+  "unsubscribe.error": "We could not unsubscribe you. Please try again.",
+  "unsubscribe.backHome": "Back to dictionary",
 
   "submit.title": "Submit a new entry",
   "submit.authRequiredPrefix": "You need an account to submit entries.",

@@ -13,6 +13,7 @@ import { ResetPasswordPage } from "@/routes/reset-password-page";
 import { SourceDetailPage } from "@/routes/source-detail-page";
 import { SignupPage } from "@/routes/signup-page";
 import { SubmitPage } from "@/routes/submit-page";
+import { UnsubscribePage } from "@/routes/unsubscribe-page";
 import { VerifyEmailPage } from "@/routes/verify-email-page";
 
 export const router = createBrowserRouter([
@@ -32,6 +33,7 @@ export const router = createBrowserRouter([
       { path: "recover", element: <RecoverAccountPage /> },
       { path: "verify-email", element: <VerifyEmailPage /> },
       { path: "reset-password", element: <ResetPasswordPage /> },
+      { path: "unsubscribe", element: <UnsubscribePage /> },
       { path: "me", element: <MePage /> },
       { path: "moderation", element: <ModerationPage /> },
     ],

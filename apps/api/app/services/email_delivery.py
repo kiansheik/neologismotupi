@@ -18,7 +18,7 @@ def _build_address(from_email: str, from_name: str | None) -> str:
     return f"{from_name} <{from_email}>"
 
 
-def _send_smtp(*, to_email: str, subject: str, body: str) -> None:
+def _send_smtp(*, to_email: str, subject: str, body: str, html_body: str | None = None) -> None:
     settings = get_settings()
     if not settings.smtp_host or not settings.smtp_from_email:
         raise RuntimeError("SMTP is not fully configured")
@@ -31,6 +31,8 @@ def _send_smtp(*, to_email: str, subject: str, body: str) -> None:
     message["Message-ID"] = make_msgid(domain=sender_domain)
     message["Date"] = formatdate(localtime=True)
     message.set_content(body)
+    if html_body:
+        message.add_alternative(html_body, subtype="html")
 
     with smtplib.SMTP(settings.smtp_host, settings.smtp_port, timeout=15) as smtp:
         if settings.smtp_use_tls:
@@ -40,14 +42,28 @@ def _send_smtp(*, to_email: str, subject: str, body: str) -> None:
         smtp.send_message(message)
 
 
-async def send_email(*, to_email: str, subject: str, body: str) -> None:
+async def send_email(
+    *,
+    to_email: str,
+    subject: str,
+    body: str,
+    html_body: str | None = None,
+) -> None:
     settings = get_settings()
     if settings.email_delivery == "smtp":
-        await asyncio.to_thread(_send_smtp, to_email=to_email, subject=subject, body=body)
+        await asyncio.to_thread(
+            _send_smtp, to_email=to_email, subject=subject, body=body, html_body=html_body
+        )
         return
 
     # Fallback mode for local/dev: logs include recovery links.
-    logger.info("Email(log mode) to=%s subject=%s body=%s", to_email, subject, body)
+    logger.info(
+        "Email(log mode) to=%s subject=%s body=%s html=%s",
+        to_email,
+        subject,
+        body,
+        "yes" if html_body else "no",
+    )
 
 
 def _public_url(path: str, token: str) -> str:

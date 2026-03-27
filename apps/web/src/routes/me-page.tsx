@@ -11,6 +11,11 @@ import { Textarea } from "@/components/ui/textarea";
 import { UserBadge } from "@/components/user-badge";
 import { useCurrentUser } from "@/features/auth/hooks";
 import {
+  listMyNewsletters,
+  NEWSLETTER_WORD_OF_DAY,
+  updateMyNewsletter,
+} from "@/features/newsletters/api";
+import {
   getNotificationPreferences,
   listNotifications,
   markAllNotificationsRead,
@@ -52,6 +57,12 @@ export function MePage() {
     enabled: Boolean(currentUser),
   });
 
+  const newslettersQuery = useQuery({
+    queryKey: ["newsletter-subscriptions"],
+    queryFn: listMyNewsletters,
+    enabled: Boolean(currentUser),
+  });
+
   const notificationsQuery = useQuery({
     queryKey: ["notifications"],
     queryFn: () => listNotifications({ page: 1, page_size: 20 }),
@@ -82,6 +93,21 @@ export function MePage() {
     },
   });
 
+  const updateNewsletterMutation = useMutation({
+    mutationFn: ({
+      newsletterKey,
+      updates,
+    }: {
+      newsletterKey: string;
+      updates: { is_active?: boolean };
+    }) => updateMyNewsletter(newsletterKey, updates),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({
+        queryKey: ["newsletter-subscriptions"],
+      });
+    },
+  });
+
   const updateProfileMutation = useMutation({
     mutationFn: updateMyProfile,
     onSuccess: async (updatedProfile) => {
@@ -103,6 +129,10 @@ export function MePage() {
   });
 
   const prefValue = notificationPreferencesQuery.data;
+  const newsletterSubscriptions = newslettersQuery.data ?? [];
+  const wordOfDaySubscription = newsletterSubscriptions.find(
+    (item) => item.newsletter_key === NEWSLETTER_WORD_OF_DAY,
+  );
   const unreadCount = notificationsQuery.data?.unread_count ?? 0;
   const notifications = notificationsQuery.data?.items ?? [];
   const profileLinks = useMemo(
@@ -458,6 +488,60 @@ export function MePage() {
         emptyMessage={t("me.noSubmissions")}
         scope={{ proposer_user_id: currentUser.id }}
       />
+
+      <Card>
+        <h2 className="text-lg font-semibold text-brand-900">
+          {t("me.newslettersTitle")}
+        </h2>
+        <p className="mt-1 text-sm text-slate-600">
+          {t("me.newslettersDescription")}
+        </p>
+        <p className="mt-1 text-xs text-slate-500">
+          {t("me.newslettersLocaleNote")}
+        </p>
+        {newslettersQuery.isLoading ? (
+          <p className="mt-3 text-sm text-slate-600">
+            {t("me.newslettersLoading")}
+          </p>
+        ) : (
+          <div className="mt-3 grid gap-2 sm:grid-cols-2">
+            <label className="flex items-start justify-between gap-4 rounded-md border border-brand-100 bg-[#fffaf2] px-3 py-2 text-sm">
+              <span>
+                <span className="block font-medium text-slate-900">
+                  {t("me.newsletterWordOfDay")}
+                </span>
+                <span className="mt-1 block text-xs text-slate-600">
+                  {t("me.newsletterWordOfDayHelp")}
+                </span>
+              </span>
+              <input
+                type="checkbox"
+                checked={wordOfDaySubscription?.is_active ?? true}
+                onChange={(event) =>
+                  updateNewsletterMutation.mutate({
+                    newsletterKey: NEWSLETTER_WORD_OF_DAY,
+                    updates: { is_active: event.target.checked },
+                  })
+                }
+                disabled={updateNewsletterMutation.isPending}
+              />
+            </label>
+          </div>
+        )}
+        {updateNewsletterMutation.isSuccess ? (
+          <p className="mt-2 text-sm text-green-700">
+            {t("me.newslettersSaved")}
+          </p>
+        ) : null}
+        {updateNewsletterMutation.error instanceof ApiError ? (
+          <p className="mt-2 text-sm text-red-700">
+            {getLocalizedApiErrorMessage(updateNewsletterMutation.error, t)}
+          </p>
+        ) : null}
+        {newslettersQuery.error ? (
+          <p className="mt-2 text-sm text-red-700">{t("api.request_failed")}</p>
+        ) : null}
+      </Card>
 
       <Card>
         <div className="flex flex-wrap items-center justify-between gap-2">

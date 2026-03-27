@@ -12,6 +12,7 @@ from app.core.deps import SessionDep, get_current_user
 from app.core.errors import raise_api_error
 from app.models.discussion import EntryComment, Notification, NotificationPreference
 from app.models.entry import Entry, Example
+from app.models.newsletter import NewsletterSubscription
 from app.models.user import Profile, Session, User
 from app.schemas.notifications import (
     NotificationListOut,
@@ -27,11 +28,14 @@ from app.schemas.users import (
     PublicProfileOut,
     PublicProfileStatsOut,
     PublicUserOut,
+    UserPreferencesOut,
+    UserPreferencesUpdate,
 )
 from app.services.notifications import (
     get_or_create_notification_preferences,
     normalize_mention_key,
 )
+from app.services.newsletters import normalize_locale
 from app.services.user_badges import get_user_badge_leaders, resolve_user_badges
 
 router = APIRouter(prefix="/users", tags=["users"])
@@ -195,6 +199,32 @@ async def get_my_notification_preferences(
             notify_on_mentions=True,
         )
     return NotificationPreferenceOut.model_validate(pref)
+
+
+@router.get("/me/preferences", response_model=UserPreferencesOut)
+async def get_my_preferences(
+    user: Annotated[User, Depends(get_current_user)],
+) -> UserPreferencesOut:
+    return UserPreferencesOut(preferred_locale=user.preferred_locale)
+
+
+@router.patch("/me/preferences", response_model=UserPreferencesOut)
+async def update_my_preferences(
+    payload: UserPreferencesUpdate,
+    db: SessionDep,
+    user: Annotated[User, Depends(get_current_user)],
+) -> UserPreferencesOut:
+    updates = payload.model_dump(exclude_unset=True)
+    if "preferred_locale" in updates and updates["preferred_locale"] is not None:
+        next_locale = normalize_locale(updates["preferred_locale"])
+        user.preferred_locale = next_locale
+        await db.execute(
+            update(NewsletterSubscription)
+            .where(NewsletterSubscription.user_id == user.id)
+            .values(preferred_locale=next_locale)
+        )
+    await db.commit()
+    return UserPreferencesOut(preferred_locale=user.preferred_locale)
 
 
 @router.patch("/me/profile", response_model=PublicProfileOut)
