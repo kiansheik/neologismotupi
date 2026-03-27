@@ -9,6 +9,7 @@ from app.schemas.badges import UserBadgeKind
 class PublicProfileStatsOut(BaseModel):
     total_entries: int = 0
     total_comments: int = 0
+    total_audio: int = 0
     last_seen_at: datetime | None = None
     last_active_at: datetime | None = None
     submitting_since_at: datetime | None = None

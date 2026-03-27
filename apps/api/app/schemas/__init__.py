@@ -8,6 +8,7 @@ from app.schemas.auth import (
     RegisterRequest,
     UserOut,
 )
+from app.schemas.audio import AudioSampleOut, AudioSubmissionListOut, AudioSubmissionOut, AudioVoteOut
 from app.schemas.entries import (
     DuplicateHintOut,
     EntryCreate,
@@ -41,6 +42,10 @@ from app.schemas.notifications import (
 
 __all__ = [
     "ActionAcceptedResponse",
+    "AudioSampleOut",
+    "AudioSubmissionListOut",
+    "AudioSubmissionOut",
+    "AudioVoteOut",
     "DuplicateHintOut",
     "EmailVerificationConfirmRequest",
     "EntryCreate",

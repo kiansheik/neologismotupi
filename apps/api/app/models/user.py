@@ -10,6 +10,7 @@ from app.models.mixins import TimestampMixin, UUIDPrimaryKeyMixin
 
 if TYPE_CHECKING:
     from app.models.discussion import EntryComment, Notification, NotificationPreference
+    from app.models.audio import AudioSample, AudioVote
     from app.models.newsletter import NewsletterDelivery, NewsletterSubscription
 
 
@@ -52,6 +53,14 @@ class User(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     )
     newsletter_deliveries: Mapped[list["NewsletterDelivery"]] = relationship(
         back_populates="user",
+        cascade="all, delete-orphan",
+    )
+    audio_samples: Mapped[list["AudioSample"]] = relationship(
+        back_populates="uploader",
+        cascade="all, delete-orphan",
+    )
+    audio_votes: Mapped[list["AudioVote"]] = relationship(
+        back_populates="voter",
         cascade="all, delete-orphan",
     )
 

@@ -1,5 +1,5 @@
 import { apiFetch, withQuery } from "@/lib/api";
-import type { EntryDetail, EntryListResponse } from "@/lib/types";
+import type { EntryDetail, EntryListResponse, Example } from "@/lib/types";
 
 export interface ListEntriesParams {
   [key: string]: string | number | boolean | undefined;
@@ -109,8 +109,8 @@ export function deleteVote(entryId: string): Promise<void> {
   return apiFetch<void>(`/entries/${entryId}/vote`, { method: "DELETE" });
 }
 
-export function createExample(entryId: string, payload: CreateExamplePayload) {
-  return apiFetch(`/entries/${entryId}/examples`, {
+export function createExample(entryId: string, payload: CreateExamplePayload): Promise<Example> {
+  return apiFetch<Example>(`/entries/${entryId}/examples`, {
     method: "POST",
     body: payload,
   });

@@ -9,6 +9,7 @@ class Settings(BaseSettings):
     app_env: str = "development"
     app_release: str = "dev-local"
     app_public_url: str = "http://localhost:5173"
+    api_public_url: str = "http://localhost:8000"
     founder_email: str | None = "kiansheik3128@gmail.com"
     database_url: str = "postgresql+asyncpg://localhost/nheenga_dev"
     secret_key: str = "change-me"
@@ -59,6 +60,12 @@ class Settings(BaseSettings):
     smtp_from_name: str = "Dicionário de Tupi"
     smtp_use_tls: bool = True
     host_disk_usage_path: str = "/"
+    media_root: str = "media"
+    max_audio_bytes: int = 5 * 1024 * 1024
+    audio_processing_enabled: bool = False
+    audio_processing_timeout_seconds: int = 30
+    ffmpeg_path: str = "ffmpeg"
+    audio_trim_padding_seconds: float = 0.5
 
     model_config = SettingsConfigDict(
         env_file=".env",

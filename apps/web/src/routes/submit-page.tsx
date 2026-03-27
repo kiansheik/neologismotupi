@@ -16,6 +16,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { useCurrentUser } from "@/features/auth/hooks";
+import { AudioCapture, AudioQueueList } from "@/features/audio/components";
+import { uploadEntryAudio } from "@/features/audio/api";
 import { createEntry, listEntries } from "@/features/entries/api";
 import { listSources } from "@/features/sources/api";
 import type { SourceSuggestion } from "@/lib/types";
@@ -38,10 +40,12 @@ type SubmitForm = {
 };
 
 export function SubmitPage() {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const navigate = useNavigate();
   const { data: currentUser } = useCurrentUser();
   const [possibleDuplicates, setPossibleDuplicates] = useState<DuplicateHint[]>([]);
+  const [queuedAudio, setQueuedAudio] = useState<File[]>([]);
+  const [isUploadingAudio, setIsUploadingAudio] = useState(false);
 
   const form = useForm<SubmitForm>({
     defaultValues: {
@@ -93,6 +97,16 @@ export function SubmitPage() {
     return Array.from(dedupedById.values());
   }, [duplicateQuery.data, possibleDuplicates]);
 
+  const addQueuedAudio = (file: File) => {
+    setQueuedAudio((current) => [...current, file]);
+  };
+  const removeQueuedAudio = (index: number) => {
+    setQueuedAudio((current) => current.filter((_, currentIndex) => currentIndex !== index));
+  };
+  const clearQueuedAudio = () => {
+    setQueuedAudio([]);
+  };
+
   const applySourceSuggestion = (source: SourceSuggestion) => {
     form.setValue("source_authors", source.authors ?? "");
     form.setValue("source_title", source.title ?? "");
@@ -106,13 +120,6 @@ export function SubmitPage() {
 
   const createMutation = useMutation({
     mutationFn: (payload: Parameters<typeof createEntry>[0]) => createEntry(payload),
-    onSuccess: (entry) => {
-      trackEvent("entry_submitted", {
-        part_of_speech: entry.part_of_speech ?? "unknown",
-        status: entry.status,
-      });
-      navigate(`/entries/${entry.slug}`);
-    },
     onError: (error) => {
       if (error instanceof ApiError && error.code === "possible_duplicates") {
         const details = error.details as { duplicates?: DuplicateHint[] } | undefined;
@@ -125,7 +132,7 @@ export function SubmitPage() {
     },
   });
 
-  const onSubmit = form.handleSubmit((payload) => {
+  const onSubmit = form.handleSubmit(async (payload) => {
     form.clearErrors();
     const schema = z.object({
       headword: z.string().trim().min(1, t("submit.error.headwordRequired")),
@@ -191,26 +198,55 @@ export function SubmitPage() {
       ? Number(parsed.data.source_publication_year)
       : undefined;
 
-    createMutation.mutate({
-      headword: parsed.data.headword,
-      gloss_pt: parsed.data.gloss_pt,
-      gloss_en: parsed.data.gloss_en,
-      part_of_speech: parsed.data.part_of_speech,
-      short_definition: parsed.data.short_definition,
-      source:
-        parsed.data.has_source && (parsed.data.source_authors || parsed.data.source_title)
-          ? {
-              authors: parsed.data.source_authors || undefined,
-              title: parsed.data.source_title || undefined,
-              publication_year: publicationYear,
-              edition_label: parsed.data.source_edition_label || undefined,
-              pages: parsed.data.source_pages || undefined,
-              url: parsed.data.source_url || undefined,
-            }
-          : undefined,
-      morphology_notes: parsed.data.morphology_notes,
-      force_submit: parsed.data.force_submit,
+    let createdEntry;
+    try {
+      createdEntry = await createMutation.mutateAsync({
+        headword: parsed.data.headword,
+        gloss_pt: parsed.data.gloss_pt,
+        gloss_en: parsed.data.gloss_en,
+        part_of_speech: parsed.data.part_of_speech,
+        short_definition: parsed.data.short_definition,
+        source:
+          parsed.data.has_source && (parsed.data.source_authors || parsed.data.source_title)
+            ? {
+                authors: parsed.data.source_authors || undefined,
+                title: parsed.data.source_title || undefined,
+                publication_year: publicationYear,
+                edition_label: parsed.data.source_edition_label || undefined,
+                pages: parsed.data.source_pages || undefined,
+                url: parsed.data.source_url || undefined,
+              }
+            : undefined,
+        morphology_notes: parsed.data.morphology_notes,
+        force_submit: parsed.data.force_submit,
+      });
+    } catch {
+      return;
+    }
+
+    if (queuedAudio.length > 0) {
+      setIsUploadingAudio(true);
+      for (const file of queuedAudio) {
+        try {
+          // eslint-disable-next-line no-await-in-loop
+          await uploadEntryAudio(createdEntry.id, file);
+          trackEvent("audio_uploaded", { target: "entry_create" });
+        } catch (error) {
+          trackEvent("audio_upload_failed", {
+            target: "entry_create",
+            error_code: error instanceof ApiError ? error.code : "unknown",
+          });
+        }
+      }
+      setIsUploadingAudio(false);
+      setQueuedAudio([]);
+    }
+
+    trackEvent("entry_submitted", {
+      part_of_speech: createdEntry.part_of_speech ?? "unknown",
+      status: createdEntry.status,
     });
+    navigate(`/entries/${createdEntry.slug}`);
   });
 
   if (!currentUser) {
@@ -432,12 +468,36 @@ export function SubmitPage() {
             {...form.register("morphology_notes")}
           />
         </div>
+        <div className="rounded-md border border-brand-100 bg-white/70 p-3">
+          <p className="text-sm font-semibold text-brand-900">{t("submit.audioTitle")}</p>
+          <p className="mt-1 text-xs text-slate-600">{t("submit.audioHelp")}</p>
+          <div className="mt-2">
+            <AudioCapture
+              t={t}
+              locale={locale}
+              onCapture={addQueuedAudio}
+              disabled={createMutation.isPending || isUploadingAudio}
+            />
+          </div>
+          <div className="mt-2">
+            <AudioQueueList
+              files={queuedAudio}
+              locale={locale}
+              t={t}
+              onRemove={removeQueuedAudio}
+              onClear={clearQueuedAudio}
+            />
+          </div>
+          {isUploadingAudio ? (
+            <p className="mt-2 text-xs text-slate-600">{t("audio.uploading")}</p>
+          ) : null}
+        </div>
 
         {createMutation.error instanceof ApiError ? (
           <p className="text-sm text-red-700">{getLocalizedApiErrorMessage(createMutation.error, t)}</p>
         ) : null}
 
-        <Button type="submit" disabled={createMutation.isPending}>
+        <Button type="submit" disabled={createMutation.isPending || isUploadingAudio}>
           {t("submit.button")}
         </Button>
       </form>

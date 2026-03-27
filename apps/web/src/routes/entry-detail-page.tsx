@@ -21,6 +21,8 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { UserBadge } from "@/components/user-badge";
 import { useCurrentUser } from "@/features/auth/hooks";
+import { AudioCapture, AudioQueueList, AudioSampleList } from "@/features/audio/components";
+import { deleteAudioSample, uploadEntryAudio, uploadExampleAudio, voteAudio } from "@/features/audio/api";
 import { createComment, voteComment } from "@/features/comments/api";
 import { listExampleVersions, reportExample, updateExample, voteExample } from "@/features/examples/api";
 import { createExample, getEntry, reportEntry, updateEntry, voteEntry } from "@/features/entries/api";
@@ -381,6 +383,9 @@ export function EntryDetailPage() {
   const [showEntryReportForm, setShowEntryReportForm] = useState(false);
   const [showEditForm, setShowEditForm] = useState(false);
   const [editingExampleId, setEditingExampleId] = useState<string | null>(null);
+  const [newExampleAudioQueue, setNewExampleAudioQueue] = useState<File[]>([]);
+  const [audioVoteTargetId, setAudioVoteTargetId] = useState<string | null>(null);
+  const [audioDeleteTargetId, setAudioDeleteTargetId] = useState<string | null>(null);
 
   const {
     data: entry,
@@ -469,6 +474,69 @@ export function EntryDetailPage() {
         direction: params.value === 1 ? "up" : "down",
         error_code: error instanceof ApiError ? error.code : "unknown",
       });
+    },
+  });
+  const uploadEntryAudioMutation = useMutation({
+    mutationFn: (params: { entryId: string; file: File }) => uploadEntryAudio(params.entryId, params.file),
+    onSuccess: () => {
+      trackEvent("audio_uploaded", { target: "entry" });
+      queryClient.invalidateQueries({ queryKey: ["entry", slug] });
+    },
+    onError: (error) => {
+      trackEvent("audio_upload_failed", {
+        target: "entry",
+        error_code: error instanceof ApiError ? error.code : "unknown",
+      });
+    },
+  });
+  const uploadExampleAudioMutation = useMutation({
+    mutationFn: (params: { exampleId: string; file: File }) => uploadExampleAudio(params.exampleId, params.file),
+    onSuccess: () => {
+      trackEvent("audio_uploaded", { target: "example" });
+      queryClient.invalidateQueries({ queryKey: ["entry", slug] });
+    },
+    onError: (error) => {
+      trackEvent("audio_upload_failed", {
+        target: "example",
+        error_code: error instanceof ApiError ? error.code : "unknown",
+      });
+    },
+  });
+  const voteAudioMutation = useMutation({
+    mutationFn: (params: { audioId: string; value: -1 | 1 }) => voteAudio(params.audioId, params.value),
+    onMutate: (params) => {
+      setAudioVoteTargetId(params.audioId);
+    },
+    onSuccess: (_, params) => {
+      trackEvent("audio_voted", { direction: params.value === 1 ? "up" : "down" });
+      queryClient.invalidateQueries({ queryKey: ["entry", slug] });
+    },
+    onError: (error, params) => {
+      trackEvent("audio_vote_failed", {
+        direction: params.value === 1 ? "up" : "down",
+        error_code: error instanceof ApiError ? error.code : "unknown",
+      });
+    },
+    onSettled: () => {
+      setAudioVoteTargetId(null);
+    },
+  });
+  const deleteAudioMutation = useMutation({
+    mutationFn: (params: { audioId: string }) => deleteAudioSample(params.audioId),
+    onMutate: (params) => {
+      setAudioDeleteTargetId(params.audioId);
+    },
+    onSuccess: () => {
+      trackEvent("audio_deleted");
+      queryClient.invalidateQueries({ queryKey: ["entry", slug] });
+    },
+    onError: (error) => {
+      trackEvent("audio_delete_failed", {
+        error_code: error instanceof ApiError ? error.code : "unknown",
+      });
+    },
+    onSettled: () => {
+      setAudioDeleteTargetId(null);
     },
   });
   const approveEntryMutation = useMutation({
@@ -615,6 +683,15 @@ export function EntryDetailPage() {
       [exampleEditSourceAuthors, exampleEditSourceTitle].map((value) => value?.trim() ?? "").join(" ").trim(),
     [exampleEditSourceAuthors, exampleEditSourceTitle],
   );
+  const addNewExampleAudio = (file: File) => {
+    setNewExampleAudioQueue((current) => [...current, file]);
+  };
+  const removeNewExampleAudio = (index: number) => {
+    setNewExampleAudioQueue((current) => current.filter((_, currentIndex) => currentIndex !== index));
+  };
+  const clearNewExampleAudio = () => {
+    setNewExampleAudioQueue([]);
+  };
   const canWrite = Boolean(currentUser);
   const isModerator = Boolean(currentUser?.is_superuser);
   const canEditEntry = Boolean(
@@ -803,7 +880,7 @@ export function EntryDetailPage() {
     },
   });
 
-  const onExampleSubmit = exampleForm.handleSubmit((payload) => {
+  const onExampleSubmit = exampleForm.handleSubmit(async (payload) => {
     exampleForm.clearErrors();
     const exampleSchema = z
       .object({
@@ -862,12 +939,28 @@ export function EntryDetailPage() {
       return;
     }
     const normalizedSource = normalizeSourcePayload(parsed.data);
-    createExampleMutation.mutate({
-      sentence_original: parsed.data.sentence_original.trim(),
-      translation_pt: normalizeOptionalField(parsed.data.translation_pt) ?? undefined,
-      source_citation: normalizedSource.source_citation ?? undefined,
-      source: normalizedSource.source ?? undefined,
-    });
+    let createdExample;
+    try {
+      createdExample = await createExampleMutation.mutateAsync({
+        sentence_original: parsed.data.sentence_original.trim(),
+        translation_pt: normalizeOptionalField(parsed.data.translation_pt) ?? undefined,
+        source_citation: normalizedSource.source_citation ?? undefined,
+        source: normalizedSource.source ?? undefined,
+      });
+    } catch {
+      return;
+    }
+    if (createdExample && newExampleAudioQueue.length > 0) {
+      for (const file of newExampleAudioQueue) {
+        try {
+          // eslint-disable-next-line no-await-in-loop
+          await uploadExampleAudioMutation.mutateAsync({ exampleId: createdExample.id, file });
+        } catch {
+          // Best-effort upload; the user can retry from the example card.
+        }
+      }
+      setNewExampleAudioQueue([]);
+    }
   });
 
   const onExampleEditSubmit = exampleEditForm.handleSubmit((payload) => {
@@ -1286,6 +1379,38 @@ export function EntryDetailPage() {
               t={t}
             />
           </p>
+        ) : null}
+        {(entry.audio_samples.length > 0 || canWrite) ? (
+          <div className="mt-3 rounded-md border border-brand-100 bg-white/70 p-3">
+            <h2 className="text-sm font-semibold text-brand-900">{t("audio.entryTitle")}</h2>
+            <p className="mt-1 text-xs text-slate-600">{t("audio.entryHelp")}</p>
+            <div className="mt-2">
+              <AudioSampleList
+                samples={entry.audio_samples}
+                locale={locale}
+                t={t}
+                canVote={canWrite}
+                currentUserId={currentUser?.id}
+                isModerator={isModerator}
+                onVote={(audioId, value) => voteAudioMutation.mutate({ audioId, value })}
+                onDelete={(audioId) => deleteAudioMutation.mutate({ audioId })}
+                votingAudioId={audioVoteTargetId}
+                deletingAudioId={audioDeleteTargetId}
+              />
+            </div>
+            {canWrite ? (
+              <div className="mt-3">
+              <AudioCapture
+                t={t}
+                locale={locale}
+                onCapture={(file) => uploadEntryAudioMutation.mutateAsync({ entryId: entry.id, file })}
+                disabled={uploadEntryAudioMutation.isPending}
+              />
+              </div>
+            ) : (
+              <p className="mt-2 text-xs text-amber-800">{t("audio.signInPrompt")}</p>
+            )}
+          </div>
         ) : null}
         <p className="mt-3 text-xs text-slate-500">
           {t("entry.firstRegistered", { date: formatDate(entry.created_at, locale) })}
@@ -1721,6 +1846,37 @@ export function EntryDetailPage() {
                     <p className="mt-1 rounded-md border border-red-200 bg-red-50 px-2 py-1 text-xs text-red-800">
                       {t("entry.moderationReason")}: {example.moderation_reason || example.moderation_notes}
                     </p>
+                  ) : null}
+                  {(example.audio_samples.length > 0 || canWrite) ? (
+                    <div className="mt-2 rounded-md border border-brand-100 bg-white/70 p-2">
+                      <p className="text-xs font-semibold text-brand-900">{t("audio.exampleTitle")}</p>
+                      <div className="mt-2">
+                        <AudioSampleList
+                          samples={example.audio_samples}
+                          locale={locale}
+                          t={t}
+                          canVote={canWrite}
+                          currentUserId={currentUser?.id}
+                          isModerator={isModerator}
+                          onVote={(audioId, value) => voteAudioMutation.mutate({ audioId, value })}
+                          onDelete={(audioId) => deleteAudioMutation.mutate({ audioId })}
+                          votingAudioId={audioVoteTargetId}
+                          deletingAudioId={audioDeleteTargetId}
+                        />
+                      </div>
+                      {canWrite ? (
+                        <div className="mt-2">
+                          <AudioCapture
+                            t={t}
+                            locale={locale}
+                            onCapture={(file) =>
+                              uploadExampleAudioMutation.mutateAsync({ exampleId: example.id, file })
+                            }
+                            disabled={uploadExampleAudioMutation.isPending}
+                          />
+                        </div>
+                      ) : null}
+                    </div>
                   ) : null}
                   <div className="mt-2 flex flex-wrap items-center gap-2">
                     <Button
@@ -2316,6 +2472,27 @@ export function EntryDetailPage() {
                   ) : null}
                 </div>
               ) : null}
+            </div>
+            <div className="rounded-md border border-brand-100 bg-white/70 p-3">
+              <p className="text-sm font-semibold text-brand-900">{t("submit.audioTitle")}</p>
+              <p className="mt-1 text-xs text-slate-600">{t("submit.audioHelp")}</p>
+              <div className="mt-2">
+                <AudioCapture
+                  t={t}
+                  locale={locale}
+                  onCapture={addNewExampleAudio}
+                  disabled={createExampleMutation.isPending}
+                />
+              </div>
+              <div className="mt-2">
+                <AudioQueueList
+                  files={newExampleAudioQueue}
+                  locale={locale}
+                  t={t}
+                  onRemove={removeNewExampleAudio}
+                  onClear={clearNewExampleAudio}
+                />
+              </div>
             </div>
             {createExampleMutation.error instanceof ApiError ? (
               <p className="text-sm text-red-700">{getLocalizedApiErrorMessage(createExampleMutation.error, t)}</p>

@@ -3,7 +3,7 @@ import logging
 from datetime import UTC, datetime
 from typing import Annotated, Literal
 
-from fastapi import APIRouter, Depends, Query, Request, Response, status
+from fastapi import APIRouter, Depends, Query, Request, Response, status, UploadFile, File
 from sqlalchemy import and_, func, or_, select
 from sqlalchemy.orm import selectinload
 
@@ -15,6 +15,7 @@ from app.core.errors import raise_api_error
 from app.core.permissions import can_edit_entry, can_edit_example, is_moderator
 from app.core.utils import collapse_whitespace, normalize_text, slugify
 from app.models.discussion import CommentVote, EntryComment
+from app.models.audio import AudioSample
 from app.models.entry import Entry, EntryTag, EntryVersion, Example, ExampleVersion, ExampleVote, Tag, Vote
 from app.models.moderation import ModerationAction, Report
 from app.models.source import SourceEdition, SourceWork
@@ -40,6 +41,7 @@ from app.schemas.entries import (
     VoteOut,
     VoteRequest,
 )
+from app.schemas.audio import AudioSampleOut
 from app.services.entries import (
     build_entry_status_for_submission,
     build_example_status_for_submission,
@@ -58,6 +60,7 @@ from app.services.entries import (
     refresh_vote_and_example_caches,
     set_entry_tags,
 )
+from app.services.audio import save_audio_upload
 from app.services.email_delivery import send_comment_notification_email, send_entry_moderation_email
 from app.services.moderation import record_moderation_action
 from app.services.notifications import (
@@ -70,6 +73,7 @@ from app.services.notifications import (
 from app.services.reputation import recompute_user_reputation
 from app.services.rate_limit import enforce_rate_limit
 from app.services.serializers import (
+    serialize_audio_sample,
     serialize_entry_comment,
     serialize_entry_detail,
     serialize_entry_summary,
@@ -102,13 +106,31 @@ async def _load_entry_with_relations(db: SessionDep, entry_id: uuid.UUID) -> Ent
         .options(
             selectinload(Entry.tags).selectinload(EntryTag.tag),
             selectinload(Entry.versions),
+            selectinload(Entry.audio_samples)
+            .selectinload(AudioSample.uploader)
+            .selectinload(User.profile),
             selectinload(Entry.examples).selectinload(Example.source_edition).selectinload(SourceEdition.work),
             selectinload(Entry.examples).selectinload(Example.source_edition).selectinload(SourceEdition.links),
+            selectinload(Entry.examples)
+            .selectinload(Example.audio_samples)
+            .selectinload(AudioSample.uploader)
+            .selectinload(User.profile),
             selectinload(Entry.comments).selectinload(EntryComment.author).selectinload(User.profile),
             selectinload(Entry.proposer).selectinload(User.profile),
             selectinload(Entry.source_edition).selectinload(SourceEdition.work),
             selectinload(Entry.source_edition).selectinload(SourceEdition.links),
         )
+    )
+    return (await db.execute(stmt)).scalar_one_or_none()
+
+
+async def _load_audio_sample_with_uploader(
+    db: SessionDep, audio_id: uuid.UUID
+) -> AudioSample | None:
+    stmt = (
+        select(AudioSample)
+        .where(AudioSample.id == audio_id)
+        .options(selectinload(AudioSample.uploader).selectinload(User.profile))
     )
     return (await db.execute(stmt)).scalar_one_or_none()
 
@@ -603,8 +625,15 @@ async def get_entry(
         .options(
             selectinload(Entry.tags).selectinload(EntryTag.tag),
             selectinload(Entry.versions),
+            selectinload(Entry.audio_samples)
+            .selectinload(AudioSample.uploader)
+            .selectinload(User.profile),
             selectinload(Entry.examples).selectinload(Example.source_edition).selectinload(SourceEdition.work),
             selectinload(Entry.examples).selectinload(Example.source_edition).selectinload(SourceEdition.links),
+            selectinload(Entry.examples)
+            .selectinload(Example.audio_samples)
+            .selectinload(AudioSample.uploader)
+            .selectinload(User.profile),
             selectinload(Entry.comments).selectinload(EntryComment.author).selectinload(User.profile),
             selectinload(Entry.proposer).selectinload(User.profile),
             selectinload(Entry.source_edition).selectinload(SourceEdition.work),
@@ -747,6 +776,30 @@ async def create_entry(
         badge_leaders=badge_leaders,
         history_events=history_events,
     )
+
+
+@router.post("/{entry_id}/audio", response_model=AudioSampleOut, status_code=status.HTTP_201_CREATED)
+async def upload_entry_audio(
+    entry_id: uuid.UUID,
+    db: SessionDep,
+    user: Annotated[User, Depends(get_current_user)],
+    file: UploadFile = File(...),
+) -> AudioSampleOut:
+    entry = await load_entry_for_update(db, entry_id)
+    if not entry:
+        raise_api_error(status_code=404, code="entry_not_found", message="Entry not found")
+
+    sample = await save_audio_upload(
+        db,
+        user_id=user.id,
+        upload=file,
+        entry_id=entry_id,
+    )
+    await db.commit()
+    hydrated = await _load_audio_sample_with_uploader(db, sample.id)
+    if not hydrated:
+        raise_api_error(status_code=500, code="audio_upload_failed", message="Could not load audio sample")
+    return serialize_audio_sample(hydrated)
 
 
 @router.patch("/{entry_id}", response_model=EntryDetailOut)
@@ -1120,6 +1173,7 @@ async def create_example(
             .options(
                 selectinload(Example.source_edition).selectinload(SourceEdition.work),
                 selectinload(Example.source_edition).selectinload(SourceEdition.links),
+                selectinload(Example.audio_samples),
             )
         )
     ).scalar_one_or_none()
@@ -1295,12 +1349,37 @@ async def update_example(
             .options(
                 selectinload(Example.source_edition).selectinload(SourceEdition.work),
                 selectinload(Example.source_edition).selectinload(SourceEdition.links),
+                selectinload(Example.audio_samples),
             )
         )
     ).scalar_one_or_none()
     if updated_example is None:
         raise_api_error(status_code=500, code="example_update_failed", message="Could not load updated example")
     return serialize_example(updated_example)
+
+
+@example_router.post("/{example_id}/audio", response_model=AudioSampleOut, status_code=status.HTTP_201_CREATED)
+async def upload_example_audio(
+    example_id: uuid.UUID,
+    db: SessionDep,
+    user: Annotated[User, Depends(get_current_user)],
+    file: UploadFile = File(...),
+) -> AudioSampleOut:
+    example = (await db.execute(select(Example).where(Example.id == example_id))).scalar_one_or_none()
+    if not example:
+        raise_api_error(status_code=404, code="example_not_found", message="Example not found")
+
+    sample = await save_audio_upload(
+        db,
+        user_id=user.id,
+        upload=file,
+        example_id=example_id,
+    )
+    await db.commit()
+    hydrated = await _load_audio_sample_with_uploader(db, sample.id)
+    if not hydrated:
+        raise_api_error(status_code=500, code="audio_upload_failed", message="Could not load audio sample")
+    return serialize_audio_sample(hydrated)
 
 
 @example_router.get("/{example_id}/versions", response_model=list[ExampleVersionOut])

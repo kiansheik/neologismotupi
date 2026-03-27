@@ -6,6 +6,7 @@ from pydantic import BaseModel, Field, model_validator
 
 from app.core.enums import EntryStatus, ExampleStatus, ReportReasonCode, TagType
 from app.schemas.badges import UserBadgeKind
+from app.schemas.audio import AudioSampleOut
 
 
 class TagOut(BaseModel):
@@ -117,6 +118,7 @@ class ExampleOut(BaseModel):
     moderation_reason: str | None = None
     moderation_notes: str | None = None
     moderated_at: datetime | None = None
+    audio_samples: list[AudioSampleOut] = Field(default_factory=list)
     created_at: datetime
     updated_at: datetime
 
@@ -162,6 +164,7 @@ class EntryDetailOut(EntrySummaryOut):
     history_events: list[EntryHistoryEventOut] = Field(default_factory=list)
     examples: list[ExampleOut] = Field(default_factory=list)
     comments: list[EntryCommentOut] = Field(default_factory=list)
+    audio_samples: list[AudioSampleOut] = Field(default_factory=list)
 
 
 class DuplicateHintOut(BaseModel):

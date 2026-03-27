@@ -63,6 +63,32 @@ function buildUrl(path: string): string {
   return `${API_BASE_URL}${path}`;
 }
 
+export async function apiUpload<T>(path: string, formData: FormData): Promise<T> {
+  const response = await fetch(buildUrl(path), {
+    credentials: "include",
+    method: "POST",
+    body: formData,
+  });
+
+  if (!response.ok) {
+    let parsed: ApiErrorShape | null = null;
+    try {
+      parsed = (await response.json()) as ApiErrorShape;
+    } catch {
+      parsed = null;
+    }
+
+    const error = parsed?.error;
+    throw new ApiError(error?.message ?? "Request failed", error?.code ?? "http_error", error?.details);
+  }
+
+  if (response.status === 204) {
+    return undefined as T;
+  }
+
+  return (await response.json()) as T;
+}
+
 export async function apiFetch<T>(path: string, options: RequestInitWithBody = {}): Promise<T> {
   const { body, headers, ...rest } = options;
   const method = (rest.method ?? "GET").toUpperCase();

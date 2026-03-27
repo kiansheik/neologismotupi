@@ -1,4 +1,5 @@
 from app.models.discussion import CommentVote, EntryComment, Notification, NotificationPreference
+from app.models.audio import AudioSample, AudioVote
 from app.models.entry import Entry, EntryTag, EntryVersion, Example, ExampleVersion, ExampleVote, Tag, Vote
 from app.models.moderation import ModerationAction, RateLimitEvent, Report
 from app.models.newsletter import NewsletterDelivery, NewsletterIssue, NewsletterSubscription
@@ -7,6 +8,8 @@ from app.models.user import EmailActionToken, Profile, Session, User
 
 __all__ = [
     "CommentVote",
+    "AudioSample",
+    "AudioVote",
     "Entry",
     "EntryComment",
     "EntryTag",

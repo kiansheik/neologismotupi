@@ -22,6 +22,7 @@ from app.db import Base
 from app.models.mixins import TimestampMixin, UUIDPrimaryKeyMixin
 
 if TYPE_CHECKING:
+    from app.models.audio import AudioSample
     from app.models.discussion import EntryComment
     from app.models.source import SourceEdition
     from app.models.user import User
@@ -78,6 +79,11 @@ class Entry(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     )
     examples: Mapped[list["Example"]] = relationship(back_populates="entry", cascade="all, delete-orphan")
     votes: Mapped[list["Vote"]] = relationship(back_populates="entry", cascade="all, delete-orphan")
+    audio_samples: Mapped[list["AudioSample"]] = relationship(
+        back_populates="entry",
+        cascade="all, delete-orphan",
+        order_by="AudioSample.created_at",
+    )
     comments: Mapped[list["EntryComment"]] = relationship(
         back_populates="entry",
         cascade="all, delete-orphan",
@@ -130,6 +136,11 @@ class Example(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     entry: Mapped[Entry] = relationship(back_populates="examples")
     votes: Mapped[list["ExampleVote"]] = relationship(
         back_populates="example", cascade="all, delete-orphan"
+    )
+    audio_samples: Mapped[list["AudioSample"]] = relationship(
+        back_populates="example",
+        cascade="all, delete-orphan",
+        order_by="AudioSample.created_at",
     )
     source_edition: Mapped["SourceEdition | None"] = relationship(back_populates="examples")
     versions: Mapped[list["ExampleVersion"]] = relationship(

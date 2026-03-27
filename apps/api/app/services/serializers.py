@@ -1,6 +1,9 @@
 import uuid
 from datetime import datetime
 
+from sqlalchemy import inspect
+
+from app.models.audio import AudioSample
 from app.models.discussion import EntryComment
 from app.models.entry import Entry, EntryTag, EntryVersion, Example, Tag
 from app.schemas.entries import (
@@ -14,6 +17,8 @@ from app.schemas.entries import (
     ExampleOut,
     TagOut,
 )
+from app.schemas.audio import AudioSampleOut
+from app.services.audio import build_audio_url
 from app.services.sources import build_source_citation
 from app.services.user_badges import UserBadgeLeaders, resolve_user_badges
 
@@ -56,6 +61,7 @@ def serialize_example(
             "score_cache": example.score_cache,
             "upvote_count_cache": example.upvote_count_cache,
             "downvote_count_cache": example.downvote_count_cache,
+            "audio_samples": [serialize_audio_sample(sample) for sample in example.audio_samples],
             "created_at": example.created_at,
             "updated_at": example.updated_at,
         }
@@ -190,8 +196,40 @@ def serialize_entry_detail(
         "history_events": history_events or [],
         "examples": [serialize_example(example, example_moderation) for example in examples],
         "comments": [serialize_entry_comment(comment, badge_leaders) for comment in comments or []],
+        "audio_samples": [serialize_audio_sample(sample) for sample in entry.audio_samples],
     }
     return EntryDetailOut.model_validate(payload)
+
+
+def serialize_audio_sample(sample: AudioSample) -> AudioSampleOut:
+    uploader_display_name = None
+    uploader_profile_url = None
+    sample_state = inspect(sample)
+    if "uploader" not in sample_state.unloaded:
+        uploader = sample.uploader
+        if uploader:
+            uploader_profile_url = f"/profiles/{uploader.id}"
+            uploader_state = inspect(uploader)
+            if "profile" not in uploader_state.unloaded and uploader.profile:
+                uploader_display_name = uploader.profile.display_name
+
+    return AudioSampleOut.model_validate(
+        {
+            "id": sample.id,
+            "entry_id": sample.entry_id,
+            "example_id": sample.example_id,
+            "user_id": sample.user_id,
+            "uploader_display_name": uploader_display_name,
+            "uploader_profile_url": uploader_profile_url,
+            "url": build_audio_url(sample.file_path),
+            "mime_type": sample.mime_type,
+            "duration_seconds": sample.duration_seconds,
+            "score_cache": sample.score_cache,
+            "upvote_count_cache": sample.upvote_count_cache,
+            "downvote_count_cache": sample.downvote_count_cache,
+            "created_at": sample.created_at,
+        }
+    )
 
 
 def _serialize_entry_source(entry: Entry) -> EntrySourceOut | None:

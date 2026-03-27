@@ -54,6 +54,29 @@ export interface EntrySummary {
   tags: Tag[];
 }
 
+export interface AudioSample {
+  id: string;
+  entry_id: string | null;
+  example_id: string | null;
+  user_id: string;
+  uploader_display_name?: string | null;
+  uploader_profile_url?: string | null;
+  url: string;
+  mime_type: string;
+  duration_seconds: number | null;
+  score_cache: number;
+  upvote_count_cache: number;
+  downvote_count_cache: number;
+  created_at: string;
+}
+
+export interface AudioVoteResponse {
+  audio_id: string;
+  user_id: string;
+  value: number;
+  score_cache: number;
+}
+
 export interface EntryVersion {
   id: string;
   entry_id: string;
@@ -91,6 +114,7 @@ export interface Example {
   score_cache: number;
   upvote_count_cache: number;
   downvote_count_cache: number;
+  audio_samples: AudioSample[];
   moderation_reason?: string | null;
   moderation_notes?: string | null;
   moderated_at?: string | null;
@@ -135,6 +159,7 @@ export interface EntryDetail extends EntrySummary {
   history_events?: EntryHistoryEvent[];
   examples: Example[];
   comments: EntryComment[];
+  audio_samples: AudioSample[];
 }
 
 export interface SourceSuggestion {
@@ -226,9 +251,31 @@ export interface Profile {
 export interface PublicProfileStats {
   total_entries: number;
   total_comments: number;
+  total_audio: number;
   last_seen_at: string | null;
   last_active_at: string | null;
   submitting_since_at: string | null;
+}
+
+export interface AudioSubmission {
+  id: string;
+  url: string;
+  mime_type: string;
+  duration_seconds: number | null;
+  score_cache: number;
+  created_at: string;
+  entry_id: string | null;
+  entry_slug: string | null;
+  entry_headword: string | null;
+  example_id: string | null;
+  example_sentence_original: string | null;
+}
+
+export interface AudioSubmissionListResponse {
+  items: AudioSubmission[];
+  page: number;
+  page_size: number;
+  total: number;
 }
 
 export interface User {

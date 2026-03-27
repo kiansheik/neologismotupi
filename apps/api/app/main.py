@@ -1,14 +1,17 @@
 import logging
+from pathlib import Path
 from time import perf_counter
 
 from fastapi import FastAPI
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from fastapi.staticfiles import StaticFiles
 from sqlalchemy import text
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from app.api.routes import (
+    audio_router,
     auth_router,
     comment_router,
     entries_router,
@@ -46,6 +49,13 @@ def create_app() -> FastAPI:
     app.add_exception_handler(StarletteHTTPException, http_exception_handler)
     app.add_exception_handler(RequestValidationError, validation_exception_handler)
 
+    media_root = settings.media_root
+    try:
+        Path(media_root).mkdir(parents=True, exist_ok=True)
+    except Exception:
+        request_logger.exception("Failed to create media root directory: %s", media_root)
+    app.mount("/media", StaticFiles(directory=media_root), name="media")
+
     @app.middleware("http")
     async def log_requests_with_user(request, call_next):
         started_at = perf_counter()
@@ -73,6 +83,7 @@ def create_app() -> FastAPI:
             )
 
     app.include_router(auth_router, prefix="/api")
+    app.include_router(audio_router, prefix="/api")
     app.include_router(entries_router, prefix="/api")
     app.include_router(example_router, prefix="/api")
     app.include_router(comment_router, prefix="/api")

@@ -6,12 +6,13 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import selectinload
+from sqlalchemy.orm import selectinload, aliased
 
 from app.core.deps import SessionDep, get_current_user
 from app.core.errors import raise_api_error
 from app.models.discussion import EntryComment, Notification, NotificationPreference
 from app.models.entry import Entry, Example
+from app.models.audio import AudioSample
 from app.models.newsletter import NewsletterSubscription
 from app.models.user import Profile, Session, User
 from app.schemas.notifications import (
@@ -31,10 +32,12 @@ from app.schemas.users import (
     UserPreferencesOut,
     UserPreferencesUpdate,
 )
+from app.schemas.audio import AudioSubmissionListOut, AudioSubmissionOut
 from app.services.notifications import (
     get_or_create_notification_preferences,
     normalize_mention_key,
 )
+from app.services.audio import build_audio_url
 from app.services.newsletters import normalize_locale
 from app.services.user_badges import get_user_badge_leaders, resolve_user_badges
 
@@ -136,6 +139,13 @@ async def _build_public_profile_stats(
             )
         ).scalar_one()
     )
+    total_audio = int(
+        (
+            await db.execute(
+                select(func.count()).select_from(AudioSample).where(AudioSample.user_id == user_id)
+            )
+        ).scalar_one()
+    )
 
     first_entry_at = (
         await db.execute(
@@ -149,6 +159,9 @@ async def _build_public_profile_stats(
         await db.execute(
             select(func.min(EntryComment.created_at)).where(EntryComment.user_id == user_id)
         )
+    ).scalar_one_or_none()
+    first_audio_at = (
+        await db.execute(select(func.min(AudioSample.created_at)).where(AudioSample.user_id == user_id))
     ).scalar_one_or_none()
 
     latest_entry_at = (
@@ -164,6 +177,9 @@ async def _build_public_profile_stats(
             select(func.max(EntryComment.created_at)).where(EntryComment.user_id == user_id)
         )
     ).scalar_one_or_none()
+    latest_audio_at = (
+        await db.execute(select(func.max(AudioSample.created_at)).where(AudioSample.user_id == user_id))
+    ).scalar_one_or_none()
 
     last_seen_at = (
         await db.execute(select(func.max(Session.last_seen_at)).where(Session.user_id == user_id))
@@ -172,10 +188,13 @@ async def _build_public_profile_stats(
     return PublicProfileStatsOut(
         total_entries=total_entries,
         total_comments=total_comments,
+        total_audio=total_audio,
         last_seen_at=last_seen_at,
-        last_active_at=_latest_timestamp([latest_entry_at, latest_example_at, latest_comment_at]),
+        last_active_at=_latest_timestamp(
+            [latest_entry_at, latest_example_at, latest_comment_at, latest_audio_at]
+        ),
         submitting_since_at=_earliest_timestamp(
-            [first_entry_at, first_example_at, first_comment_at]
+            [first_entry_at, first_example_at, first_comment_at, first_audio_at]
         ),
     )
 
@@ -566,3 +585,73 @@ async def get_user_profile(user_id: uuid.UUID, db: SessionDep) -> PublicUserOut:
     profile_out.badges = resolve_user_badges(user.id, badge_leaders)
     profile_out.stats = await _build_public_profile_stats(db, user_id=user.id)
     return PublicUserOut(id=user.id, created_at=user.created_at, profile=profile_out)
+
+
+@router.get("/{user_id}/audio", response_model=AudioSubmissionListOut)
+async def list_user_audio_submissions(
+    user_id: uuid.UUID,
+    db: SessionDep,
+    page: int = Query(default=1, ge=1),
+    page_size: int = Query(default=20, ge=1, le=100),
+) -> AudioSubmissionListOut:
+    user_exists = (
+        await db.execute(select(User.id).where(User.id == user_id))
+    ).scalar_one_or_none()
+    if not user_exists:
+        raise_api_error(status_code=404, code="user_not_found", message="User not found")
+
+    entry_for_example = aliased(Entry)
+
+    base_stmt = (
+        select(AudioSample, Entry, Example, entry_for_example)
+        .outerjoin(Entry, AudioSample.entry_id == Entry.id)
+        .outerjoin(Example, AudioSample.example_id == Example.id)
+        .outerjoin(entry_for_example, Example.entry_id == entry_for_example.id)
+        .where(AudioSample.user_id == user_id)
+        .order_by(AudioSample.created_at.desc())
+    )
+    count_stmt = (
+        select(func.count())
+        .select_from(AudioSample)
+        .where(AudioSample.user_id == user_id)
+    )
+
+    rows = (
+        await db.execute(base_stmt.offset((page - 1) * page_size).limit(page_size))
+    ).all()
+    total = int((await db.execute(count_stmt)).scalar_one())
+
+    items: list[AudioSubmissionOut] = []
+    for sample, entry, example, example_entry in rows:
+        entry_id = None
+        entry_slug = None
+        entry_headword = None
+        example_sentence = None
+        if entry is not None:
+            entry_id = entry.id
+            entry_slug = entry.slug
+            entry_headword = entry.headword
+        elif example_entry is not None:
+            entry_id = example_entry.id
+            entry_slug = example_entry.slug
+            entry_headword = example_entry.headword
+        if example is not None:
+            example_sentence = example.sentence_original
+
+        items.append(
+            AudioSubmissionOut(
+                id=sample.id,
+                url=build_audio_url(sample.file_path),
+                mime_type=sample.mime_type,
+                duration_seconds=sample.duration_seconds,
+                score_cache=sample.score_cache,
+                created_at=sample.created_at,
+                entry_id=entry_id,
+                entry_slug=entry_slug,
+                entry_headword=entry_headword,
+                example_id=example.id if example else None,
+                example_sentence_original=example_sentence,
+            )
+        )
+
+    return AudioSubmissionListOut(items=items, page=page, page_size=page_size, total=total)

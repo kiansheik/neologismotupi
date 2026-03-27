@@ -38,6 +38,9 @@ deploy/env/*.env
 # Local backups
 backups/
 
+# Media uploads
+apps/api/media/
+
 # Alembic artifacts
 alembic.log
 

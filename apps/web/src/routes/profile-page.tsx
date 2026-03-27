@@ -1,15 +1,15 @@
-import { useQuery } from "@tanstack/react-query";
+import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
+import { useMemo } from "react";
 import { Link, useParams } from "react-router-dom";
 
 import { EntryBrowser } from "@/components/entry-browser";
 import { Card } from "@/components/ui/card";
 import { UserBadge } from "@/components/user-badge";
+import { Button } from "@/components/ui/button";
 import { getPublicUser } from "@/features/auth/api";
-import {
-  formatDate,
-  formatRelativeOrDate,
-  formatTimeSince,
-} from "@/i18n/formatters";
+import { listUserAudioSubmissions } from "@/features/audio/api";
+import { CompactAudioPlayer } from "@/features/audio/components";
+import { formatDate, formatRelativeOrDate, formatTimeSince } from "@/i18n/formatters";
 import { useI18n } from "@/i18n";
 import { buildProfileLinks } from "@/lib/profile-links";
 import { buildAbsoluteUrl, useSeo } from "@/lib/seo";
@@ -28,6 +28,22 @@ export function ProfilePage() {
     queryFn: () => getPublicUser(String(userId)),
     enabled: Boolean(userId),
   });
+
+  const audioQuery = useInfiniteQuery({
+    queryKey: ["profile-audio", userId],
+    initialPageParam: 1,
+    queryFn: ({ pageParam }) =>
+      listUserAudioSubmissions(String(userId), { page: Number(pageParam), page_size: 10 }),
+    getNextPageParam: (lastPage, allPages) => {
+      const loadedCount = allPages.reduce((total, page) => total + page.items.length, 0);
+      return loadedCount < lastPage.total ? lastPage.page + 1 : undefined;
+    },
+    enabled: Boolean(userId),
+  });
+  const audioItems = useMemo(
+    () => audioQuery.data?.pages.flatMap((page) => page.items) ?? [],
+    [audioQuery.data],
+  );
 
   const seoProfile = userQuery.data?.profile;
   useSeo({
@@ -155,6 +171,14 @@ export function ProfilePage() {
           </div>
           <div className="rounded-md border border-brand-100 bg-brand-50/30 px-3 py-2">
             <p className="text-xs font-medium uppercase tracking-wide text-slate-500">
+              {t("profile.totalAudio")}
+            </p>
+            <p className="text-base font-semibold text-brand-900">
+              {stats?.total_audio ?? 0}
+            </p>
+          </div>
+          <div className="rounded-md border border-brand-100 bg-brand-50/30 px-3 py-2">
+            <p className="text-xs font-medium uppercase tracking-wide text-slate-500">
               {t("profile.lastActive")}
             </p>
             <p className="text-sm text-slate-700">
@@ -182,6 +206,55 @@ export function ProfilePage() {
             ? `${formatTimeSince(stats.submitting_since_at, locale)} (${formatDate(stats.submitting_since_at, locale)})`
             : t("profile.notAvailable")}
         </p>
+      </Card>
+
+      <Card>
+        <h2 className="text-lg font-semibold text-brand-900">{t("profile.audioTitle")}</h2>
+        <div className="mt-3 space-y-3">
+          {audioQuery.isLoading ? (
+            <p className="text-sm text-slate-600">{t("profile.audioLoading")}</p>
+          ) : audioQuery.isError ? (
+            <p className="text-sm text-red-700">{t("profile.audioLoadError")}</p>
+          ) : audioItems.length ? (
+            audioItems.map((submission) => (
+              <article key={submission.id} className="rounded-md border border-brand-100 p-3">
+                <CompactAudioPlayer src={submission.url} t={t} size="sm" />
+                <p className="mt-2 text-sm text-slate-700">
+                  {submission.entry_slug ? (
+                    <Link className="text-brand-700 hover:underline" to={`/entries/${submission.entry_slug}`}>
+                      {submission.entry_headword ?? t("profile.audioEntryFallback")}
+                    </Link>
+                  ) : (
+                    <span>{t("profile.audioEntryFallback")}</span>
+                  )}
+                </p>
+                {submission.example_sentence_original ? (
+                  <p className="mt-1 text-xs text-slate-600">
+                    {t("profile.audioExampleLabel")}: {submission.example_sentence_original}
+                  </p>
+                ) : null}
+                <p className="mt-1 text-xs text-slate-500">
+                  {t("audio.uploadedAt", { date: formatRelativeOrDate(submission.created_at, locale) })}
+                </p>
+              </article>
+            ))
+          ) : (
+            <p className="text-sm text-slate-600">{t("profile.audioEmpty")}</p>
+          )}
+        </div>
+        {audioQuery.hasNextPage ? (
+          <div className="mt-3">
+            <Button
+              type="button"
+              variant="secondary"
+              className="px-3 py-1.5 text-xs"
+              onClick={() => audioQuery.fetchNextPage()}
+              disabled={audioQuery.isFetchingNextPage}
+            >
+              {audioQuery.isFetchingNextPage ? t("profile.audioLoadingMore") : t("profile.audioLoadMore")}
+            </Button>
+          </div>
+        ) : null}
       </Card>
 
       <EntryBrowser
