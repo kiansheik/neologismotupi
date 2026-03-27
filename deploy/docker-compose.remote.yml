@@ -28,6 +28,8 @@ services:
         condition: service_healthy
       smtp-relay:
         condition: service_started
+    volumes:
+      - media_data:/app/media
 
   newsletter-scheduler:
     build:
@@ -74,5 +76,6 @@ services:
 
 volumes:
   postgres_data:
+  media_data:
   caddy_data:
   caddy_config:

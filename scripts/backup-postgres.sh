@@ -3,6 +3,9 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 API_ENV_FILE="${API_ENV_FILE:-$ROOT_DIR/apps/api/.env}"
+MEDIA_BACKUP_DIR="${MEDIA_BACKUP_DIR:-$ROOT_DIR/backups/media}"
+MEDIA_BACKUP_FILE_BASENAME="${MEDIA_BACKUP_FILE_BASENAME:-nheenga_media}"
+MEDIA_BACKUP_ENABLED="${MEDIA_BACKUP_ENABLED:-1}"
 
 if ! command -v pg_dump >/dev/null 2>&1; then
   echo "pg_dump not found. Install PostgreSQL client tools first."
@@ -40,3 +43,30 @@ if [[ "$BACKUP_RETENTION_DAYS" =~ ^[0-9]+$ ]]; then
 fi
 
 echo "Backup complete."
+
+if [[ "$MEDIA_BACKUP_ENABLED" == "1" ]]; then
+  if [[ -f "$API_ENV_FILE" ]]; then
+    set -a
+    # shellcheck disable=SC1090
+    source "$API_ENV_FILE"
+    set +a
+  fi
+
+  MEDIA_ROOT_INPUT="${MEDIA_ROOT:-media}"
+  API_ENV_DIR="$(cd "$(dirname "$API_ENV_FILE")" && pwd)"
+  if [[ "$MEDIA_ROOT_INPUT" = /* ]]; then
+    MEDIA_ROOT_PATH="$MEDIA_ROOT_INPUT"
+  else
+    MEDIA_ROOT_PATH="$API_ENV_DIR/$MEDIA_ROOT_INPUT"
+  fi
+
+  if [[ -d "$MEDIA_ROOT_PATH" ]]; then
+    mkdir -p "$MEDIA_BACKUP_DIR"
+    MEDIA_OUTPUT_FILE="$MEDIA_BACKUP_DIR/${MEDIA_BACKUP_FILE_BASENAME}_${TIMESTAMP}.tar.gz"
+    echo "Backing up media: $MEDIA_OUTPUT_FILE"
+    tar -C "$MEDIA_ROOT_PATH" -czf "$MEDIA_OUTPUT_FILE" .
+    echo "Media backup complete."
+  else
+    echo "Media directory not found ($MEDIA_ROOT_PATH); skipping media backup."
+  fi
+fi

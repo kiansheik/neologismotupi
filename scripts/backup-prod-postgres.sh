@@ -10,13 +10,16 @@ SSH_PORT="${SSH_PORT:-22}"
 SSH_IDENTITY="${SSH_IDENTITY:-$HOME/.ssh/neologismotupi_ed25519}"
 
 REMOTE_BACKUP_DIR="${REMOTE_BACKUP_DIR:-$DEPLOY_PATH/backups/postgres}"
+REMOTE_MEDIA_BACKUP_DIR="${REMOTE_MEDIA_BACKUP_DIR:-$DEPLOY_PATH/backups/media}"
 REMOTE_BACKUP_SCRIPT="${REMOTE_BACKUP_SCRIPT:-$DEPLOY_PATH/scripts/backup-postgres.sh}"
 REMOTE_API_ENV_FILE="${REMOTE_API_ENV_FILE:-$DEPLOY_PATH/apps/api/.env.production}"
 REMOTE_COMPOSE_FILE="${REMOTE_COMPOSE_FILE:-$DEPLOY_PATH/deploy/docker-compose.remote.yml}"
 REMOTE_STACK_ENV="${REMOTE_STACK_ENV:-$DEPLOY_PATH/deploy/env/stack.env}"
 REMOTE_BACKUP_MODE="${REMOTE_BACKUP_MODE:-auto}" # auto | docker | host
 BACKUP_FILE_BASENAME="${BACKUP_FILE_BASENAME:-nheenga}"
+MEDIA_BACKUP_FILE_BASENAME="${MEDIA_BACKUP_FILE_BASENAME:-nheenga_media}"
 LOCAL_BACKUP_DIR="${LOCAL_BACKUP_DIR:-$ROOT_DIR/backups/prod-postgres}"
+LOCAL_MEDIA_BACKUP_DIR="${LOCAL_MEDIA_BACKUP_DIR:-$ROOT_DIR/backups/prod-media}"
 SKIP_REMOTE_BACKUP="${SKIP_REMOTE_BACKUP:-0}"
 
 if [[ -z "$DEPLOY_HOST" ]]; then
@@ -47,11 +50,15 @@ run_remote_backup() {
       set -euo pipefail
       cd \"$DEPLOY_PATH\"
       mkdir -p \"$REMOTE_BACKUP_DIR\"
+      mkdir -p \"$REMOTE_MEDIA_BACKUP_DIR\"
       ts=\$(date -u +\"%Y%m%dT%H%M%SZ\")
       out=\"$REMOTE_BACKUP_DIR/${BACKUP_FILE_BASENAME}_\${ts}.sql.gz\"
       docker compose -f \"$REMOTE_COMPOSE_FILE\" --env-file \"$REMOTE_STACK_ENV\" exec -T postgres \
         bash -lc \"PGPASSWORD=\\\"\\\${POSTGRES_PASSWORD:-}\\\" pg_dump -U \\\"\\\${POSTGRES_USER}\\\" -d \\\"\\\${POSTGRES_DB}\\\" --no-owner --no-privileges\" \
         | gzip > \"\$out\"
+      docker compose -f \"$REMOTE_COMPOSE_FILE\" --env-file \"$REMOTE_STACK_ENV\" exec -T api \
+        sh -lc \"mkdir -p /app/media && tar -C /app -czf - media\" \
+        > \"$REMOTE_MEDIA_BACKUP_DIR/${MEDIA_BACKUP_FILE_BASENAME}_\${ts}.tar.gz\"
       echo \"\$out\"
     '"
     return $?
@@ -95,3 +102,14 @@ echo "Downloading $latest_remote to $LOCAL_BACKUP_DIR"
 scp "${SCP_OPTS[@]}" "$REMOTE:$latest_remote" "$LOCAL_BACKUP_DIR/"
 
 echo "Backup downloaded: $LOCAL_BACKUP_DIR/$(basename "$latest_remote")"
+
+echo "Finding latest media backup on $REMOTE..."
+latest_media_remote="$(ssh "${SSH_OPTS[@]}" "$REMOTE" "ls -t '$REMOTE_MEDIA_BACKUP_DIR/${MEDIA_BACKUP_FILE_BASENAME}_'*.tar.gz 2>/dev/null | head -n 1")"
+if [[ -n "$latest_media_remote" ]]; then
+  mkdir -p "$LOCAL_MEDIA_BACKUP_DIR"
+  echo "Downloading $latest_media_remote to $LOCAL_MEDIA_BACKUP_DIR"
+  scp "${SCP_OPTS[@]}" "$REMOTE:$latest_media_remote" "$LOCAL_MEDIA_BACKUP_DIR/"
+  echo "Media backup downloaded: $LOCAL_MEDIA_BACKUP_DIR/$(basename "$latest_media_remote")"
+else
+  echo "No media backup files found in $REMOTE_MEDIA_BACKUP_DIR."
+fi

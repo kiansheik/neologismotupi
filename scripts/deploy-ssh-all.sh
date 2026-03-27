@@ -276,6 +276,7 @@ if [[ "${DEPLOY_MODE:-full}" == "daily" ]]; then
 else
   "${DC[@]}" -f "$COMPOSE_FILE" --env-file "$ENV_FILE" up -d api caddy
 fi
+"${DC[@]}" -f "$COMPOSE_FILE" --env-file "$ENV_FILE" up -d newsletter-scheduler
 
 if [[ -n "${DEPLOY_SEED_CSV_REMOTE:-}" && -f "${DEPLOY_SEED_CSV_REMOTE}" ]]; then
   echo "Seeding database from CSV: ${DEPLOY_SEED_CSV_REMOTE}"

@@ -6,6 +6,8 @@ import asyncio
 import subprocess
 import tempfile
 
+import logging
+
 from fastapi import UploadFile
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -13,6 +15,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.config import get_settings
 from app.core.errors import raise_api_error
 from app.models.audio import AudioSample, AudioVote
+
+logger = logging.getLogger("uvicorn.error")
 
 ALLOWED_AUDIO_TYPES: dict[str, str] = {
     "audio/mpeg": "mp3",
@@ -97,8 +101,9 @@ def _process_audio_file(path: Path) -> None:
                 str(temp_path),
             ],
             check=True,
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
             timeout=settings.audio_processing_timeout_seconds,
         )
         temp_path.replace(path)
@@ -143,13 +148,11 @@ async def save_audio_upload(
     target_path.write_bytes(payload)
     try:
         await asyncio.to_thread(_process_audio_file, target_path)
-    except Exception:  # noqa: BLE001
-        target_path.unlink(missing_ok=True)
-        raise_api_error(
-            status_code=500,
-            code="audio_processing_failed",
-            message="Audio processing failed",
-        )
+    except Exception as exc:  # noqa: BLE001
+        details = None
+        if isinstance(exc, subprocess.CalledProcessError):
+            details = exc.stderr or exc.stdout
+        logger.exception("Audio processing failed; keeping original file. %s", details or "")
 
     sample = AudioSample(
         id=audio_id,

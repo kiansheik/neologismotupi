@@ -384,20 +384,6 @@ export function AudioCapture({
           </Button>
           <Button
             type="button"
-            variant="secondary"
-            className={iconButtonBase}
-            onClick={() => {
-              clearPendingRecording();
-              beginCountdown();
-            }}
-            disabled={isBusy}
-            title={t("audio.redoRecording")}
-            aria-label={t("audio.redoRecording")}
-          >
-            <span className="text-base">🔄</span>
-          </Button>
-          <Button
-            type="button"
             variant="ghost"
             className={`${iconButtonBase} ${iconButtonDanger}`}
             onClick={clearPendingRecording}
