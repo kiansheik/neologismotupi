@@ -1,6 +1,9 @@
 # Dicionário de Tupi
 
+Official site: https://neo.academiatupi.com
+
 Community-built living dictionary of Tupi usage, historical and contemporary.
+This repository is still named `neologismotupi` for historical reasons: the project began focused on documenting contemporary neologisms, but it has since expanded to include historical sources and broader usage, so the product name evolved to Dicionário de Tupi.
 
 ## What this project is
 Dicionário de Tupi is a community platform for collecting, reviewing, and discussing Tupi entries and usage examples - historical, contemporary, and newly coined. It is not an official dictionary.

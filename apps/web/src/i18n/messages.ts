@@ -475,7 +475,7 @@ export const ptBR = {
   "about.fundingTitle": "Financiamento, contato e código aberto",
   "about.fundingBody":
     "O projeto é financiado pessoalmente por Kian Sheik. Doações via Pix e dúvidas sobre o site podem ser tratadas por e-mail.",
-  "about.contactPrefix": "Contato:",
+  "about.contactPrefix": "Contato e chave de Pix:",
   "about.opensourceBody":
     "O projeto é 100% open-source. Se você tiver boas ideias para melhorar a plataforma, faça um fork no GitHub e contribua.",
   "about.githubCta": "Ver repositório no GitHub",
@@ -1018,7 +1018,7 @@ const tupiOverrides: Partial<Record<TranslationKey, string>> = {
 
    "nav.entries": "Temimondó",
   "nav.submit": "Eîmondó",
-  "nav.about": "Asé resé",
+  "nav.about": "Oré resé",
   "nav.moderation": "Moderação",
   "nav.me": "Xe îekuabegûaba",
   "nav.logout": "Esem",
@@ -1036,22 +1036,22 @@ const tupiOverrides: Partial<Record<TranslationKey, string>> = {
   "entries.searchAria": "Esekar temimondó",
   "entries.searchPlaceholder": "Tesekar tupinhe'enga pupé konipó perónhe'enga pupé",
 
-  "entries.allStatuses": "Todos os status",
+  "entries.allStatuses": "Opá sekoaba",
   "entries.sort.alphabetical": "Alfabética",
   "entries.sort.recent": "Recentes",
   "entries.sort.score": "Pontuação",
-  "entries.sort.mostExamples": "Mais exemplos",
-  "entries.resultsTitle": "Resultados",
-  "entries.loading": "Carregando verbetes...",
-  "entries.loadingMore": "Carregando mais verbetes...",
-  "entries.noMatches": "Nenhum verbete encontrado.",
-  "entries.scoreExamples": "Pontuação: {score} · Exemplos: {examples}",
-  "entries.submittedBy": "Enviado por",
+  "entries.sort.mostExamples": "Eîarybé amõ sa'angaba",
+  "entries.resultsTitle": "i basemagûera",
+  "entries.loading": "temimondé mombosyîa...",
+  "entries.loadingMore": "amõ temimondé mombosyîbebo...",
+  "entries.noMatches": "Nditybi temimondó.",
+  "entries.scoreExamples": "ipapasaba: {score} · Sa'angaba: {examples}",
+  "entries.submittedBy": "semimondosara",
   "reputation.label": "Karma: {score}",
-  "badge.founder": "Fundador construtor",
-  "badge.topContributor": "Mais dedicado",
-  "badge.karmaLeader": "Mais popular (qualidade)",
-  "badge.community": "Comunidade",  
+  "badge.founder": "Koba'e monhangarypy",
+  "badge.topContributor": "Oporabykyba'e-eté",
+  "badge.karmaLeader": "Serapûaneté (i katûaba)",
+  "badge.community": "Anametá",  
 };
 
 export const tupiBrasil: Record<TranslationKey, string> = {
