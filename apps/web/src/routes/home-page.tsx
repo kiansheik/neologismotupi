@@ -2,10 +2,12 @@ import { Link } from "react-router-dom";
 
 import { EntryBrowser } from "@/components/entry-browser";
 import { Card } from "@/components/ui/card";
+import { useCurrentUser } from "@/features/auth/hooks";
 import { useI18n } from "@/i18n";
 
 export function HomePage() {
   const { t } = useI18n();
+  const { data: currentUser } = useCurrentUser();
 
   return (
     <section className="space-y-6">
@@ -38,6 +40,7 @@ export function HomePage() {
         title={t("home.recent")}
         emptyMessage={t("home.noEntries")}
         initialSort="recent"
+        allowUnseenFilter={Boolean(currentUser)}
       />
     </section>
   );

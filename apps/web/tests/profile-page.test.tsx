@@ -22,7 +22,10 @@ vi.mock("@/features/auth/api", () => ({
       badges: ["founder"],
       stats: {
         total_entries: 12,
+        entry_vote_cost_entries: 12,
         total_comments: 7,
+        total_entry_votes: 0,
+        entry_vote_cost_votes: 0,
         last_seen_at: "2026-03-14T10:00:00Z",
         last_active_at: "2026-03-14T09:00:00Z",
         submitting_since_at: "2026-01-10T00:00:00Z",

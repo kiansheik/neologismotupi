@@ -1,4 +1,5 @@
 import json
+from datetime import UTC, datetime
 from functools import lru_cache
 
 from pydantic import field_validator, model_validator
@@ -29,6 +30,12 @@ class Settings(BaseSettings):
 
     downvote_min_account_age_hours: int = 72
     enforce_downvote_account_age: bool = True
+    downvote_requires_comment: bool = True
+    downvote_comment_min_length: int = 5
+    downvote_comment_exempt_staff: bool = False
+    entry_vote_cost: int = 3
+    entry_vote_cost_exempt_staff: bool = False
+    entry_vote_cost_start_at: datetime | None = None
     pending_entry_threshold: int = 3
     pending_example_threshold: int = 5
     auto_approve_after_threshold: int = -1
@@ -113,6 +120,24 @@ class Settings(BaseSettings):
     def validate_auto_approve_after_threshold(cls, value: int) -> int:
         if value < -1:
             raise ValueError("AUTO_APPROVE_AFTER_THRESHOLD must be -1 or >= 0")
+        return value
+
+    @field_validator("entry_vote_cost_start_at", mode="before")
+    @classmethod
+    def normalize_entry_vote_cost_start_at(cls, value: str | datetime | None) -> datetime | None:
+        if value is None:
+            return None
+        if isinstance(value, str) and not value.strip():
+            return None
+        return value
+
+    @field_validator("entry_vote_cost_start_at")
+    @classmethod
+    def ensure_entry_vote_cost_start_at_timezone(cls, value: datetime | None) -> datetime | None:
+        if value is None:
+            return None
+        if value.tzinfo is None:
+            return value.replace(tzinfo=UTC)
         return value
 
     @field_validator("email_delivery", mode="before")

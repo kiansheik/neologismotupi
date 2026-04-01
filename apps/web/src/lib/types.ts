@@ -230,6 +230,12 @@ export interface EntryListResponse {
   total: number;
 }
 
+export interface EntryConstraints {
+  entry_vote_cost: number;
+  downvote_requires_comment: boolean;
+  downvote_comment_min_length: number;
+}
+
 export interface Profile {
   id: string;
   display_name: string;
@@ -250,6 +256,9 @@ export interface Profile {
 
 export interface PublicProfileStats {
   total_entries: number;
+  entry_vote_cost_entries: number;
+  total_entry_votes: number;
+  entry_vote_cost_votes: number;
   total_comments: number;
   total_audio: number;
   last_seen_at: string | null;

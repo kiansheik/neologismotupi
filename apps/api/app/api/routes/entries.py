@@ -4,7 +4,7 @@ from datetime import UTC, datetime
 from typing import Annotated, Literal
 
 from fastapi import APIRouter, Depends, Query, Request, Response, status, UploadFile, File
-from sqlalchemy import and_, func, or_, select
+from sqlalchemy import and_, exists, func, or_, select
 from sqlalchemy.orm import selectinload
 
 from app.config import get_settings
@@ -28,6 +28,7 @@ from app.schemas.entries import (
     EntryCommentOut,
     EntryDetailOut,
     EntryHistoryEventOut,
+    EntryConstraintsOut,
     EntryListOut,
     EntryUpdate,
     EntryVersionOut,
@@ -47,12 +48,15 @@ from app.services.entries import (
     build_example_status_for_submission,
     can_downvote,
     count_user_entries,
+    count_user_entry_votes,
     count_user_examples,
+    get_entry_vote_cost_start_at,
     create_entry_version,
     create_example_version,
     ensure_unique_slug,
     find_possible_duplicates,
     is_effectively_empty,
+    is_valid_headword,
     load_entry_for_update,
     normalize_headword,
     refresh_comment_vote_caches,
@@ -97,6 +101,16 @@ ENTRY_HISTORY_ACTION_TYPES = {
     "entry_disputed",
     "entry_verified_by_vote",
 }
+
+
+@router.get("/constraints", response_model=EntryConstraintsOut)
+async def get_entry_constraints() -> EntryConstraintsOut:
+    settings = get_settings()
+    return EntryConstraintsOut(
+        entry_vote_cost=settings.entry_vote_cost,
+        downvote_requires_comment=settings.downvote_requires_comment,
+        downvote_comment_min_length=settings.downvote_comment_min_length,
+    )
 
 
 async def _load_entry_with_relations(db: SessionDep, entry_id: uuid.UUID) -> Entry | None:
@@ -507,7 +521,8 @@ async def list_entries(
     source_work_id: uuid.UUID | None = None,
     proposer_user_id: uuid.UUID | None = None,
     mine: bool = False,
-    sort: Literal["alphabetical", "recent", "newest", "score", "most_examples"] = "recent",
+    unseen: bool = False,
+    sort: Literal["alphabetical", "recent", "newest", "score", "most_examples", "unseen"] = "recent",
 ) -> EntryListOut:
     stmt = select(Entry).options(
         selectinload(Entry.tags).selectinload(EntryTag.tag),
@@ -527,6 +542,9 @@ async def list_entries(
             )
         )
 
+    if sort == "unseen":
+        unseen = True
+
     if status_filter:
         conditions.append(Entry.status == status_filter)
     else:
@@ -545,6 +563,17 @@ async def list_entries(
         conditions.append(Entry.proposer_user_id == user.id)
     elif proposer_user_id is not None:
         conditions.append(Entry.proposer_user_id == proposer_user_id)
+
+    if unseen:
+        if not user:
+            raise_api_error(
+                status_code=401,
+                code="unauthenticated",
+                message="Authentication required for unseen=true",
+            )
+        conditions.append(
+            ~exists().where(and_(Vote.entry_id == Entry.id, Vote.user_id == user.id))
+        )
 
     if topic or region:
         stmt = stmt.join(EntryTag, EntryTag.entry_id == Entry.id).join(Tag, Tag.id == EntryTag.tag_id)
@@ -590,7 +619,11 @@ async def list_entries(
         stmt = stmt.where(and_(*conditions))
         count_stmt = count_stmt.where(and_(*conditions))
 
-    if sort == "score":
+    total_votes_expr = Entry.upvote_count_cache + Entry.downvote_count_cache
+
+    if sort == "unseen":
+        stmt = stmt.order_by(total_votes_expr.asc(), Entry.created_at.desc())
+    elif sort == "score":
         stmt = stmt.order_by(Entry.score_cache.desc(), Entry.created_at.desc())
     elif sort == "most_examples":
         stmt = stmt.order_by(Entry.example_count_cache.desc(), Entry.created_at.desc())
@@ -694,12 +727,52 @@ async def create_entry(
 
     if is_effectively_empty(payload.headword) or is_effectively_empty(payload.gloss_pt):
         raise_api_error(status_code=400, code="empty_submission", message="Entry content cannot be empty")
+    if not is_valid_headword(payload.headword):
+        raise_api_error(
+            status_code=400,
+            code="invalid_headword_format",
+            message="Headword contains invalid characters",
+        )
 
     short_definition = (
         collapse_whitespace(payload.short_definition)
         if payload.short_definition is not None and not is_effectively_empty(payload.short_definition)
         else collapse_whitespace(payload.gloss_pt)
     )
+
+    user_entry_count = await count_user_entries(db, user.id)
+    if settings.entry_vote_cost > 0 and not (
+        user.is_superuser and settings.entry_vote_cost_exempt_staff
+    ):
+        cost_start_at = get_entry_vote_cost_start_at()
+        chargeable_entries = (
+            await count_user_entries(db, user.id, created_after=cost_start_at)
+            if cost_start_at
+            else user_entry_count
+        )
+        votes_cast = (
+            await count_user_entry_votes(db, user.id, created_after=cost_start_at)
+            if cost_start_at
+            else await count_user_entry_votes(db, user.id)
+        )
+        required_votes = (chargeable_entries + 1) * settings.entry_vote_cost
+        if votes_cast < required_votes:
+            balance = votes_cast - (chargeable_entries * settings.entry_vote_cost)
+            needed = required_votes - votes_cast
+            raise_api_error(
+                status_code=403,
+                code="entry_vote_quota",
+                message="Not enough entry votes to submit a new entry",
+                details={
+                    "required_votes": required_votes,
+                    "votes_cast": votes_cast,
+                    "entries_submitted": user_entry_count,
+                    "entries_charged": chargeable_entries,
+                    "entry_vote_cost": settings.entry_vote_cost,
+                    "balance": balance,
+                    "needed": needed,
+                },
+            )
 
     normalized_headword = normalize_headword(payload.headword)
     duplicates = await find_possible_duplicates(
@@ -725,7 +798,6 @@ async def create_entry(
             details={"duplicates": duplicate_payload},
         )
 
-    user_entry_count = await count_user_entries(db, user.id)
     status_value = build_entry_status_for_submission(user, user_entry_count)
 
     base_slug = slugify(payload.headword)
@@ -821,6 +893,12 @@ async def update_entry(
     if payload.headword is not None:
         if is_effectively_empty(payload.headword):
             raise_api_error(status_code=400, code="empty_submission", message="Headword cannot be empty")
+        if not is_valid_headword(payload.headword):
+            raise_api_error(
+                status_code=400,
+                code="invalid_headword_format",
+                message="Headword contains invalid characters",
+            )
         entry.headword = collapse_whitespace(payload.headword)
         entry.normalized_headword = normalize_headword(payload.headword)
         entry.slug = await ensure_unique_slug(db, slugify(payload.headword), entry.id)
@@ -961,6 +1039,36 @@ async def vote_entry(
             code="self_vote_forbidden",
             message="You cannot vote on your own entry",
         )
+
+    settings = get_settings()
+    if (
+        payload.value == -1
+        and settings.downvote_requires_comment
+        and not (user.is_superuser and settings.downvote_comment_exempt_staff)
+    ):
+        min_length = settings.downvote_comment_min_length
+        comment_count = int(
+            (
+                await db.execute(
+                    select(func.count())
+                    .select_from(EntryComment)
+                    .where(
+                        and_(
+                            EntryComment.entry_id == entry_id,
+                            EntryComment.user_id == user.id,
+                            func.length(func.trim(EntryComment.body)) >= min_length,
+                        )
+                    )
+                )
+            ).scalar_one()
+        )
+        if comment_count == 0:
+            raise_api_error(
+                status_code=403,
+                code="downvote_comment_required",
+                message="Downvote requires a comment on the entry",
+                details={"min_length": min_length},
+            )
 
     existing_vote = (
         await db.execute(select(Vote).where(and_(Vote.entry_id == entry_id, Vote.user_id == user.id)))

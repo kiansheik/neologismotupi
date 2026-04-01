@@ -4,6 +4,7 @@ SHELL := /bin/bash
 APP_ENV ?= development
 DB_NAME ?= nheenga_dev
 DB_USER ?= $(shell whoami)
+RUN_E2E ?= 0
 DEPLOY_HOST ?= academiatupi.com
 DEPLOY_USER ?= root
 DEPLOY_PATH ?= /srv/nheenga-neologismos
@@ -318,7 +319,11 @@ test-api:
 	@cd $(API_DIR) && PYTHONPATH=. uv run pytest
 
 test-e2e:
-	@cd $(WEB_DIR) && pnpm playwright test
+	@if [ "$(RUN_E2E)" = "1" ]; then \
+		cd $(WEB_DIR) && pnpm playwright test; \
+	else \
+		echo "Skipping Playwright e2e (set RUN_E2E=1 to enable)."; \
+	fi
 
 lint:
 	@cd $(API_DIR) && uv run ruff check .

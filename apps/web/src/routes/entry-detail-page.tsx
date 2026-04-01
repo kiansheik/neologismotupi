@@ -1380,13 +1380,13 @@ export function EntryDetailPage() {
             />
           </p>
         ) : null}
-        {(entry.audio_samples.length > 0 || canWrite) ? (
+        {((entry.audio_samples?.length ?? 0) > 0 || canWrite) ? (
           <div className="mt-3 rounded-md border border-brand-100 bg-white/70 p-3">
             <h2 className="text-sm font-semibold text-brand-900">{t("audio.entryTitle")}</h2>
             <p className="mt-1 text-xs text-slate-600">{t("audio.entryHelp")}</p>
             <div className="mt-2">
               <AudioSampleList
-                samples={entry.audio_samples}
+                samples={entry.audio_samples ?? []}
                 locale={locale}
                 t={t}
                 canVote={canWrite}
@@ -1847,12 +1847,12 @@ export function EntryDetailPage() {
                       {t("entry.moderationReason")}: {example.moderation_reason || example.moderation_notes}
                     </p>
                   ) : null}
-                  {(example.audio_samples.length > 0 || canWrite) ? (
+                  {((example.audio_samples?.length ?? 0) > 0 || canWrite) ? (
                     <div className="mt-2 rounded-md border border-brand-100 bg-white/70 p-2">
                       <p className="text-xs font-semibold text-brand-900">{t("audio.exampleTitle")}</p>
                       <div className="mt-2">
                         <AudioSampleList
-                          samples={example.audio_samples}
+                          samples={example.audio_samples ?? []}
                           locale={locale}
                           t={t}
                           canVote={canWrite}

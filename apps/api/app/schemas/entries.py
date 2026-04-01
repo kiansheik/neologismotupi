@@ -182,6 +182,12 @@ class EntryListOut(BaseModel):
     total: int
 
 
+class EntryConstraintsOut(BaseModel):
+    entry_vote_cost: int
+    downvote_requires_comment: bool
+    downvote_comment_min_length: int
+
+
 class EntryCreate(BaseModel):
     headword: str = Field(min_length=1, max_length=180)
     gloss_pt: str = Field(min_length=1, max_length=255)

@@ -92,7 +92,8 @@ async def test_non_moderator_entries_remain_pending_after_threshold(client):
     await register_user(client, "trusted-user@example.com", "Trusted User")
 
     for index in range(1, 6):
-        created = await create_entry(client, f"trusted-user-entry-{index}")
+        suffix = chr(96 + index)
+        created = await create_entry(client, f"trusted-user-entry-{suffix}")
         assert created["status"] == "pending"
 
 
@@ -104,6 +105,38 @@ async def test_auto_approve_threshold_zero_approves_immediately(client, monkeypa
     await register_user(client, "auto-approve-user@example.com", "Auto Approve User")
     entry = await create_entry(client, "auto-approve-immediate")
     assert entry["status"] == "approved"
+
+
+@pytest.mark.asyncio
+async def test_superuser_entries_require_peer_approval(client):
+    await register_user(client, "superuser-owner@example.com", "Super Owner")
+
+    async with db_module.AsyncSessionLocal() as session:
+        owner = (
+            await session.execute(select(User).where(User.email == "superuser-owner@example.com"))
+        ).scalar_one()
+        owner.is_superuser = True
+        await session.commit()
+
+    entry = await create_entry(client, "superuser-pending-entry")
+    assert entry["status"] == "pending"
+
+    self_approve = await client.post(f"/api/mod/entries/{entry['id']}/approve", json={})
+    assert self_approve.status_code == 403
+
+    await client.post("/api/auth/logout")
+    await register_user(client, "superuser-peer@example.com", "Super Peer")
+
+    async with db_module.AsyncSessionLocal() as session:
+        peer = (
+            await session.execute(select(User).where(User.email == "superuser-peer@example.com"))
+        ).scalar_one()
+        peer.is_superuser = True
+        await session.commit()
+
+    approve = await client.post(f"/api/mod/entries/{entry['id']}/approve", json={"notes": "peer ok"})
+    assert approve.status_code == 200, approve.text
+    assert approve.json()["status"] == "approved"
 
 
 @pytest.mark.asyncio
@@ -134,6 +167,78 @@ async def test_entry_source_citation_is_detail_only(client):
     detail_response = await client.get(f"/api/entries/{created['slug']}")
     assert detail_response.status_code == 200, detail_response.text
     assert detail_response.json()["source_citation"] == "Protocolo Mendonça · p. 22"
+
+
+@pytest.mark.asyncio
+async def test_invalid_headword_rejected(client):
+    await register_user(client, "invalid-headword@example.com", "Invalid Headword")
+    response = await client.post(
+        "/api/entries",
+        json={
+            "headword": "eminondó (ou emimosó)",
+            "gloss_pt": "teste",
+            "gloss_en": "test",
+            "part_of_speech": "noun",
+            "short_definition": "Headword with parentheses should be rejected.",
+            "morphology_notes": "seed note",
+            "force_submit": True,
+            "tag_ids": [],
+        },
+    )
+    assert response.status_code == 400, response.text
+    assert response.json()["error"]["code"] == "invalid_headword_format"
+
+
+@pytest.mark.asyncio
+async def test_entry_vote_quota_requires_votes(client, monkeypatch):
+    await register_user(client, "seed-entries@example.com", "Seed Entries")
+    entry_a = await create_entry(client, "seed-entry-a")
+    entry_b = await create_entry(client, "seed-entry-b")
+    entry_c = await create_entry(client, "seed-entry-c")
+
+    await client.post("/api/auth/logout")
+    await register_user(client, "quota-user@example.com", "Quota User")
+
+    monkeypatch.setenv("ENTRY_VOTE_COST", "3")
+    get_settings.cache_clear()
+
+    response = await client.post(
+        "/api/entries",
+        json={
+            "headword": "quota-entry",
+            "gloss_pt": "teste",
+            "gloss_en": "test",
+            "part_of_speech": "noun",
+            "short_definition": "Quota gated entry.",
+            "morphology_notes": "seed note",
+            "force_submit": True,
+            "tag_ids": [],
+        },
+    )
+    assert response.status_code == 403, response.text
+    assert response.json()["error"]["code"] == "entry_vote_quota"
+
+    for entry in (entry_a, entry_b, entry_c):
+        vote_response = await client.post(
+            f"/api/entries/{entry['id']}/vote",
+            json={"value": 1},
+        )
+        assert vote_response.status_code == 200, vote_response.text
+
+    response = await client.post(
+        "/api/entries",
+        json={
+            "headword": "quota-entry",
+            "gloss_pt": "teste",
+            "gloss_en": "test",
+            "part_of_speech": "noun",
+            "short_definition": "Quota gated entry.",
+            "morphology_notes": "seed note",
+            "force_submit": True,
+            "tag_ids": [],
+        },
+    )
+    assert response.status_code == 201, response.text
 
 
 @pytest.mark.asyncio
@@ -712,6 +817,33 @@ async def test_new_user_can_downvote_when_account_age_gate_is_disabled(client, m
 
     await client.post("/api/auth/logout")
     await register_user(client, "beta-newbie@example.com", "Beta Newbie")
+
+    response = await client.post(f"/api/entries/{entry['id']}/vote", json={"value": -1})
+    assert response.status_code == 200, response.text
+
+
+@pytest.mark.asyncio
+async def test_downvote_requires_comment(client, monkeypatch):
+    monkeypatch.setenv("DOWNVOTE_REQUIRES_COMMENT", "true")
+    monkeypatch.setenv("DOWNVOTE_COMMENT_MIN_LENGTH", "5")
+    monkeypatch.setenv("ENFORCE_DOWNVOTE_ACCOUNT_AGE", "false")
+    get_settings.cache_clear()
+
+    await register_user(client, "downvote-owner@example.com", "Downvote Owner")
+    entry = await create_entry(client, "downvote-comment-target")
+
+    await client.post("/api/auth/logout")
+    await register_user(client, "downvote-voter@example.com", "Downvote Voter")
+
+    response = await client.post(f"/api/entries/{entry['id']}/vote", json={"value": -1})
+    assert response.status_code == 403, response.text
+    assert response.json()["error"]["code"] == "downvote_comment_required"
+
+    comment_response = await client.post(
+        f"/api/entries/{entry['id']}/comments",
+        json={"body": "Motivo claro"},
+    )
+    assert comment_response.status_code == 201, comment_response.text
 
     response = await client.post(f"/api/entries/{entry['id']}/vote", json={"value": -1})
     assert response.status_code == 200, response.text

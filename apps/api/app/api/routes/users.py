@@ -4,14 +4,14 @@ from datetime import UTC, datetime
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Query
-from sqlalchemy import func, select, update
+from sqlalchemy import and_, func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload, aliased
 
 from app.core.deps import SessionDep, get_current_user
 from app.core.errors import raise_api_error
 from app.models.discussion import EntryComment, Notification, NotificationPreference
-from app.models.entry import Entry, Example
+from app.models.entry import Entry, Example, Vote
 from app.models.audio import AudioSample
 from app.models.newsletter import NewsletterSubscription
 from app.models.user import Profile, Session, User
@@ -40,6 +40,7 @@ from app.services.notifications import (
 from app.services.audio import build_audio_url
 from app.services.newsletters import normalize_locale
 from app.services.user_badges import get_user_badge_leaders, resolve_user_badges
+from app.services.entries import get_entry_vote_cost_start_at, count_user_entry_votes
 
 router = APIRouter(prefix="/users", tags=["users"])
 
@@ -130,6 +131,37 @@ async def _build_public_profile_stats(
             )
         ).scalar_one()
     )
+    chargeable_entries = total_entries
+    entry_vote_cost_start_at = get_entry_vote_cost_start_at()
+    if entry_vote_cost_start_at is not None:
+        chargeable_entries = int(
+            (
+                await db.execute(
+                    select(func.count())
+                    .select_from(Entry)
+                    .where(
+                        and_(
+                            Entry.proposer_user_id == user_id,
+                            Entry.created_at >= entry_vote_cost_start_at,
+                        )
+                    )
+                )
+            ).scalar_one()
+        )
+    total_entry_votes = int(
+        (
+            await db.execute(
+                select(func.count()).select_from(Vote).where(Vote.user_id == user_id)
+            )
+        ).scalar_one()
+    )
+    entry_vote_cost_votes = total_entry_votes
+    if entry_vote_cost_start_at is not None:
+        entry_vote_cost_votes = await count_user_entry_votes(
+            db,
+            user_id,
+            created_after=entry_vote_cost_start_at,
+        )
     total_comments = int(
         (
             await db.execute(
@@ -187,6 +219,9 @@ async def _build_public_profile_stats(
 
     return PublicProfileStatsOut(
         total_entries=total_entries,
+        entry_vote_cost_entries=chargeable_entries,
+        total_entry_votes=total_entry_votes,
+        entry_vote_cost_votes=entry_vote_cost_votes,
         total_comments=total_comments,
         total_audio=total_audio,
         last_seen_at=last_seen_at,
