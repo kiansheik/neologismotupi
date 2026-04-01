@@ -1,4 +1,5 @@
 import uuid
+import unicodedata
 from datetime import UTC, datetime, timedelta
 
 from sqlalchemy import and_, delete, func, or_, select
@@ -206,7 +207,7 @@ async def refresh_comment_vote_caches(db: AsyncSession, comment: EntryComment) -
 
 def should_new_entry_be_pending(user_entry_count: int, is_superuser: bool) -> bool:
     if is_superuser:
-        return False
+        return True
     return user_entry_count < get_settings().pending_entry_threshold
 
 
@@ -237,8 +238,36 @@ async def load_entry_for_update(db: AsyncSession, entry_id: uuid.UUID) -> Entry 
     return (await db.execute(stmt)).scalar_one_or_none()
 
 
-async def count_user_entries(db: AsyncSession, user_id: uuid.UUID) -> int:
+async def count_user_entries(
+    db: AsyncSession,
+    user_id: uuid.UUID,
+    *,
+    created_after: datetime | None = None,
+) -> int:
     stmt = select(func.count()).where(Entry.proposer_user_id == user_id)
+    if created_after is not None:
+        stmt = stmt.where(Entry.created_at >= created_after)
+    return int((await db.execute(stmt)).scalar_one())
+
+
+def get_entry_vote_cost_start_at() -> datetime | None:
+    start_at = get_settings().entry_vote_cost_start_at
+    if start_at is None:
+        return None
+    if start_at.tzinfo is None:
+        return start_at.replace(tzinfo=UTC)
+    return start_at
+
+
+async def count_user_entry_votes(
+    db: AsyncSession,
+    user_id: uuid.UUID,
+    *,
+    created_after: datetime | None = None,
+) -> int:
+    stmt = select(func.count()).select_from(Vote).where(Vote.user_id == user_id)
+    if created_after is not None:
+        stmt = stmt.where(Vote.created_at >= created_after)
     return int((await db.execute(stmt)).scalar_one())
 
 
@@ -249,7 +278,7 @@ async def count_user_examples(db: AsyncSession, user_id: uuid.UUID) -> int:
 
 def build_entry_status_for_submission(user: User, user_entry_count: int) -> EntryStatus:
     if user.is_superuser:
-        return EntryStatus.approved
+        return EntryStatus.pending
 
     settings = get_settings()
     if settings.auto_approve_after_threshold >= 0 and user_entry_count >= settings.auto_approve_after_threshold:
@@ -269,6 +298,23 @@ def build_example_status_for_submission(user: User, user_example_count: int) -> 
 
 def cleaned_text(value: str) -> str:
     return collapse_whitespace(value)
+
+
+def is_valid_headword(value: str) -> bool:
+    cleaned = collapse_whitespace(value).strip()
+    if not cleaned:
+        return False
+    if not cleaned[0].isalpha() or not cleaned[-1].isalpha():
+        return False
+    for ch in cleaned:
+        if ch in {"'", "-", " "}:
+            continue
+        if ch.isalpha():
+            continue
+        if unicodedata.category(ch).startswith("M"):
+            continue
+        return False
+    return True
 
 
 def is_effectively_empty(value: str | None) -> bool:

@@ -31,8 +31,27 @@ interface I18nContextValue {
 
 const I18nContext = createContext<I18nContextValue | null>(null);
 
+function getStorage(): Storage | null {
+  if (typeof window === "undefined") {
+    return null;
+  }
+  const storage = window.localStorage;
+  if (
+    !storage ||
+    typeof storage.getItem !== "function" ||
+    typeof storage.setItem !== "function"
+  ) {
+    return null;
+  }
+  return storage;
+}
+
 function resolveInitialLocale(): Locale {
-  const saved = window.localStorage.getItem(STORAGE_KEY);
+  const storage = getStorage();
+  if (!storage) {
+    return "pt-BR";
+  }
+  const saved = storage.getItem(STORAGE_KEY);
   if (saved === "pt-BR" || saved === "en-US" || saved === "tupi-BR") {
     return saved;
   }
@@ -51,7 +70,10 @@ export function I18nProvider({ children }: PropsWithChildren) {
   const [locale, setLocaleState] = useState<Locale>(resolveInitialLocale);
 
   useEffect(() => {
-    window.localStorage.setItem(STORAGE_KEY, locale);
+    const storage = getStorage();
+    if (storage) {
+      storage.setItem(STORAGE_KEY, locale);
+    }
     document.documentElement.lang = locale === "tupi-BR" ? "pt-BR" : locale;
   }, [locale]);
 

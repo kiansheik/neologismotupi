@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
 import { UserBadge } from "@/components/user-badge";
+import { getPublicUser } from "@/features/auth/api";
 import { useCurrentUser } from "@/features/auth/hooks";
 import {
   listMyNewsletters,
@@ -140,6 +141,13 @@ export function MePage() {
     [currentUser?.profile],
   );
 
+  const publicProfileQuery = useQuery({
+    queryKey: ["public-user", currentUser?.id],
+    queryFn: () => getPublicUser(String(currentUser?.id)),
+    enabled: Boolean(currentUser?.id),
+  });
+  const publicStats = publicProfileQuery.data?.profile.stats;
+
   const preferenceRows = useMemo(
     () => [
       { key: "in_app_enabled", label: t("me.pref.inApp") },
@@ -197,6 +205,12 @@ export function MePage() {
             score: currentUser.profile?.reputation_score ?? 0,
           })}
         </p>
+        {publicStats ? (
+          <p className="mt-1 text-sm text-slate-600">
+            {t("profile.totalEntryVotes")}: {publicStats.total_entry_votes ?? 0} ·{" "}
+            {t("profile.totalEntries")}: {publicStats.total_entries ?? 0}
+          </p>
+        ) : null}
       </Card>
 
       <Card>

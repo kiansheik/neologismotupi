@@ -358,6 +358,13 @@ async def _set_entry_status(
     if not entry:
         raise_api_error(status_code=404, code="entry_not_found", message="Entry not found")
 
+    if new_status == EntryStatus.approved and entry.proposer_user_id == moderator.id:
+        raise_api_error(
+            status_code=403,
+            code="self_approval_forbidden",
+            message="You cannot approve your own entry",
+        )
+
     cleaned_reason = _clean_reason(reason)
     if new_status == EntryStatus.rejected:
         if not cleaned_reason:

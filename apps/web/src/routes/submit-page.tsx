@@ -15,12 +15,23 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { getPublicUser } from "@/features/auth/api";
 import { useCurrentUser } from "@/features/auth/hooks";
 import { AudioCapture, AudioQueueList } from "@/features/audio/components";
 import { uploadEntryAudio } from "@/features/audio/api";
-import { createEntry, listEntries } from "@/features/entries/api";
+import { createEntry, getEntryConstraints, listEntries } from "@/features/entries/api";
 import { listSources } from "@/features/sources/api";
 import type { SourceSuggestion } from "@/lib/types";
+
+const HEADWORD_PATTERN = /^[\p{L}](?:[\p{L}\p{M}' -]*[\p{L}])?$/u;
+
+function isValidHeadword(value: string): boolean {
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return false;
+  }
+  return HEADWORD_PATTERN.test(trimmed);
+}
 
 type SubmitForm = {
   headword: string;
@@ -84,6 +95,30 @@ export function SubmitPage() {
     enabled: watchedHeadword.trim().length >= 2,
   });
 
+  const constraintsQuery = useQuery({
+    queryKey: ["entry-constraints"],
+    queryFn: getEntryConstraints,
+  });
+
+  const publicProfileQuery = useQuery({
+    queryKey: ["public-user", currentUser?.id],
+    queryFn: () => getPublicUser(String(currentUser?.id)),
+    enabled: Boolean(currentUser?.id),
+  });
+
+  const entryVoteCost = constraintsQuery.data?.entry_vote_cost ?? 3;
+  const totalEntryVotes =
+    publicProfileQuery.data?.profile.stats?.entry_vote_cost_votes ??
+    publicProfileQuery.data?.profile.stats?.total_entry_votes ??
+    0;
+  const totalEntries = publicProfileQuery.data?.profile.stats?.total_entries ?? 0;
+  const entryVoteCostEntries =
+    publicProfileQuery.data?.profile.stats?.entry_vote_cost_entries ?? totalEntries;
+  const voteBalance = Math.max(0, totalEntryVotes - entryVoteCostEntries * entryVoteCost);
+  const voteNeeded = Math.max(0, entryVoteCost - voteBalance);
+  const voteProgress =
+    entryVoteCost > 0 ? Math.min(100, (voteBalance / entryVoteCost) * 100) : 100;
+
   const sourceSuggestionsQuery = useQuery({
     queryKey: ["source-suggestions", sourceLookupQuery],
     queryFn: () => listSources({ query: sourceLookupQuery, limit: 8 }),
@@ -96,6 +131,9 @@ export function SubmitPage() {
     const dedupedById = new Map(merged.map((entry) => [entry.id, entry]));
     return Array.from(dedupedById.values());
   }, [duplicateQuery.data, possibleDuplicates]);
+
+  const headwordValid = isValidHeadword(watchedHeadword);
+  const showHeadwordRules = watchedHeadword.trim().length > 0 && !headwordValid;
 
   const addQueuedAudio = (file: File) => {
     setQueuedAudio((current) => [...current, file]);
@@ -135,7 +173,11 @@ export function SubmitPage() {
   const onSubmit = form.handleSubmit(async (payload) => {
     form.clearErrors();
     const schema = z.object({
-      headword: z.string().trim().min(1, t("submit.error.headwordRequired")),
+      headword: z
+        .string()
+        .trim()
+        .min(1, t("submit.error.headwordRequired"))
+        .refine((value) => isValidHeadword(value), t("submit.error.headwordInvalid")),
       gloss_pt: z.string().trim().min(1, t("submit.error.glossRequired")),
       gloss_en: z.string().trim().max(255).optional(),
       part_of_speech: z.string().optional(),
@@ -261,6 +303,71 @@ export function SubmitPage() {
     );
   }
 
+  if (constraintsQuery.isError || publicProfileQuery.isError) {
+    return (
+      <Card>
+        <h1 className="text-xl font-semibold text-brand-900">{t("submit.title")}</h1>
+        <p className="mt-2 text-sm text-red-700">{t("submit.voteGateError")}</p>
+      </Card>
+    );
+  }
+
+  if (!constraintsQuery.isSuccess || !publicProfileQuery.isSuccess) {
+    return (
+      <Card>
+        <h1 className="text-xl font-semibold text-brand-900">{t("submit.title")}</h1>
+        <p className="mt-2 text-sm text-slate-700">{t("submit.voteGateLoading")}</p>
+      </Card>
+    );
+  }
+
+  if (entryVoteCost > 0 && voteBalance < entryVoteCost) {
+    return (
+      <Card>
+        <h1 className="text-xl font-semibold text-brand-900">{t("submit.title")}</h1>
+        <p className="mt-2 text-sm text-slate-700">
+          {t("submit.voteGateBody", {
+            cost: entryVoteCost,
+            balance: Math.max(0, voteBalance),
+            needed: voteNeeded,
+          })}
+        </p>
+        <div className="mt-3 rounded-md border border-brand-200 bg-brand-50/70 p-4">
+          <div className="flex flex-wrap items-center justify-between gap-4">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wide text-brand-800">
+                {t("submit.voteBalanceLabel")}
+              </p>
+              <p className="text-3xl font-semibold text-brand-900">{Math.max(0, voteBalance)}</p>
+              <p className="text-xs text-slate-600">{t("submit.voteBalanceUnits")}</p>
+            </div>
+            <div className="min-w-[180px] text-sm text-slate-700">
+              <p>{t("submit.voteCost", { cost: entryVoteCost })}</p>
+              <p className="mt-1 text-amber-700">
+                {t("submit.voteBalanceHint", { needed: voteNeeded })}
+              </p>
+            </div>
+          </div>
+          <div className="mt-3 h-2 rounded-full bg-brand-100">
+            <div
+              className="h-2 rounded-full bg-brand-600 transition-all"
+              style={{ width: `${voteProgress}%` }}
+            />
+          </div>
+        </div>
+        <p className="mt-3 text-sm text-slate-700">{t("submit.voteGateHint")}</p>
+        <div className="mt-3">
+          <Link
+            className="inline-flex items-center rounded-md bg-brand-700 px-4 py-2 text-sm text-white"
+            to="/entries?unseen=1"
+          >
+            {t("submit.voteGateCta")}
+          </Link>
+        </div>
+      </Card>
+    );
+  }
+
   return (
     <Card>
       <h1 className="text-xl font-semibold text-brand-900">{t("submit.title")}</h1>
@@ -270,6 +377,17 @@ export function SubmitPage() {
       </div>
       <p className="mt-1 text-xs text-slate-600">{t("form.requiredLegend")}</p>
       <p className="mt-1 text-xs text-slate-600">{t("submit.onlyRequired")}</p>
+      {entryVoteCost > 0 ? (
+        <div className="mt-2 rounded-md border border-brand-100 bg-brand-50/30 px-3 py-2 text-xs text-slate-700">
+          <p>{t("submit.voteCost", { cost: entryVoteCost })}</p>
+          <p>{t("submit.voteBalance", { balance: Math.max(0, voteBalance) })}</p>
+          {voteBalance < entryVoteCost ? (
+            <p className="mt-1 text-amber-700">
+              {t("submit.voteBalanceHint", { needed: voteNeeded })}
+            </p>
+          ) : null}
+        </div>
+      ) : null}
       <form
         className="mt-4 space-y-3"
         onSubmit={(event) => {
@@ -281,9 +399,28 @@ export function SubmitPage() {
             {t("submit.headword")} *
           </label>
           <p className="mb-1 text-xs text-slate-600">{t("submit.help.headword")}</p>
-          <Input id="headword" placeholder="bebesara" {...form.register("headword")} />
+          <Input
+            id="headword"
+            placeholder="bebesara"
+            className={
+              showHeadwordRules
+                ? "border-red-400 focus:border-red-500 focus:ring-red-200"
+                : undefined
+            }
+            {...form.register("headword")}
+          />
           {form.formState.errors.headword?.message ? (
             <p className="mt-1 text-xs text-red-700">{form.formState.errors.headword.message}</p>
+          ) : null}
+          {showHeadwordRules ? (
+            <div className="mt-2 rounded-md border border-red-300 bg-red-50 p-2 text-xs text-red-800">
+              <p className="font-semibold">{t("submit.headwordRulesTitle")}</p>
+              <ul className="mt-1 list-disc space-y-1 pl-4">
+                <li>{t("submit.headwordRuleChars")}</li>
+                <li>{t("submit.headwordRuleSingle")}</li>
+                <li>{t("submit.headwordRuleVariants")}</li>
+              </ul>
+            </div>
           ) : null}
         </div>
 

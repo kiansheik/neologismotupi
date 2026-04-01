@@ -4,12 +4,16 @@ import userEvent from "@testing-library/user-event";
 import { SubmitPage } from "@/routes/submit-page";
 import { renderWithProviders } from "./test-utils";
 
-const { listEntriesMock, createEntryMock } = vi.hoisted(() => ({
+const { listEntriesMock, createEntryMock, getEntryConstraintsMock } = vi.hoisted(() => ({
   listEntriesMock: vi.fn(),
   createEntryMock: vi.fn(),
+  getEntryConstraintsMock: vi.fn(),
 }));
 const { listSourcesMock } = vi.hoisted(() => ({
   listSourcesMock: vi.fn(),
+}));
+const { getPublicUserMock } = vi.hoisted(() => ({
+  getPublicUserMock: vi.fn(),
 }));
 
 vi.mock("react-router-dom", async () => {
@@ -38,15 +42,45 @@ vi.mock("@/features/auth/hooks", () => ({
 vi.mock("@/features/entries/api", () => ({
   listEntries: listEntriesMock,
   createEntry: createEntryMock,
+  getEntryConstraints: getEntryConstraintsMock,
 }));
 
 vi.mock("@/features/sources/api", () => ({
   listSources: listSourcesMock,
 }));
 
+vi.mock("@/features/auth/api", () => ({
+  getPublicUser: getPublicUserMock,
+}));
+
 describe("SubmitPage", () => {
   beforeEach(() => {
     listSourcesMock.mockResolvedValue([]);
+    getEntryConstraintsMock.mockResolvedValue({
+      entry_vote_cost: 3,
+      downvote_requires_comment: false,
+      downvote_comment_min_length: 5,
+      downvote_comment_exempt_staff: false,
+      entry_vote_cost_exempt_staff: false,
+    });
+    getPublicUserMock.mockResolvedValue({
+      id: "u1",
+      created_at: "2026-01-01T00:00:00Z",
+      profile: {
+        id: "profile-1",
+        display_name: "Teste",
+        stats: {
+          total_entries: 0,
+          entry_vote_cost_entries: 0,
+          total_comments: 0,
+          total_entry_votes: 3,
+          entry_vote_cost_votes: 3,
+          last_seen_at: "2026-01-01T00:00:00Z",
+          last_active_at: "2026-01-01T00:00:00Z",
+          submitting_since_at: "2026-01-01T00:00:00Z",
+        },
+      },
+    });
     listEntriesMock.mockResolvedValue({
       items: [
         {
@@ -80,7 +114,7 @@ describe("SubmitPage", () => {
     const user = userEvent.setup();
     renderWithProviders(<SubmitPage />);
 
-    const headwordInput = screen.getByLabelText(/Verbete/i);
+    const headwordInput = await screen.findByLabelText(/Verbete/i);
     await user.type(headwordInput, "new");
 
     await waitFor(() => {
@@ -131,7 +165,7 @@ describe("SubmitPage", () => {
     const user = userEvent.setup();
     renderWithProviders(<SubmitPage />);
 
-    const headwordInput = screen.getByLabelText(/Verbete/i);
+    const headwordInput = await screen.findByLabelText(/Verbete/i);
     await user.type(headwordInput, "mba'eoby");
 
     await waitFor(() => {

@@ -12,7 +12,7 @@ import { useI18n } from "@/i18n";
 import { trackEvent } from "@/lib/analytics";
 import { entryDefinitionPreview } from "@/lib/entry-definition";
 
-type EntrySort = "alphabetical" | "recent" | "score" | "most_examples";
+type EntrySort = "alphabetical" | "recent" | "score" | "most_examples" | "unseen";
 
 interface EntryBrowserScope {
   proposer_user_id?: string;
@@ -31,6 +31,7 @@ interface EntryBrowserProps {
   initialSort?: EntrySort;
   pageSize?: number;
   analyticsContext?: string;
+  allowUnseenFilter?: boolean;
 }
 
 function normalizeComparableText(value: string | null | undefined): string {
@@ -58,6 +59,7 @@ export function EntryBrowser({
   initialSort = "recent",
   pageSize = 50,
   analyticsContext,
+  allowUnseenFilter = false,
 }: EntryBrowserProps) {
   const { t } = useI18n();
   const TitleTag = titleAs;
@@ -89,23 +91,23 @@ export function EntryBrowser({
     return () => window.clearTimeout(timer);
   }, [analyticsContext, partOfSpeech, search, sort, status]);
 
+  useEffect(() => {
+    if (!allowUnseenFilter && sort === "unseen") {
+      setSort("recent");
+    }
+  }, [allowUnseenFilter, sort]);
+
   const filters = useMemo(
     () => ({
       search,
       status,
       part_of_speech: partOfSpeech,
       sort,
+      unseen: sort === "unseen" ? true : undefined,
       proposer_user_id: scope?.proposer_user_id,
       source_work_id: scope?.source_work_id,
     }),
-    [
-      search,
-      status,
-      partOfSpeech,
-      sort,
-      scope?.proposer_user_id,
-      scope?.source_work_id,
-    ],
+    [search, status, partOfSpeech, sort, scope?.proposer_user_id, scope?.source_work_id],
   );
 
   const { data, isPending, isFetchingNextPage, hasNextPage, fetchNextPage } =
@@ -219,7 +221,8 @@ export function EntryBrowser({
                   | "alphabetical"
                   | "recent"
                   | "score"
-                  | "most_examples",
+                  | "most_examples"
+                  | "unseen",
               )
             }
           >
@@ -231,6 +234,9 @@ export function EntryBrowser({
             <option value="most_examples">
               {t("entries.sort.mostExamples")}
             </option>
+            {allowUnseenFilter ? (
+              <option value="unseen">{t("entries.sort.unseen")}</option>
+            ) : null}
           </select>
         </div>
       </Card>

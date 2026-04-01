@@ -18,6 +18,8 @@ async def reset_database(tmp_path, monkeypatch) -> AsyncGenerator[None, None]:
     monkeypatch.setenv("SECRET_KEY", "test-secret")
     monkeypatch.setenv("FIRST_USER_IS_ADMIN", "false")
     monkeypatch.setenv("TURNSTILE_ENABLED", "false")
+    monkeypatch.setenv("ENTRY_VOTE_COST", "0")
+    monkeypatch.setenv("DOWNVOTE_REQUIRES_COMMENT", "false")
 
     get_settings.cache_clear()
     set_database_url(database_url)

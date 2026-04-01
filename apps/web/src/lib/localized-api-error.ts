@@ -20,9 +20,26 @@ const codeToTranslation: Partial<Record<string, TranslationKey>> = {
   notification_not_found: "api.notification_not_found",
   downvote_blocked: "api.downvote_blocked",
   self_vote_forbidden: "api.self_vote_forbidden",
+  downvote_comment_required: "api.downvote_comment_required",
+  entry_vote_quota: "api.entry_vote_quota",
+  invalid_headword_format: "api.invalid_headword_format",
 };
 
 export function getLocalizedApiErrorMessage(error: ApiError, t: TranslateFn): string {
+  if (error.code === "downvote_comment_required") {
+    const min = (error.details as { min_length?: number } | undefined)?.min_length;
+    if (typeof min === "number") {
+      return t("api.downvote_comment_required", { min });
+    }
+    return t("api.downvote_comment_required");
+  }
+  if (error.code === "entry_vote_quota") {
+    const needed = (error.details as { needed?: number } | undefined)?.needed;
+    if (typeof needed === "number") {
+      return t("api.entry_vote_quota", { needed });
+    }
+    return t("api.entry_vote_quota");
+  }
   const key = codeToTranslation[error.code];
   if (!key) {
     return error.message || t("api.request_failed");

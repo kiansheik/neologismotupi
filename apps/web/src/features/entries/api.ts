@@ -1,5 +1,5 @@
 import { apiFetch, withQuery } from "@/lib/api";
-import type { EntryDetail, EntryListResponse, Example } from "@/lib/types";
+import type { EntryConstraints, EntryDetail, EntryListResponse, Example } from "@/lib/types";
 
 export interface ListEntriesParams {
   [key: string]: string | number | boolean | undefined;
@@ -14,7 +14,8 @@ export interface ListEntriesParams {
   region?: string;
   proposer_user_id?: string;
   mine?: boolean;
-  sort?: "alphabetical" | "recent" | "score" | "most_examples";
+  unseen?: boolean;
+  sort?: "alphabetical" | "recent" | "score" | "most_examples" | "unseen";
 }
 
 export interface EntrySourceInput {
@@ -79,6 +80,10 @@ export function listEntries(
 
 export function getEntry(slug: string): Promise<EntryDetail> {
   return apiFetch<EntryDetail>(`/entries/${slug}`);
+}
+
+export function getEntryConstraints(): Promise<EntryConstraints> {
+  return apiFetch<EntryConstraints>("/entries/constraints");
 }
 
 export function createEntry(payload: CreateEntryPayload): Promise<EntryDetail> {

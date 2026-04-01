@@ -8,6 +8,9 @@ from app.schemas.badges import UserBadgeKind
 
 class PublicProfileStatsOut(BaseModel):
     total_entries: int = 0
+    entry_vote_cost_entries: int = 0
+    total_entry_votes: int = 0
+    entry_vote_cost_votes: int = 0
     total_comments: int = 0
     total_audio: int = 0
     last_seen_at: datetime | None = None

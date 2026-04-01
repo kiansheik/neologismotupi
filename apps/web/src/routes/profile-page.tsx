@@ -163,6 +163,14 @@ export function ProfilePage() {
           </div>
           <div className="rounded-md border border-brand-100 bg-brand-50/30 px-3 py-2">
             <p className="text-xs font-medium uppercase tracking-wide text-slate-500">
+              {t("profile.totalEntryVotes")}
+            </p>
+            <p className="text-base font-semibold text-brand-900">
+              {stats?.total_entry_votes ?? 0}
+            </p>
+          </div>
+          <div className="rounded-md border border-brand-100 bg-brand-50/30 px-3 py-2">
+            <p className="text-xs font-medium uppercase tracking-wide text-slate-500">
               {t("profile.totalComments")}
             </p>
             <p className="text-base font-semibold text-brand-900">
