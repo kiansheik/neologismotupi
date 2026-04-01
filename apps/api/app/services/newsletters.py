@@ -144,6 +144,7 @@ def build_word_of_day_email(
     submit_url: str,
     home_url: str,
     unsubscribe_url: str,
+    author_name: str | None = None,
     display_name: str | None = None,
 ) -> tuple[str, str, str]:
     locale = normalize_locale(locale)
@@ -160,11 +161,13 @@ def build_word_of_day_email(
         etymology_label = "Etymology"
         example_label = "Example"
         view_label = "View entry"
+        author_label = "Author"
         cta_intro = "Inspired? Help keep the dictionary alive:"
         cta_submit = "Add your own entry"
         cta_share = "Share the site"
         cta_karma = "Explore entries and earn karma"
         unsubscribe_label = "Unsubscribe"
+        secondary_gloss_label = "Gloss (PT)"
     else:
         subject = f"Palavra do Dia: {headword}"
         greeting = f"Olá {display_name}," if display_name else "Olá,"
@@ -175,16 +178,20 @@ def build_word_of_day_email(
         etymology_label = "Etimologia"
         example_label = "Exemplo"
         view_label = "Ver verbete"
+        author_label = "Autor"
         cta_intro = "Se esta palavra inspirou você, ajude a manter o dicionário vivo:"
         cta_submit = "Envie seu próprio verbete"
         cta_share = "Compartilhe o site"
         cta_karma = "Explore verbetes e ganhe karma"
         unsubscribe_label = "Cancelar inscrição"
+        secondary_gloss_label = "Gloss (EN)"
 
     lines = [greeting, headline, "", f"{view_label}: {entry_url}", ""]
     lines.append(f"{gloss_label}: {primary_gloss or '—'}")
     if secondary_gloss:
-        lines.append(f"{gloss_label} (alt): {secondary_gloss}")
+        lines.append(f"{secondary_gloss_label}: {secondary_gloss}")
+    if author_name:
+        lines.append(f"{author_label}: {author_name}")
     if part_label:
         lines.append(f"{part_label_title}: {part_label}")
     if short_definition:
@@ -224,7 +231,8 @@ def build_word_of_day_email(
 
         <table style="width:100%;font-size:14px;border-collapse:collapse;">
           <tr><td style="padding:6px 0;color:#6b7280;">{esc(gloss_label)}</td><td style="padding:6px 0;color:#111827;">{esc(primary_gloss or '—')}</td></tr>
-          {f'<tr><td style="padding:6px 0;color:#6b7280;">{esc(gloss_label)} (alt)</td><td style="padding:6px 0;color:#111827;">{esc(secondary_gloss)}</td></tr>' if secondary_gloss else ''}
+          {f'<tr><td style="padding:6px 0;color:#6b7280;">{esc(secondary_gloss_label)}</td><td style="padding:6px 0;color:#111827;">{esc(secondary_gloss)}</td></tr>' if secondary_gloss else ''}
+          {f'<tr><td style="padding:6px 0;color:#6b7280;">{esc(author_label)}</td><td style="padding:6px 0;color:#111827;">{esc(author_name)}</td></tr>' if author_name else ''}
           {f'<tr><td style="padding:6px 0;color:#6b7280;">{esc(part_label_title)}</td><td style="padding:6px 0;color:#111827;">{esc(part_label)}</td></tr>' if part_label else ''}
           {f'<tr><td style="padding:6px 0;color:#6b7280;">{esc(definition_label)}</td><td style="padding:6px 0;color:#111827;">{esc(short_definition)}</td></tr>' if short_definition else ''}
           {f'<tr><td style="padding:6px 0;color:#6b7280;">{esc(etymology_label)}</td><td style="padding:6px 0;color:#111827;">{esc(morphology_notes)}</td></tr>' if morphology_notes else ''}

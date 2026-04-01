@@ -85,6 +85,21 @@ async def _send_word_of_day(
     ).scalar_one()
     example = await _get_example(db, entry_id=entry.id)
 
+    author_name = None
+    author_row = (
+        await db.execute(
+            select(User, Profile)
+            .join(Profile, Profile.user_id == User.id, isouter=True)
+            .where(User.id == entry.proposer_user_id)
+        )
+    ).first()
+    if author_row:
+        author_user, author_profile = author_row
+        if author_profile and author_profile.display_name:
+            author_name = author_profile.display_name
+        elif author_user.email:
+            author_name = author_user.email.split("@", maxsplit=1)[0]
+
     query = (
         select(NewsletterSubscription, User, Profile)
         .join(User, NewsletterSubscription.user_id == User.id)
@@ -142,6 +157,7 @@ async def _send_word_of_day(
             submit_url=submit_url,
             home_url=home_url,
             unsubscribe_url=unsubscribe_url,
+            author_name=author_name,
             display_name=profile.display_name if profile else None,
         )
 
