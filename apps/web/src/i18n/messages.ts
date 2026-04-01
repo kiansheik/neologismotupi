@@ -1038,7 +1038,7 @@ const tupiOverrides: Partial<Record<TranslationKey, string>> = {
 
   "entries.allStatuses": "Opá sekoaba",
   "entries.sort.alphabetical": "Nhe'engekomonhangaba",
-  "entries.sort.recent": "ipysasyeté",
+  "entries.sort.recent": "ipysasueté",
   "entries.sort.score": "Serapûaneté",
   "entries.sort.mostExamples": "Og a'angabetá rerekoara",
   "entries.resultsTitle": "i basemagûera",
