@@ -69,6 +69,7 @@ class EntrySummaryOut(BaseModel):
     upvote_count_cache: int
     downvote_count_cache: int
     example_count_cache: int
+    current_user_vote: int | None = None
     proposer_user_id: uuid.UUID
     proposer: EntryAuthorOut
     created_at: datetime
@@ -115,6 +116,7 @@ class ExampleOut(BaseModel):
     score_cache: int
     upvote_count_cache: int
     downvote_count_cache: int
+    current_user_vote: int | None = None
     moderation_reason: str | None = None
     moderation_notes: str | None = None
     moderated_at: datetime | None = None
@@ -146,6 +148,7 @@ class EntryCommentOut(BaseModel):
     score_cache: int
     upvote_count_cache: int
     downvote_count_cache: int
+    current_user_vote: int | None = None
     created_at: datetime
     updated_at: datetime
     author: EntryAuthorOut
@@ -186,6 +189,23 @@ class EntryConstraintsOut(BaseModel):
     entry_vote_cost: int
     downvote_requires_comment: bool
     downvote_comment_min_length: int
+
+
+class EntrySubmissionGateOut(BaseModel):
+    window_start: datetime
+    window_end: datetime
+    votes_today: int
+    entries_today: int
+    unlocked_posts: int | None
+    remaining_posts: int | None
+    unlimited: bool
+    next_votes_required: int
+    votes_required_for_unlimited: int
+    step1_votes: int
+    step1_posts: int
+    step2_votes: int
+    step2_posts: int
+    step3_votes: int
 
 
 class EntryCreate(BaseModel):

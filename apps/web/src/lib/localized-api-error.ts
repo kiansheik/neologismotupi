@@ -34,7 +34,8 @@ export function getLocalizedApiErrorMessage(error: ApiError, t: TranslateFn): st
     return t("api.downvote_comment_required");
   }
   if (error.code === "entry_vote_quota") {
-    const needed = (error.details as { needed?: number } | undefined)?.needed;
+    const details = error.details as { needed?: number; next_votes_required?: number } | undefined;
+    const needed = details?.needed ?? details?.next_votes_required;
     if (typeof needed === "number") {
       return t("api.entry_vote_quota", { needed });
     }

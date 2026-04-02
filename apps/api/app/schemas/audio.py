@@ -17,6 +17,7 @@ class AudioSampleOut(BaseModel):
     score_cache: int
     upvote_count_cache: int
     downvote_count_cache: int
+    current_user_vote: int | None = None
     created_at: datetime
 
 

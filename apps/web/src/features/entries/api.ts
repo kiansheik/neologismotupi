@@ -1,5 +1,11 @@
 import { apiFetch, withQuery } from "@/lib/api";
-import type { EntryConstraints, EntryDetail, EntryListResponse, Example } from "@/lib/types";
+import type {
+  EntryConstraints,
+  EntryDetail,
+  EntryListResponse,
+  EntrySubmissionGate,
+  Example,
+} from "@/lib/types";
 
 export interface ListEntriesParams {
   [key: string]: string | number | boolean | undefined;
@@ -84,6 +90,10 @@ export function getEntry(slug: string): Promise<EntryDetail> {
 
 export function getEntryConstraints(): Promise<EntryConstraints> {
   return apiFetch<EntryConstraints>("/entries/constraints");
+}
+
+export function getEntrySubmissionGate(): Promise<EntrySubmissionGate> {
+  return apiFetch<EntrySubmissionGate>("/entries/submit-gate");
 }
 
 export function createEntry(payload: CreateEntryPayload): Promise<EntryDetail> {

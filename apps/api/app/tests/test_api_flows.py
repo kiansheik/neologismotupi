@@ -195,11 +195,17 @@ async def test_entry_vote_quota_requires_votes(client, monkeypatch):
     entry_a = await create_entry(client, "seed-entry-a")
     entry_b = await create_entry(client, "seed-entry-b")
     entry_c = await create_entry(client, "seed-entry-c")
+    entry_d = await create_entry(client, "seed-entry-d")
+    entry_e = await create_entry(client, "seed-entry-e")
 
     await client.post("/api/auth/logout")
     await register_user(client, "quota-user@example.com", "Quota User")
 
-    monkeypatch.setenv("ENTRY_VOTE_COST", "3")
+    monkeypatch.setenv("ENTRY_VOTE_DAILY_STEP1_VOTES", "3")
+    monkeypatch.setenv("ENTRY_VOTE_DAILY_STEP1_POSTS", "1")
+    monkeypatch.setenv("ENTRY_VOTE_DAILY_STEP2_VOTES", "2")
+    monkeypatch.setenv("ENTRY_VOTE_DAILY_STEP2_POSTS", "3")
+    monkeypatch.setenv("ENTRY_VOTE_DAILY_STEP3_VOTES", "1")
     get_settings.cache_clear()
 
     response = await client.post(
@@ -233,6 +239,43 @@ async def test_entry_vote_quota_requires_votes(client, monkeypatch):
             "gloss_en": "test",
             "part_of_speech": "noun",
             "short_definition": "Quota gated entry.",
+            "morphology_notes": "seed note",
+            "force_submit": True,
+            "tag_ids": [],
+        },
+    )
+    assert response.status_code == 201, response.text
+
+    response = await client.post(
+        "/api/entries",
+        json={
+            "headword": "quota-entry-b",
+            "gloss_pt": "teste",
+            "gloss_en": "test",
+            "part_of_speech": "noun",
+            "short_definition": "Quota gated entry second.",
+            "morphology_notes": "seed note",
+            "force_submit": True,
+            "tag_ids": [],
+        },
+    )
+    assert response.status_code == 403, response.text
+
+    for entry in (entry_d, entry_e):
+        vote_response = await client.post(
+            f"/api/entries/{entry['id']}/vote",
+            json={"value": 1},
+        )
+        assert vote_response.status_code == 200, vote_response.text
+
+    response = await client.post(
+        "/api/entries",
+        json={
+            "headword": "quota-entry-c",
+            "gloss_pt": "teste",
+            "gloss_en": "test",
+            "part_of_speech": "noun",
+            "short_definition": "Quota gated entry third.",
             "morphology_notes": "seed note",
             "force_submit": True,
             "tag_ids": [],

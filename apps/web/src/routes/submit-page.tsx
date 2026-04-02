@@ -15,11 +15,10 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { getPublicUser } from "@/features/auth/api";
 import { useCurrentUser } from "@/features/auth/hooks";
 import { AudioCapture, AudioQueueList } from "@/features/audio/components";
 import { uploadEntryAudio } from "@/features/audio/api";
-import { createEntry, getEntryConstraints, listEntries } from "@/features/entries/api";
+import { createEntry, getEntrySubmissionGate, listEntries } from "@/features/entries/api";
 import { listSources } from "@/features/sources/api";
 import type { SourceSuggestion } from "@/lib/types";
 
@@ -95,29 +94,22 @@ export function SubmitPage() {
     enabled: watchedHeadword.trim().length >= 2,
   });
 
-  const constraintsQuery = useQuery({
-    queryKey: ["entry-constraints"],
-    queryFn: getEntryConstraints,
-  });
-
-  const publicProfileQuery = useQuery({
-    queryKey: ["public-user", currentUser?.id],
-    queryFn: () => getPublicUser(String(currentUser?.id)),
+  const gateQuery = useQuery({
+    queryKey: ["entry-submission-gate", currentUser?.id],
+    queryFn: getEntrySubmissionGate,
     enabled: Boolean(currentUser?.id),
   });
 
-  const entryVoteCost = constraintsQuery.data?.entry_vote_cost ?? 3;
-  const totalEntryVotes =
-    publicProfileQuery.data?.profile.stats?.entry_vote_cost_votes ??
-    publicProfileQuery.data?.profile.stats?.total_entry_votes ??
-    0;
-  const totalEntries = publicProfileQuery.data?.profile.stats?.total_entries ?? 0;
-  const entryVoteCostEntries =
-    publicProfileQuery.data?.profile.stats?.entry_vote_cost_entries ?? totalEntries;
-  const voteBalance = Math.max(0, totalEntryVotes - entryVoteCostEntries * entryVoteCost);
-  const voteNeeded = Math.max(0, entryVoteCost - voteBalance);
-  const voteProgress =
-    entryVoteCost > 0 ? Math.min(100, (voteBalance / entryVoteCost) * 100) : 100;
+  const votesToday = gateQuery.data?.votes_today ?? 0;
+  const remainingPosts = gateQuery.data?.remaining_posts ?? 0;
+  const isUnlimited = gateQuery.data?.unlimited ?? false;
+  const nextVotesRequired = gateQuery.data?.next_votes_required ?? 0;
+  const votesRequiredForUnlimited = gateQuery.data?.votes_required_for_unlimited ?? 0;
+  const voteProgress = isUnlimited
+    ? 100
+    : votesRequiredForUnlimited > 0
+      ? Math.min(100, (votesToday / votesRequiredForUnlimited) * 100)
+      : 100;
 
   const sourceSuggestionsQuery = useQuery({
     queryKey: ["source-suggestions", sourceLookupQuery],
@@ -303,7 +295,7 @@ export function SubmitPage() {
     );
   }
 
-  if (constraintsQuery.isError || publicProfileQuery.isError) {
+  if (gateQuery.isError) {
     return (
       <Card>
         <h1 className="text-xl font-semibold text-brand-900">{t("submit.title")}</h1>
@@ -312,7 +304,7 @@ export function SubmitPage() {
     );
   }
 
-  if (!constraintsQuery.isSuccess || !publicProfileQuery.isSuccess) {
+  if (!gateQuery.isSuccess) {
     return (
       <Card>
         <h1 className="text-xl font-semibold text-brand-900">{t("submit.title")}</h1>
@@ -321,30 +313,31 @@ export function SubmitPage() {
     );
   }
 
-  if (entryVoteCost > 0 && voteBalance < entryVoteCost) {
+  if (!isUnlimited && remainingPosts <= 0) {
     return (
       <Card>
         <h1 className="text-xl font-semibold text-brand-900">{t("submit.title")}</h1>
         <p className="mt-2 text-sm text-slate-700">
-          {t("submit.voteGateBody", {
-            cost: entryVoteCost,
-            balance: Math.max(0, voteBalance),
-            needed: voteNeeded,
-          })}
+          {t("submit.voteGateBody")}
         </p>
         <div className="mt-3 rounded-md border border-brand-200 bg-brand-50/70 p-4">
           <div className="flex flex-wrap items-center justify-between gap-4">
             <div>
               <p className="text-xs font-semibold uppercase tracking-wide text-brand-800">
-                {t("submit.voteBalanceLabel")}
+                {t("submit.dailyVotesLabel")}
               </p>
-              <p className="text-3xl font-semibold text-brand-900">{Math.max(0, voteBalance)}</p>
-              <p className="text-xs text-slate-600">{t("submit.voteBalanceUnits")}</p>
+              <p className="text-3xl font-semibold text-brand-900">{votesToday}</p>
+              <p className="text-xs text-slate-600">{t("submit.dailyVotesUnits")}</p>
             </div>
             <div className="min-w-[180px] text-sm text-slate-700">
-              <p>{t("submit.voteCost", { cost: entryVoteCost })}</p>
+              <p className="text-xs font-semibold uppercase tracking-wide text-brand-800">
+                {t("submit.dailyPostsLabel")}
+              </p>
+              <p className="mt-1 text-lg font-semibold text-slate-800">
+                {t("submit.dailyPostsRemaining", { remaining: remainingPosts })}
+              </p>
               <p className="mt-1 text-amber-700">
-                {t("submit.voteBalanceHint", { needed: voteNeeded })}
+                {t("submit.dailyUnlockHint", { needed: nextVotesRequired })}
               </p>
             </div>
           </div>
@@ -377,17 +370,40 @@ export function SubmitPage() {
       </div>
       <p className="mt-1 text-xs text-slate-600">{t("form.requiredLegend")}</p>
       <p className="mt-1 text-xs text-slate-600">{t("submit.onlyRequired")}</p>
-      {entryVoteCost > 0 ? (
-        <div className="mt-2 rounded-md border border-brand-100 bg-brand-50/30 px-3 py-2 text-xs text-slate-700">
-          <p>{t("submit.voteCost", { cost: entryVoteCost })}</p>
-          <p>{t("submit.voteBalance", { balance: Math.max(0, voteBalance) })}</p>
-          {voteBalance < entryVoteCost ? (
-            <p className="mt-1 text-amber-700">
-              {t("submit.voteBalanceHint", { needed: voteNeeded })}
+      <div className="mt-2 rounded-md border border-brand-100 bg-brand-50/30 px-3 py-2 text-xs text-slate-700">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-brand-800">
+              {t("submit.dailyVotesLabel")}
             </p>
-          ) : null}
+            <p className="text-lg font-semibold text-brand-900">{votesToday}</p>
+            <p className="text-[11px] text-slate-600">{t("submit.dailyVotesUnits")}</p>
+          </div>
+          <div>
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-brand-800">
+              {t("submit.dailyPostsLabel")}
+            </p>
+            <p className="text-sm font-semibold text-slate-800">
+              {isUnlimited
+                ? t("submit.dailyPostsUnlimited")
+                : t("submit.dailyPostsRemaining", { remaining: remainingPosts })}
+            </p>
+          </div>
+          {!isUnlimited ? (
+            <p className="text-[11px] text-amber-700">
+              {t("submit.dailyUnlockHint", { needed: nextVotesRequired })}
+            </p>
+          ) : (
+            <p className="text-[11px] text-emerald-700">{t("submit.dailyUnlockAll")}</p>
+          )}
         </div>
-      ) : null}
+        <div className="mt-2 h-1.5 rounded-full bg-brand-100">
+          <div
+            className="h-1.5 rounded-full bg-brand-600 transition-all"
+            style={{ width: `${voteProgress}%` }}
+          />
+        </div>
+      </div>
       <form
         className="mt-4 space-y-3"
         onSubmit={(event) => {

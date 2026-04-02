@@ -40,6 +40,8 @@ def serialize_entry_tags(entry_tags: list[EntryTag]) -> list[TagOut]:
 def serialize_example(
     example: Example,
     moderation_map: dict[uuid.UUID, ModerationContext] | None = None,
+    current_user_vote: int | None = None,
+    audio_user_votes: dict[uuid.UUID, int] | None = None,
 ) -> ExampleOut:
     serialized = ExampleOut.model_validate(
         {
@@ -61,7 +63,14 @@ def serialize_example(
             "score_cache": example.score_cache,
             "upvote_count_cache": example.upvote_count_cache,
             "downvote_count_cache": example.downvote_count_cache,
-            "audio_samples": [serialize_audio_sample(sample) for sample in example.audio_samples],
+            "current_user_vote": current_user_vote,
+            "audio_samples": [
+                serialize_audio_sample(
+                    sample,
+                    current_user_vote=(audio_user_votes or {}).get(sample.id),
+                )
+                for sample in example.audio_samples
+            ],
             "created_at": example.created_at,
             "updated_at": example.updated_at,
         }
@@ -123,6 +132,7 @@ def serialize_comment_author(
 def serialize_entry_comment(
     comment: EntryComment,
     badge_leaders: UserBadgeLeaders | None = None,
+    current_user_vote: int | None = None,
 ) -> EntryCommentOut:
     return EntryCommentOut(
         id=comment.id,
@@ -133,6 +143,7 @@ def serialize_entry_comment(
         score_cache=comment.score_cache,
         upvote_count_cache=comment.upvote_count_cache,
         downvote_count_cache=comment.downvote_count_cache,
+        current_user_vote=current_user_vote,
         created_at=comment.created_at,
         updated_at=comment.updated_at,
         author=serialize_comment_author(comment, badge_leaders),
@@ -142,6 +153,7 @@ def serialize_entry_comment(
 def serialize_entry_summary(
     entry: Entry,
     badge_leaders: UserBadgeLeaders | None = None,
+    current_user_vote: int | None = None,
 ) -> EntrySummaryOut:
     payload = {
         "id": entry.id,
@@ -157,6 +169,7 @@ def serialize_entry_summary(
         "upvote_count_cache": entry.upvote_count_cache,
         "downvote_count_cache": entry.downvote_count_cache,
         "example_count_cache": entry.example_count_cache,
+        "current_user_vote": current_user_vote,
         "proposer_user_id": entry.proposer_user_id,
         "proposer": serialize_entry_author(entry, badge_leaders),
         "created_at": entry.created_at,
@@ -175,6 +188,10 @@ def serialize_entry_detail(
     entry_moderation: ModerationContext | None = None,
     example_moderation: dict[uuid.UUID, ModerationContext] | None = None,
     history_events: list[EntryHistoryEventOut] | None = None,
+    current_user_vote: int | None = None,
+    example_user_votes: dict[uuid.UUID, int] | None = None,
+    comment_user_votes: dict[uuid.UUID, int] | None = None,
+    audio_user_votes: dict[uuid.UUID, int] | None = None,
 ) -> EntryDetailOut:
     moderation_reason: str | None = None
     moderation_notes: str | None = None
@@ -183,7 +200,7 @@ def serialize_entry_detail(
         moderation_reason, moderation_notes, moderated_at = entry_moderation
 
     payload = {
-        **serialize_entry_summary(entry, badge_leaders).model_dump(),
+        **serialize_entry_summary(entry, badge_leaders, current_user_vote).model_dump(),
         "source_citation": entry.source_citation,
         "source": _serialize_entry_source(entry),
         "morphology_notes": entry.morphology_notes,
@@ -194,14 +211,35 @@ def serialize_entry_detail(
         "moderated_at": moderated_at,
         "versions": [serialize_entry_version(version) for version in entry.versions],
         "history_events": history_events or [],
-        "examples": [serialize_example(example, example_moderation) for example in examples],
-        "comments": [serialize_entry_comment(comment, badge_leaders) for comment in comments or []],
-        "audio_samples": [serialize_audio_sample(sample) for sample in entry.audio_samples],
+        "examples": [
+            serialize_example(
+                example,
+                example_moderation,
+                (example_user_votes or {}).get(example.id),
+                audio_user_votes,
+            )
+            for example in examples
+        ],
+        "comments": [
+            serialize_entry_comment(
+                comment,
+                badge_leaders,
+                (comment_user_votes or {}).get(comment.id),
+            )
+            for comment in comments or []
+        ],
+        "audio_samples": [
+            serialize_audio_sample(
+                sample,
+                current_user_vote=(audio_user_votes or {}).get(sample.id),
+            )
+            for sample in entry.audio_samples
+        ],
     }
     return EntryDetailOut.model_validate(payload)
 
 
-def serialize_audio_sample(sample: AudioSample) -> AudioSampleOut:
+def serialize_audio_sample(sample: AudioSample, current_user_vote: int | None = None) -> AudioSampleOut:
     uploader_display_name = None
     uploader_profile_url = None
     sample_state = inspect(sample)
@@ -227,6 +265,7 @@ def serialize_audio_sample(sample: AudioSample) -> AudioSampleOut:
             "score_cache": sample.score_cache,
             "upvote_count_cache": sample.upvote_count_cache,
             "downvote_count_cache": sample.downvote_count_cache,
+            "current_user_vote": current_user_vote,
             "created_at": sample.created_at,
         }
     )
