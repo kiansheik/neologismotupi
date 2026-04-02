@@ -88,6 +88,13 @@ async def test_create_entry(client):
 
 
 @pytest.mark.asyncio
+async def test_headword_allows_leading_apostrophe(client):
+    await register_user(client, "apostrophe@example.com", "Apostrophe User")
+    entry = await create_entry(client, "'ara")
+    assert entry["headword"] == "'ara"
+
+
+@pytest.mark.asyncio
 async def test_non_moderator_entries_remain_pending_after_threshold(client):
     await register_user(client, "trusted-user@example.com", "Trusted User")
 

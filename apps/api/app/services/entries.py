@@ -408,7 +408,12 @@ def is_valid_headword(value: str) -> bool:
     cleaned = collapse_whitespace(value).strip()
     if not cleaned:
         return False
-    if not cleaned[0].isalpha() or not cleaned[-1].isalpha():
+    boundary_check = cleaned
+    if boundary_check.startswith("'"):
+        boundary_check = boundary_check[1:]
+        if not boundary_check:
+            return False
+    if not boundary_check[0].isalpha() or not boundary_check[-1].isalpha():
         return False
     for ch in cleaned:
         if ch in {"'", "-", " "}:
