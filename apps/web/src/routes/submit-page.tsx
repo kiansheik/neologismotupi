@@ -22,7 +22,7 @@ import { createEntry, getEntrySubmissionGate, listEntries } from "@/features/ent
 import { listSources } from "@/features/sources/api";
 import type { SourceSuggestion } from "@/lib/types";
 
-const HEADWORD_PATTERN = /^'?[\p{L}](?:[\p{L}\p{M}' -]*[\p{L}])?$/u;
+const HEADWORD_PATTERN = /^["']?[\p{L}](?:[\p{L}\p{M}'" -]*[\p{L}])?$/u;
 
 function isValidHeadword(value: string): boolean {
   const trimmed = value.trim();

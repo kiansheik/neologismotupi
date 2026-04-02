@@ -95,6 +95,13 @@ async def test_headword_allows_leading_apostrophe(client):
 
 
 @pytest.mark.asyncio
+async def test_headword_allows_leading_double_quote(client):
+    await register_user(client, "double-quote@example.com", "Double Quote User")
+    entry = await create_entry(client, "\"ara")
+    assert entry["headword"] == "\"ara"
+
+
+@pytest.mark.asyncio
 async def test_non_moderator_entries_remain_pending_after_threshold(client):
     await register_user(client, "trusted-user@example.com", "Trusted User")
 

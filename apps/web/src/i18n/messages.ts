@@ -201,7 +201,7 @@ export const ptBR = {
   "submit.morphologyNotes": "Etimologia/Morfologia",
   "submit.help.headword": "A forma principal do {term.entry} (palavra ou expressão), sem explicação neste campo.",
   "submit.headwordRulesTitle": "Regras do {term.entry}",
-  "submit.headwordRuleChars": "Somente letras, espaços, ' e -.",
+  "submit.headwordRuleChars": "Somente letras, espaços, ' , \" e -.",
   "submit.headwordRuleSingle": "Use uma única forma/base (sem parênteses ou alternativas).",
   "submit.headwordRuleVariants": "Variações em {term.entries} separados; notas morfológicas com a etimologia.",
   "submit.help.glossPt":
@@ -765,7 +765,7 @@ export const enUS: Record<TranslationKey, string> = {
   "submit.morphologyNotes": "Etymology",
   "submit.help.headword": "The main {term.entry} (word or expression), without a long explanation.",
   "submit.headwordRulesTitle": "{term.entryCap} rules",
-  "submit.headwordRuleChars": "Only letters, spaces, ' and -.",
+  "submit.headwordRuleChars": "Only letters, spaces, ' , \" and -.",
   "submit.headwordRuleSingle": "Use a single base form (no parentheses or alternatives).",
   "submit.headwordRuleVariants": "Put variants in separate {term.entries}; morphology in etymology.",
   "submit.help.glossPt":

@@ -409,14 +409,14 @@ def is_valid_headword(value: str) -> bool:
     if not cleaned:
         return False
     boundary_check = cleaned
-    if boundary_check.startswith("'"):
+    if boundary_check.startswith(("'", '"')):
         boundary_check = boundary_check[1:]
         if not boundary_check:
             return False
     if not boundary_check[0].isalpha() or not boundary_check[-1].isalpha():
         return False
     for ch in cleaned:
-        if ch in {"'", "-", " "}:
+        if ch in {"'", '"', "-", " "}:
             continue
         if ch.isalpha():
             continue
