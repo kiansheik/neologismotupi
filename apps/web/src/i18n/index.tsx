@@ -58,12 +58,31 @@ function resolveInitialLocale(): Locale {
   return "pt-BR";
 }
 
-function interpolate(template: string, vars: Record<string, string | number>): string {
-  let output = template;
-  for (const [key, value] of Object.entries(vars)) {
-    output = output.replaceAll(`{${key}}`, String(value));
-  }
-  return output;
+function resolveMessage(
+  key: TranslationKey,
+  dictionary: Record<TranslationKey, string>,
+  vars?: Record<string, string | number>,
+): string {
+  const lookup = dictionary as Record<string, string>;
+
+  const resolveTemplate = (template: string, visited: Set<string>): string =>
+    template.replace(/\{([^}]+)\}/g, (match, token) => {
+      if (vars && Object.prototype.hasOwnProperty.call(vars, token)) {
+        return String(vars[token]);
+      }
+      const nested = lookup[token];
+      if (!nested) {
+        return match;
+      }
+      if (visited.has(token)) {
+        return nested;
+      }
+      visited.add(token);
+      return resolveTemplate(nested, visited);
+    });
+
+  const template = lookup[key] ?? key;
+  return resolveTemplate(template, new Set<string>([key]));
 }
 
 export function I18nProvider({ children }: PropsWithChildren) {
@@ -79,13 +98,7 @@ export function I18nProvider({ children }: PropsWithChildren) {
 
   const value = useMemo<I18nContextValue>(() => {
     const dictionary = dictionaries[locale];
-    const t: TranslateFn = (key, vars) => {
-      const message = dictionary[key];
-      if (!vars) {
-        return message;
-      }
-      return interpolate(message, vars);
-    };
+    const t: TranslateFn = (key, vars) => resolveMessage(key, dictionary, vars);
     return {
       locale,
       setLocale: setLocaleState,
