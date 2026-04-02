@@ -36,6 +36,11 @@ class Settings(BaseSettings):
     entry_vote_cost: int = 3
     entry_vote_cost_exempt_staff: bool = False
     entry_vote_cost_start_at: datetime | None = None
+    entry_vote_daily_step1_votes: int = 3
+    entry_vote_daily_step1_posts: int = 1
+    entry_vote_daily_step2_votes: int = 2
+    entry_vote_daily_step2_posts: int = 3
+    entry_vote_daily_step3_votes: int = 1
     pending_entry_threshold: int = 3
     pending_example_threshold: int = 5
     auto_approve_after_threshold: int = -1
@@ -120,6 +125,19 @@ class Settings(BaseSettings):
     def validate_auto_approve_after_threshold(cls, value: int) -> int:
         if value < -1:
             raise ValueError("AUTO_APPROVE_AFTER_THRESHOLD must be -1 or >= 0")
+        return value
+
+    @field_validator(
+        "entry_vote_daily_step1_votes",
+        "entry_vote_daily_step1_posts",
+        "entry_vote_daily_step2_votes",
+        "entry_vote_daily_step2_posts",
+        "entry_vote_daily_step3_votes",
+    )
+    @classmethod
+    def validate_entry_vote_daily_steps(cls, value: int) -> int:
+        if value < 0:
+            raise ValueError("ENTRY_VOTE_DAILY step values must be >= 0")
         return value
 
     @field_validator("entry_vote_cost_start_at", mode="before")

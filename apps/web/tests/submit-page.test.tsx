@@ -4,16 +4,13 @@ import userEvent from "@testing-library/user-event";
 import { SubmitPage } from "@/routes/submit-page";
 import { renderWithProviders } from "./test-utils";
 
-const { listEntriesMock, createEntryMock, getEntryConstraintsMock } = vi.hoisted(() => ({
+const { listEntriesMock, createEntryMock, getEntrySubmissionGateMock } = vi.hoisted(() => ({
   listEntriesMock: vi.fn(),
   createEntryMock: vi.fn(),
-  getEntryConstraintsMock: vi.fn(),
+  getEntrySubmissionGateMock: vi.fn(),
 }));
 const { listSourcesMock } = vi.hoisted(() => ({
   listSourcesMock: vi.fn(),
-}));
-const { getPublicUserMock } = vi.hoisted(() => ({
-  getPublicUserMock: vi.fn(),
 }));
 
 vi.mock("react-router-dom", async () => {
@@ -42,44 +39,31 @@ vi.mock("@/features/auth/hooks", () => ({
 vi.mock("@/features/entries/api", () => ({
   listEntries: listEntriesMock,
   createEntry: createEntryMock,
-  getEntryConstraints: getEntryConstraintsMock,
+  getEntrySubmissionGate: getEntrySubmissionGateMock,
 }));
 
 vi.mock("@/features/sources/api", () => ({
   listSources: listSourcesMock,
 }));
 
-vi.mock("@/features/auth/api", () => ({
-  getPublicUser: getPublicUserMock,
-}));
-
 describe("SubmitPage", () => {
   beforeEach(() => {
     listSourcesMock.mockResolvedValue([]);
-    getEntryConstraintsMock.mockResolvedValue({
-      entry_vote_cost: 3,
-      downvote_requires_comment: false,
-      downvote_comment_min_length: 5,
-      downvote_comment_exempt_staff: false,
-      entry_vote_cost_exempt_staff: false,
-    });
-    getPublicUserMock.mockResolvedValue({
-      id: "u1",
-      created_at: "2026-01-01T00:00:00Z",
-      profile: {
-        id: "profile-1",
-        display_name: "Teste",
-        stats: {
-          total_entries: 0,
-          entry_vote_cost_entries: 0,
-          total_comments: 0,
-          total_entry_votes: 3,
-          entry_vote_cost_votes: 3,
-          last_seen_at: "2026-01-01T00:00:00Z",
-          last_active_at: "2026-01-01T00:00:00Z",
-          submitting_since_at: "2026-01-01T00:00:00Z",
-        },
-      },
+    getEntrySubmissionGateMock.mockResolvedValue({
+      window_start: "2026-04-01T00:00:00Z",
+      window_end: "2026-04-02T00:00:00Z",
+      votes_today: 3,
+      entries_today: 0,
+      unlocked_posts: 1,
+      remaining_posts: 1,
+      unlimited: false,
+      next_votes_required: 2,
+      votes_required_for_unlimited: 6,
+      step1_votes: 3,
+      step1_posts: 1,
+      step2_votes: 5,
+      step2_posts: 4,
+      step3_votes: 6,
     });
     listEntriesMock.mockResolvedValue({
       items: [

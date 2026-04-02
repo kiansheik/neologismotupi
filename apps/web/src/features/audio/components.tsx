@@ -447,6 +447,7 @@ export function AudioSampleList({
         const isVoting = votingAudioId === sample.id;
         const isDeleting = deletingAudioId === sample.id;
         const canVoteOnSample = canVote && sample.user_id !== currentUserId;
+        const audioVote = sample.current_user_vote ?? 0;
         const uploaderLabel = sample.uploader_display_name ?? t("audio.unknownUploader");
         const uploaderUrl = sample.uploader_profile_url ?? null;
         const isConfirmingDelete = confirmDeleteId === sample.id;
@@ -458,7 +459,11 @@ export function AudioSampleList({
                 <Button
                   type="button"
                   variant="secondary"
-                  className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-[#d3c6b0] bg-[#fffaf2] p-0 text-base leading-none shadow-sm hover:border-brand-500 hover:bg-brand-50"
+                  className={`inline-flex h-8 w-8 items-center justify-center rounded-full border border-[#d3c6b0] bg-[#fffaf2] p-0 text-base leading-none shadow-sm transition-colors ${
+                    audioVote === 1
+                      ? "border-brand-600 bg-brand-600 text-white hover:bg-brand-700"
+                      : "hover:border-brand-500 hover:bg-brand-50"
+                  }`}
                   onClick={() => onVote?.(sample.id, 1)}
                   disabled={!canVoteOnSample || isVoting || isDeleting}
                   title={t("audio.upvote")}
@@ -469,7 +474,11 @@ export function AudioSampleList({
                 <Button
                   type="button"
                   variant="secondary"
-                  className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-[#d3c6b0] bg-[#fffaf2] p-0 text-base leading-none shadow-sm hover:border-red-500 hover:bg-red-100"
+                  className={`inline-flex h-8 w-8 items-center justify-center rounded-full border border-[#d3c6b0] bg-[#fffaf2] p-0 text-base leading-none shadow-sm transition-colors ${
+                    audioVote === -1
+                      ? "border-red-600 bg-red-600 text-white hover:bg-red-700"
+                      : "hover:border-red-500 hover:bg-red-100"
+                  }`}
                   onClick={() => onVote?.(sample.id, -1)}
                   disabled={!canVoteOnSample || isVoting || isDeleting}
                   title={t("audio.downvote")}

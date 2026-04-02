@@ -15,7 +15,7 @@ from app.core.errors import raise_api_error
 from app.core.permissions import can_edit_entry, can_edit_example, is_moderator
 from app.core.utils import collapse_whitespace, normalize_text, slugify
 from app.models.discussion import CommentVote, EntryComment
-from app.models.audio import AudioSample
+from app.models.audio import AudioSample, AudioVote
 from app.models.entry import Entry, EntryTag, EntryVersion, Example, ExampleVersion, ExampleVote, Tag, Vote
 from app.models.moderation import ModerationAction, Report
 from app.models.source import SourceEdition, SourceWork
@@ -29,6 +29,7 @@ from app.schemas.entries import (
     EntryDetailOut,
     EntryHistoryEventOut,
     EntryConstraintsOut,
+    EntrySubmissionGateOut,
     EntryListOut,
     EntryUpdate,
     EntryVersionOut,
@@ -47,10 +48,11 @@ from app.services.entries import (
     build_entry_status_for_submission,
     build_example_status_for_submission,
     can_downvote,
+    compute_entry_vote_daily_gate,
     count_user_entries,
     count_user_entry_votes,
     count_user_examples,
-    get_entry_vote_cost_start_at,
+    get_entry_vote_daily_window,
     create_entry_version,
     create_example_version,
     ensure_unique_slug,
@@ -110,6 +112,56 @@ async def get_entry_constraints() -> EntryConstraintsOut:
         entry_vote_cost=settings.entry_vote_cost,
         downvote_requires_comment=settings.downvote_requires_comment,
         downvote_comment_min_length=settings.downvote_comment_min_length,
+    )
+
+
+@router.get("/submit-gate", response_model=EntrySubmissionGateOut)
+async def get_entry_submission_gate(
+    db: SessionDep,
+    user: Annotated[User, Depends(get_current_user)],
+) -> EntrySubmissionGateOut:
+    settings = get_settings()
+    window_start, window_end, gate_active = get_entry_vote_daily_window()
+    exempt = user.is_superuser and settings.entry_vote_cost_exempt_staff
+
+    votes_today = 0
+    entries_today = 0
+    if gate_active and not exempt and settings.entry_vote_daily_step1_votes > 0:
+        votes_today = await count_user_entry_votes(
+            db,
+            user.id,
+            created_after=window_start,
+            created_before=window_end,
+        )
+        entries_today = await count_user_entries(
+            db,
+            user.id,
+            created_after=window_start,
+            created_before=window_end,
+        )
+
+    gate = compute_entry_vote_daily_gate(votes_today, entries_today)
+
+    unlimited = gate.unlimited or not gate_active or exempt
+    unlocked_posts = None if unlimited else gate.unlocked_posts
+    remaining_posts = None if unlimited else gate.remaining_posts
+    next_votes_required = 0 if unlimited else gate.next_votes_required
+
+    return EntrySubmissionGateOut(
+        window_start=window_start,
+        window_end=window_end,
+        votes_today=votes_today,
+        entries_today=entries_today,
+        unlocked_posts=unlocked_posts,
+        remaining_posts=remaining_posts,
+        unlimited=unlimited,
+        next_votes_required=next_votes_required,
+        votes_required_for_unlimited=gate.votes_required_for_unlimited,
+        step1_votes=gate.step1_votes,
+        step1_posts=gate.step1_posts,
+        step2_votes=gate.step2_votes,
+        step2_posts=gate.step2_posts,
+        step3_votes=gate.step3_votes,
     )
 
 
@@ -741,38 +793,44 @@ async def create_entry(
     )
 
     user_entry_count = await count_user_entries(db, user.id)
-    if settings.entry_vote_cost > 0 and not (
+    if settings.entry_vote_daily_step1_votes > 0 and not (
         user.is_superuser and settings.entry_vote_cost_exempt_staff
     ):
-        cost_start_at = get_entry_vote_cost_start_at()
-        chargeable_entries = (
-            await count_user_entries(db, user.id, created_after=cost_start_at)
-            if cost_start_at
-            else user_entry_count
-        )
-        votes_cast = (
-            await count_user_entry_votes(db, user.id, created_after=cost_start_at)
-            if cost_start_at
-            else await count_user_entry_votes(db, user.id)
-        )
-        required_votes = (chargeable_entries + 1) * settings.entry_vote_cost
-        if votes_cast < required_votes:
-            balance = votes_cast - (chargeable_entries * settings.entry_vote_cost)
-            needed = required_votes - votes_cast
-            raise_api_error(
-                status_code=403,
-                code="entry_vote_quota",
-                message="Not enough entry votes to submit a new entry",
-                details={
-                    "required_votes": required_votes,
-                    "votes_cast": votes_cast,
-                    "entries_submitted": user_entry_count,
-                    "entries_charged": chargeable_entries,
-                    "entry_vote_cost": settings.entry_vote_cost,
-                    "balance": balance,
-                    "needed": needed,
-                },
+        window_start, window_end, gate_active = get_entry_vote_daily_window()
+        if gate_active:
+            votes_today = await count_user_entry_votes(
+                db,
+                user.id,
+                created_after=window_start,
+                created_before=window_end,
             )
+            entries_today = await count_user_entries(
+                db,
+                user.id,
+                created_after=window_start,
+                created_before=window_end,
+            )
+            gate = compute_entry_vote_daily_gate(votes_today, entries_today)
+            if not gate.unlimited and entries_today >= (gate.unlocked_posts or 0):
+                raise_api_error(
+                    status_code=403,
+                    code="entry_vote_quota",
+                    message="Not enough entry votes to submit a new entry",
+                    details={
+                        "votes_today": votes_today,
+                        "entries_today": entries_today,
+                        "unlocked_posts": gate.unlocked_posts,
+                        "remaining_posts": gate.remaining_posts,
+                        "next_votes_required": gate.next_votes_required,
+                        "needed": gate.next_votes_required,
+                        "votes_required_for_unlimited": gate.votes_required_for_unlimited,
+                        "step1_votes": gate.step1_votes,
+                        "step1_posts": gate.step1_posts,
+                        "step2_votes": gate.step2_votes,
+                        "step2_posts": gate.step2_posts,
+                        "step3_votes": gate.step3_votes,
+                    },
+                )
 
     normalized_headword = normalize_headword(payload.headword)
     duplicates = await find_possible_duplicates(
@@ -990,6 +1048,53 @@ async def update_entry(
     entry_moderation = await _load_entry_moderation_context(db, entry=hydrated)
     example_moderation = await _load_example_moderation_context(db, examples=examples)
     history_events = await _load_entry_history_events(db, entry=hydrated)
+    entry_vote_value: int | None = None
+    example_votes: dict[uuid.UUID, int] = {}
+    comment_votes: dict[uuid.UUID, int] = {}
+    audio_votes: dict[uuid.UUID, int] = {}
+
+    if user:
+        entry_vote_value = (
+            await db.execute(
+                select(Vote.value).where(and_(Vote.entry_id == hydrated.id, Vote.user_id == user.id))
+            )
+        ).scalar_one_or_none()
+
+        if examples:
+            example_ids = [example.id for example in examples]
+            example_rows = (
+                await db.execute(
+                    select(ExampleVote.example_id, ExampleVote.value).where(
+                        and_(ExampleVote.user_id == user.id, ExampleVote.example_id.in_(example_ids))
+                    )
+                )
+            ).all()
+            example_votes = {row[0]: row[1] for row in example_rows}
+
+        if comments:
+            comment_ids = [comment.id for comment in comments]
+            comment_rows = (
+                await db.execute(
+                    select(CommentVote.comment_id, CommentVote.value).where(
+                        and_(CommentVote.user_id == user.id, CommentVote.comment_id.in_(comment_ids))
+                    )
+                )
+            ).all()
+            comment_votes = {row[0]: row[1] for row in comment_rows}
+
+        audio_ids = [sample.id for sample in hydrated.audio_samples]
+        if examples:
+            for example in examples:
+                audio_ids.extend(sample.id for sample in example.audio_samples)
+        if audio_ids:
+            audio_rows = (
+                await db.execute(
+                    select(AudioVote.audio_id, AudioVote.value).where(
+                        and_(AudioVote.user_id == user.id, AudioVote.audio_id.in_(audio_ids))
+                    )
+                )
+            ).all()
+            audio_votes = {row[0]: row[1] for row in audio_rows}
     return serialize_entry_detail(
         hydrated,
         examples=examples,
@@ -998,6 +1103,10 @@ async def update_entry(
         entry_moderation=entry_moderation,
         example_moderation=example_moderation,
         history_events=history_events,
+        current_user_vote=entry_vote_value,
+        example_user_votes=example_votes,
+        comment_user_votes=comment_votes,
+        audio_user_votes=audio_votes,
     )
 
 

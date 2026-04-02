@@ -47,6 +47,7 @@ export interface EntrySummary {
   upvote_count_cache: number;
   downvote_count_cache: number;
   example_count_cache: number;
+  current_user_vote?: number | null;
   proposer_user_id: string;
   proposer: EntryAuthor;
   created_at: string;
@@ -67,6 +68,7 @@ export interface AudioSample {
   score_cache: number;
   upvote_count_cache: number;
   downvote_count_cache: number;
+  current_user_vote?: number | null;
   created_at: string;
 }
 
@@ -114,6 +116,7 @@ export interface Example {
   score_cache: number;
   upvote_count_cache: number;
   downvote_count_cache: number;
+  current_user_vote?: number | null;
   audio_samples: AudioSample[];
   moderation_reason?: string | null;
   moderation_notes?: string | null;
@@ -141,6 +144,7 @@ export interface EntryComment {
   score_cache: number;
   upvote_count_cache: number;
   downvote_count_cache: number;
+  current_user_vote?: number | null;
   created_at: string;
   updated_at: string;
   author: EntryAuthor;
@@ -234,6 +238,23 @@ export interface EntryConstraints {
   entry_vote_cost: number;
   downvote_requires_comment: boolean;
   downvote_comment_min_length: number;
+}
+
+export interface EntrySubmissionGate {
+  window_start: string;
+  window_end: string;
+  votes_today: number;
+  entries_today: number;
+  unlocked_posts: number | null;
+  remaining_posts: number | null;
+  unlimited: boolean;
+  next_votes_required: number;
+  votes_required_for_unlimited: number;
+  step1_votes: number;
+  step1_posts: number;
+  step2_votes: number;
+  step2_posts: number;
+  step3_votes: number;
 }
 
 export interface Profile {

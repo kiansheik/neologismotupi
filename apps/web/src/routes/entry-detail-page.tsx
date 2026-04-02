@@ -1303,6 +1303,7 @@ export function EntryDetailPage() {
   const shouldShowGloss =
     Boolean(preferredGloss) &&
     normalizeComparableText(preferredGloss) !== normalizeComparableText(entry.short_definition);
+  const entryVote = entry.current_user_vote ?? 0;
   const historyEvents =
     entry.history_events && entry.history_events.length > 0
       ? entry.history_events
@@ -1420,7 +1421,11 @@ export function EntryDetailPage() {
           <Button
             type="button"
             variant="secondary"
-            className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-[#d3c6b0] bg-[#fffaf2] p-0 text-lg leading-none shadow-sm hover:border-brand-500 hover:bg-brand-50"
+            className={`inline-flex h-10 w-10 items-center justify-center rounded-full border border-[#d3c6b0] bg-[#fffaf2] p-0 text-lg leading-none shadow-sm transition-colors ${
+              entryVote === 1
+                ? "border-brand-600 bg-brand-600 text-white hover:bg-brand-700"
+                : "hover:border-brand-500 hover:bg-brand-50"
+            }`}
             onClick={() => voteMutation.mutate(1)}
             disabled={!canWrite || voteMutation.isPending}
             title={t("entry.upvote")}
@@ -1431,7 +1436,11 @@ export function EntryDetailPage() {
           <Button
             type="button"
             variant="secondary"
-            className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-[#d3c6b0] bg-[#fffaf2] p-0 text-lg leading-none shadow-sm hover:border-red-500 hover:bg-red-100"
+            className={`inline-flex h-10 w-10 items-center justify-center rounded-full border border-[#d3c6b0] bg-[#fffaf2] p-0 text-lg leading-none shadow-sm transition-colors ${
+              entryVote === -1
+                ? "border-red-600 bg-red-600 text-white hover:bg-red-700"
+                : "hover:border-red-500 hover:bg-red-100"
+            }`}
             onClick={() => voteMutation.mutate(-1)}
             disabled={!canWrite || voteMutation.isPending}
             title={t("entry.downvote")}
@@ -1818,6 +1827,7 @@ export function EntryDetailPage() {
               const displayedExampleSourceCitation = example.source?.citation ?? example.source_citation;
               const exampleSourceWorkId = example.source?.work_id ?? null;
               const exampleSourceFirstUrl = example.source?.urls?.[0] ?? null;
+              const exampleVote = example.current_user_vote ?? 0;
 
               return (
                 <article key={example.id} className="rounded-md border border-brand-100 p-3">
@@ -1882,7 +1892,11 @@ export function EntryDetailPage() {
                     <Button
                       type="button"
                       variant="secondary"
-                      className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-[#d3c6b0] bg-[#fffaf2] p-0 text-base leading-none shadow-sm hover:border-brand-500 hover:bg-brand-50"
+                      className={`inline-flex h-8 w-8 items-center justify-center rounded-full border border-[#d3c6b0] bg-[#fffaf2] p-0 text-base leading-none shadow-sm transition-colors ${
+                        exampleVote === 1
+                          ? "border-brand-600 bg-brand-600 text-white hover:bg-brand-700"
+                          : "hover:border-brand-500 hover:bg-brand-50"
+                      }`}
                       onClick={() => voteExampleMutation.mutate({ exampleId: example.id, value: 1 })}
                       disabled={!canWrite || voteExampleMutation.isPending}
                       title={t("entry.upvote")}
@@ -1893,7 +1907,11 @@ export function EntryDetailPage() {
                     <Button
                       type="button"
                       variant="secondary"
-                      className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-[#d3c6b0] bg-[#fffaf2] p-0 text-base leading-none shadow-sm hover:border-red-500 hover:bg-red-100"
+                      className={`inline-flex h-8 w-8 items-center justify-center rounded-full border border-[#d3c6b0] bg-[#fffaf2] p-0 text-base leading-none shadow-sm transition-colors ${
+                        exampleVote === -1
+                          ? "border-red-600 bg-red-600 text-white hover:bg-red-700"
+                          : "hover:border-red-500 hover:bg-red-100"
+                      }`}
                       onClick={() => voteExampleMutation.mutate({ exampleId: example.id, value: -1 })}
                       disabled={!canWrite || voteExampleMutation.isPending}
                       title={t("entry.downvote")}
@@ -2183,8 +2201,10 @@ export function EntryDetailPage() {
         <h2 className="text-lg font-semibold text-brand-900">{t("entry.commentsTitle")}</h2>
         <div className="mt-3 space-y-3">
           {entry.comments.length ? (
-            entry.comments.map((comment) => (
-              <article key={comment.id} className="rounded-md border border-brand-100 p-3">
+            entry.comments.map((comment) => {
+              const commentVote = comment.current_user_vote ?? 0;
+              return (
+                <article key={comment.id} className="rounded-md border border-brand-100 p-3">
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <p className="text-sm text-slate-700">
                     {t("entry.commentBy")}{" "}
@@ -2205,7 +2225,11 @@ export function EntryDetailPage() {
                   <Button
                     type="button"
                     variant="secondary"
-                    className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-[#d3c6b0] bg-[#fffaf2] p-0 text-base leading-none shadow-sm hover:border-brand-500 hover:bg-brand-50"
+                    className={`inline-flex h-8 w-8 items-center justify-center rounded-full border border-[#d3c6b0] bg-[#fffaf2] p-0 text-base leading-none shadow-sm transition-colors ${
+                      commentVote === 1
+                        ? "border-brand-600 bg-brand-600 text-white hover:bg-brand-700"
+                        : "hover:border-brand-500 hover:bg-brand-50"
+                    }`}
                     onClick={() => voteCommentMutation.mutate({ commentId: comment.id, value: 1 })}
                     disabled={!canWrite || voteCommentMutation.isPending}
                     title={t("entry.upvote")}
@@ -2216,7 +2240,11 @@ export function EntryDetailPage() {
                   <Button
                     type="button"
                     variant="secondary"
-                    className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-[#d3c6b0] bg-[#fffaf2] p-0 text-base leading-none shadow-sm hover:border-red-500 hover:bg-red-100"
+                    className={`inline-flex h-8 w-8 items-center justify-center rounded-full border border-[#d3c6b0] bg-[#fffaf2] p-0 text-base leading-none shadow-sm transition-colors ${
+                      commentVote === -1
+                        ? "border-red-600 bg-red-600 text-white hover:bg-red-700"
+                        : "hover:border-red-500 hover:bg-red-100"
+                    }`}
                     onClick={() => voteCommentMutation.mutate({ commentId: comment.id, value: -1 })}
                     disabled={!canWrite || voteCommentMutation.isPending}
                     title={t("entry.downvote")}
@@ -2228,8 +2256,9 @@ export function EntryDetailPage() {
                     {t("entry.commentScore", { score: comment.score_cache })}
                   </span>
                 </div>
-              </article>
-            ))
+                </article>
+              );
+            })
           ) : (
             <p className="text-sm text-slate-600">{t("entry.noComments")}</p>
           )}

@@ -1,5 +1,6 @@
 import uuid
 import unicodedata
+from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 
 from sqlalchemy import and_, delete, func, or_, select
@@ -243,10 +244,13 @@ async def count_user_entries(
     user_id: uuid.UUID,
     *,
     created_after: datetime | None = None,
+    created_before: datetime | None = None,
 ) -> int:
     stmt = select(func.count()).where(Entry.proposer_user_id == user_id)
     if created_after is not None:
         stmt = stmt.where(Entry.created_at >= created_after)
+    if created_before is not None:
+        stmt = stmt.where(Entry.created_at < created_before)
     return int((await db.execute(stmt)).scalar_one())
 
 
@@ -259,15 +263,115 @@ def get_entry_vote_cost_start_at() -> datetime | None:
     return start_at
 
 
+@dataclass(frozen=True)
+class EntryVoteDailyGate:
+    step1_votes: int
+    step1_posts: int
+    step2_votes: int
+    step2_posts: int
+    step3_votes: int
+    votes_required_for_unlimited: int
+    votes_today: int
+    entries_today: int
+    unlocked_posts: int | None
+    remaining_posts: int | None
+    next_votes_required: int
+    unlimited: bool
+
+
+def get_entry_vote_daily_window(now: datetime | None = None) -> tuple[datetime, datetime, bool]:
+    now = now or datetime.now(UTC)
+    day_start = datetime(now.year, now.month, now.day, tzinfo=UTC)
+    day_end = day_start + timedelta(days=1)
+    start_at = get_entry_vote_cost_start_at()
+    if start_at and start_at > now:
+        return day_start, day_end, False
+    if start_at and start_at > day_start:
+        day_start = start_at
+    return day_start, day_end, True
+
+
+def compute_entry_vote_daily_gate(votes_today: int, entries_today: int) -> EntryVoteDailyGate:
+    settings = get_settings()
+    step1_votes = max(0, settings.entry_vote_daily_step1_votes)
+    step1_posts = max(0, settings.entry_vote_daily_step1_posts)
+    if step1_votes == 0:
+        return EntryVoteDailyGate(
+            step1_votes=step1_votes,
+            step1_posts=step1_posts,
+            step2_votes=step1_votes,
+            step2_posts=step1_posts,
+            step3_votes=step1_votes,
+            votes_required_for_unlimited=0,
+            votes_today=votes_today,
+            entries_today=entries_today,
+            unlocked_posts=None,
+            remaining_posts=None,
+            next_votes_required=0,
+            unlimited=True,
+        )
+
+    step2_votes = step1_votes + max(0, settings.entry_vote_daily_step2_votes)
+    step2_posts = step1_posts + max(0, settings.entry_vote_daily_step2_posts)
+    step3_votes = step2_votes + max(0, settings.entry_vote_daily_step3_votes)
+    votes_required_for_unlimited = step3_votes
+
+    if votes_today >= step3_votes:
+        return EntryVoteDailyGate(
+            step1_votes=step1_votes,
+            step1_posts=step1_posts,
+            step2_votes=step2_votes,
+            step2_posts=step2_posts,
+            step3_votes=step3_votes,
+            votes_required_for_unlimited=votes_required_for_unlimited,
+            votes_today=votes_today,
+            entries_today=entries_today,
+            unlocked_posts=None,
+            remaining_posts=None,
+            next_votes_required=0,
+            unlimited=True,
+        )
+
+    if votes_today >= step2_votes:
+        unlocked_posts = step2_posts
+        next_votes_required = max(0, step3_votes - votes_today)
+    elif votes_today >= step1_votes:
+        unlocked_posts = step1_posts
+        next_votes_required = max(0, step2_votes - votes_today)
+    else:
+        unlocked_posts = 0
+        next_votes_required = max(0, step1_votes - votes_today)
+
+    remaining_posts = max(0, unlocked_posts - entries_today)
+
+    return EntryVoteDailyGate(
+        step1_votes=step1_votes,
+        step1_posts=step1_posts,
+        step2_votes=step2_votes,
+        step2_posts=step2_posts,
+        step3_votes=step3_votes,
+        votes_required_for_unlimited=votes_required_for_unlimited,
+        votes_today=votes_today,
+        entries_today=entries_today,
+        unlocked_posts=unlocked_posts,
+        remaining_posts=remaining_posts,
+        next_votes_required=next_votes_required,
+        unlimited=False,
+    )
+
+
 async def count_user_entry_votes(
     db: AsyncSession,
     user_id: uuid.UUID,
     *,
     created_after: datetime | None = None,
+    created_before: datetime | None = None,
 ) -> int:
     stmt = select(func.count()).select_from(Vote).where(Vote.user_id == user_id)
     if created_after is not None:
         stmt = stmt.where(Vote.created_at >= created_after)
+    if created_before is not None:
+        stmt = stmt.where(Vote.created_at < created_before)
     return int((await db.execute(stmt)).scalar_one())
 
 
