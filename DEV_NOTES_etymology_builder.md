@@ -8,7 +8,7 @@
 - `apps/web/src/features/etymology-builder/dictionary-search.ts`
 - `apps/web/src/features/etymology-builder/note-export.ts`
 - `apps/web/src/features/etymology-builder/pydicate-preview.ts`
-- `apps/web/src/features/etymology-builder/pydicate-runtime.ts`
+- `apps/web/src/features/etymology-builder/pyodide-runtime.ts`
 - `apps/web/src/features/etymology-builder/orthography.ts`
 - `apps/web/src/features/etymology-builder/pos.ts`
 - `apps/web/src/routes/submit-page.tsx`
@@ -42,8 +42,9 @@
   - Human-readable semicolon-style note synced to `morphology_notes`.
   - Structured tree preview.
   - Best-effort Pydicate-like preview + canonical piece list.
-- Optional live runtime output via the same `/api/execute` backend used in `tupi-annotation-suite` (no schema changes).
-  - Configurable via `VITE_PYDICATE_API_BASE` (defaults to `http://localhost:8080`).
+- Optional live runtime output via Pyodide (iframe) with local wheels.
+  - Assets live in `apps/web/public/etymology/iframe_pyodide.html` and `apps/web/public/etymology/pyodide/*.whl`.
+  - Pyodide itself is loaded from `https://cdn.jsdelivr.net/pyodide/v0.25.1/full/pyodide.js`.
 
 ## Intentionally Deferred
 - Full argument structure editing and mood/tense controls.

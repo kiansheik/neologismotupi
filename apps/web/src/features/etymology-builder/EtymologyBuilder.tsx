@@ -21,7 +21,7 @@ import { collectPieces, renderPydicate } from "./pydicate-preview";
 import { normalizeNoAccent } from "./orthography";
 import { compactDefinition, defaultPosInfo, formatPosDisplay, parsePosInfo, posInfoForKind, POS_OPTIONS } from "./pos";
 import type { RootPosKind } from "./pos";
-import { usePydicateRuntime } from "./pydicate-runtime";
+import { usePyodideRuntime } from "./pyodide-runtime";
 
 const DEFAULT_DERIVE: DeriveOperation = "agent";
 
@@ -80,7 +80,7 @@ export function EtymologyBuilder({ onNoteChange, onApplyNote, isManualOverride }
   const generatedNote = useMemo(() => renderHumanNote(root), [root]);
   const pydicatePreview = useMemo(() => renderPydicate(root), [root]);
   const pieces = useMemo(() => collectPieces(root), [root]);
-  const runtimeState = usePydicateRuntime(pydicatePreview, isOpen && runtimeEnabled);
+  const { state: runtimeState, iframeProps } = usePyodideRuntime(pydicatePreview, isOpen && runtimeEnabled);
 
   useEffect(() => {
     onNoteChange(generatedNote);
@@ -374,13 +374,13 @@ export function EtymologyBuilder({ onNoteChange, onApplyNote, isManualOverride }
                       checked={runtimeEnabled}
                       onChange={(event) => setRuntimeEnabled(event.target.checked)}
                     />
-                    Executar pydicate (runtime)
+                    Executar pydicate (Pyodide)
                   </label>
+                  {runtimeState.status === "loading" ? (
+                    <span className="text-[11px] text-slate-500">{runtimeState.message || "Carregando..."}</span>
+                  ) : null}
                   {runtimeState.status === "running" ? (
                     <span className="text-[11px] text-slate-500">Executando...</span>
-                  ) : null}
-                  {runtimeState.status === "ready" && runtimeState.durationMs !== undefined ? (
-                    <span className="text-[11px] text-emerald-700">ok {runtimeState.durationMs} ms</span>
                   ) : null}
                   {runtimeState.status === "error" && runtimeState.message ? (
                     <span className="text-[11px] text-amber-700">{runtimeState.message}</span>
@@ -389,6 +389,7 @@ export function EtymologyBuilder({ onNoteChange, onApplyNote, isManualOverride }
                 <div className="mt-2 rounded-md border border-slate-200 bg-white px-2 py-2 text-xs text-slate-800">
                   {runtimeEnabled ? runtimeState.output || runtimeState.message || "—" : "Runtime desativado."}
                 </div>
+                {runtimeEnabled ? <iframe {...iframeProps} className="hidden" /> : null}
                 <div className="mt-2">
                   <p className="text-xs font-semibold text-slate-700">Peças canônicas</p>
                   <div className="mt-1 flex flex-wrap gap-2">
