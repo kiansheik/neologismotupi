@@ -19,6 +19,9 @@ import type { SearchIndexEntry, SearchResult } from "./dictionary-search";
 import { describeNode, renderHumanNote } from "./note-export";
 import { collectPieces, renderPydicate } from "./pydicate-preview";
 import { normalizeNoAccent } from "./orthography";
+import { compactDefinition, defaultPosInfo, formatPosDisplay, parsePosInfo, posInfoForKind, POS_OPTIONS } from "./pos";
+import type { RootPosKind } from "./pos";
+import { usePydicateRuntime } from "./pydicate-runtime";
 
 const DEFAULT_DERIVE: DeriveOperation = "agent";
 
@@ -35,6 +38,11 @@ export function EtymologyBuilder({ onNoteChange, onApplyNote, isManualOverride }
   const [query, setQuery] = useState("");
   const [searchIndex, setSearchIndex] = useState<SearchIndexEntry[] | null>(null);
   const [searchError, setSearchError] = useState<string | null>(null);
+  const [searchMinimized, setSearchMinimized] = useState(false);
+  const [manualHeadword, setManualHeadword] = useState("");
+  const [manualGloss, setManualGloss] = useState("");
+  const [manualPosKind, setManualPosKind] = useState<RootPosKind>("noun");
+  const [runtimeEnabled, setRuntimeEnabled] = useState(true);
 
   useEffect(() => {
     let active = true;
@@ -52,14 +60,27 @@ export function EtymologyBuilder({ onNoteChange, onApplyNote, isManualOverride }
     };
   }, []);
 
+  useEffect(() => {
+    if (pendingInsert) {
+      setSearchMinimized(false);
+    }
+  }, [pendingInsert]);
+
+  useEffect(() => {
+    if (!root) {
+      setSearchMinimized(false);
+    }
+  }, [root]);
+
   const results = useMemo(() => {
-    if (!searchIndex) return [];
+    if (!searchIndex || searchMinimized) return [];
     return searchDictionary(searchIndex, query).slice(0, 12);
-  }, [searchIndex, query]);
+  }, [searchIndex, query, searchMinimized]);
 
   const generatedNote = useMemo(() => renderHumanNote(root), [root]);
   const pydicatePreview = useMemo(() => renderPydicate(root), [root]);
   const pieces = useMemo(() => collectPieces(root), [root]);
+  const runtimeState = usePydicateRuntime(pydicatePreview, isOpen && runtimeEnabled);
 
   useEffect(() => {
     onNoteChange(generatedNote);
@@ -75,9 +96,9 @@ export function EtymologyBuilder({ onNoteChange, onApplyNote, isManualOverride }
       case "combine":
         return targetLabel ? `Combinar com ${targetLabel}` : "Combinar com outra raiz";
       case "possessor":
-        return targetLabel ? `Definir possuidor de ${targetLabel}` : "Definir possuidor";
+        return targetLabel ? `Definir complemento de ${targetLabel}` : "Definir complemento";
       case "modifier":
-        return targetLabel ? `Definir modificador de ${targetLabel}` : "Definir modificador";
+        return targetLabel ? `Definir adjunto de ${targetLabel}` : "Definir adjunto";
       case "postposition":
         return targetLabel ? `Adicionar pós-posição em ${targetLabel}` : "Adicionar pós-posição";
       case "derive-agent":
@@ -91,6 +112,28 @@ export function EtymologyBuilder({ onNoteChange, onApplyNote, isManualOverride }
     const newRoot = createRootNode(entry);
     setRoot((current) => applyPendingInsert(current, pendingInsert, newRoot));
     setPendingInsert(null);
+    setQuery("");
+    setSearchMinimized(true);
+  };
+
+  const handleAddManual = () => {
+    const headword = manualHeadword.trim();
+    if (!headword) return;
+    const posInfo = posInfoForKind(manualPosKind);
+    const gloss = manualGloss.trim();
+    handlePickRoot({
+      headword,
+      gloss: gloss || undefined,
+      posAbbrev: posInfo.abbrev,
+      posLabel: posInfo.label,
+      posKind: posInfo.kind,
+      posAssumed: false,
+      type: "manual",
+      rawDefinition: gloss || undefined,
+    });
+    setManualHeadword("");
+    setManualGloss("");
+    setManualPosKind("noun");
   };
 
   const handleQuickPostposition = (targetId: string, postposition: string) => {
@@ -134,43 +177,103 @@ export function EtymologyBuilder({ onNoteChange, onApplyNote, isManualOverride }
             <section className="rounded-md border border-brand-100 bg-brand-50/30 p-3">
               <div className="flex items-center justify-between gap-2">
                 <p className="text-sm font-semibold text-brand-900">Buscar raízes</p>
-                {pendingLabel ? (
+                <div className="flex items-center gap-2">
                   <button
                     type="button"
-                    className="text-xs text-amber-700 underline"
-                    onClick={() => setPendingInsert(null)}
+                    className="text-xs text-slate-600 underline"
+                    onClick={() => {
+                      if (!searchMinimized) {
+                        setQuery("");
+                      }
+                      setSearchMinimized((prev) => !prev);
+                    }}
                   >
-                    Cancelar seleção
+                    {searchMinimized ? "Reabrir busca" : "Minimizar"}
                   </button>
-                ) : null}
+                  {pendingLabel ? (
+                    <button
+                      type="button"
+                      className="text-xs text-amber-700 underline"
+                      onClick={() => setPendingInsert(null)}
+                    >
+                      Cancelar seleção
+                    </button>
+                  ) : null}
+                </div>
               </div>
               <p className="mt-1 text-xs text-slate-600">
-                Pesquisa no dicionário nhe-enga por verbete ou significado (mesma ordem do site).
+                Pesquisa no dicionário nhe-enga por verbete ou significado (seção tupi→português).
               </p>
               {pendingLabel ? (
                 <p className="mt-2 rounded-md border border-amber-200 bg-amber-50 px-2 py-1 text-xs text-amber-800">
                   {pendingLabel}
                 </p>
               ) : null}
-              <div className="mt-2">
-                <Input
-                  value={query}
-                  onChange={(event) => setQuery(event.target.value)}
-                  placeholder="Digite um verbete ou glosa..."
-                />
-              </div>
-              <div className="mt-3 space-y-2">
-                {!searchIndex && !searchError ? (
-                  <p className="text-xs text-slate-500">Carregando dicionário...</p>
-                ) : null}
-                {searchError ? <p className="text-xs text-red-700">{searchError}</p> : null}
-                {searchIndex && query && results.length === 0 ? (
-                  <p className="text-xs text-slate-500">Nenhum resultado para a busca.</p>
-                ) : null}
-                {results.map((result) => (
-                  <ResultCard key={`${result.first_word}-${result.definition}`} result={result} onPick={handlePickRoot} />
-                ))}
-              </div>
+              {searchMinimized ? (
+                <div className="mt-2 rounded-md border border-dashed border-brand-200 bg-white/60 p-3 text-xs text-slate-600">
+                  Busca minimizada. Reabra para adicionar outra raiz.
+                </div>
+              ) : (
+                <>
+                  <div className="mt-2">
+                    <Input
+                      value={query}
+                      onChange={(event) => setQuery(event.target.value)}
+                      placeholder="Digite um verbete ou glosa..."
+                    />
+                  </div>
+                  <div className="mt-3 space-y-2">
+                    {!searchIndex && !searchError ? (
+                      <p className="text-xs text-slate-500">Carregando dicionário...</p>
+                    ) : null}
+                    {searchError ? <p className="text-xs text-red-700">{searchError}</p> : null}
+                    {searchIndex && query && results.length === 0 ? (
+                      <p className="text-xs text-slate-500">Nenhum resultado para a busca.</p>
+                    ) : null}
+                    {results.map((result) => (
+                      <ResultCard
+                        key={`${result.first_word}-${result.definition}`}
+                        result={result}
+                        onPick={handlePickRoot}
+                      />
+                    ))}
+                  </div>
+                  <div className="mt-3 rounded-md border border-slate-200 bg-white/70 p-2">
+                    <p className="text-xs font-semibold text-slate-700">Adicionar manualmente</p>
+                    <p className="mt-1 text-[11px] text-slate-500">
+                      Use quando o verbete não estiver no dicionário.
+                    </p>
+                    <div className="mt-2 grid gap-2">
+                      <Input
+                        value={manualHeadword}
+                        onChange={(event) => setManualHeadword(event.target.value)}
+                        placeholder="Forma base (ex.: mba'e)"
+                      />
+                      <div className="grid gap-2 sm:grid-cols-[minmax(0,140px)_minmax(0,1fr)]">
+                        <select
+                          className="rounded-md border border-slate-200 bg-white px-2 py-1 text-xs"
+                          value={manualPosKind}
+                          onChange={(event) => setManualPosKind(event.target.value as RootPosKind)}
+                        >
+                          {POS_OPTIONS.map((option) => (
+                            <option key={option.kind} value={option.kind}>
+                              {option.abbrev} — {option.label}
+                            </option>
+                          ))}
+                        </select>
+                        <Input
+                          value={manualGloss}
+                          onChange={(event) => setManualGloss(event.target.value)}
+                          placeholder="Definição curta (opcional)"
+                        />
+                      </div>
+                      <Button type="button" variant="secondary" onClick={handleAddManual} disabled={!manualHeadword.trim()}>
+                        Adicionar elemento
+                      </Button>
+                    </div>
+                  </div>
+                </>
+              )}
             </section>
 
             <section className="rounded-md border border-brand-100 bg-white/70 p-3">
@@ -258,10 +361,33 @@ export function EtymologyBuilder({ onNoteChange, onApplyNote, isManualOverride }
               <details className="mt-2">
                 <summary className="cursor-pointer text-xs font-semibold text-slate-700">Prévia avançada</summary>
                 <p className="mt-2 text-xs text-slate-500">
-                  Melhor esforço (usa Tok(...) quando não há forma direta).
+                  Melhor esforço (assume substantivo quando a classe não é detectada).
                 </p>
                 <div className="mt-2 rounded-md border border-slate-200 bg-slate-50 px-2 py-2 text-xs text-slate-800">
                   {pydicatePreview || "—"}
+                </div>
+                <div className="mt-2 flex flex-wrap items-center gap-2">
+                  <label className="flex items-center gap-2 text-[11px] text-slate-600">
+                    <input
+                      type="checkbox"
+                      className="h-3 w-3"
+                      checked={runtimeEnabled}
+                      onChange={(event) => setRuntimeEnabled(event.target.checked)}
+                    />
+                    Executar pydicate (runtime)
+                  </label>
+                  {runtimeState.status === "running" ? (
+                    <span className="text-[11px] text-slate-500">Executando...</span>
+                  ) : null}
+                  {runtimeState.status === "ready" && runtimeState.durationMs !== undefined ? (
+                    <span className="text-[11px] text-emerald-700">ok {runtimeState.durationMs} ms</span>
+                  ) : null}
+                  {runtimeState.status === "error" && runtimeState.message ? (
+                    <span className="text-[11px] text-amber-700">{runtimeState.message}</span>
+                  ) : null}
+                </div>
+                <div className="mt-2 rounded-md border border-slate-200 bg-white px-2 py-2 text-xs text-slate-800">
+                  {runtimeEnabled ? runtimeState.output || runtimeState.message || "—" : "Runtime desativado."}
                 </div>
                 <div className="mt-2">
                   <p className="text-xs font-semibold text-slate-700">Peças canônicas</p>
@@ -290,8 +416,10 @@ export function EtymologyBuilder({ onNoteChange, onApplyNote, isManualOverride }
 }
 
 function ResultCard({ result, onPick }: { result: SearchResult; onPick: (entry: RootEntry) => void }) {
-  const gloss = extractGloss(result.definition);
-  const pos = extractPos(result.definition);
+  const parsedPos = parsePosInfo(result.definition);
+  const posInfo = parsedPos ?? defaultPosInfo();
+  const posDisplay = formatPosDisplay(posInfo);
+  const gloss = compactDefinition(result.definition);
   const rawLower = (result.first_word || "").toLowerCase();
   const normalized = normalizeNoAccent(result.first_word || "");
   const orthVariants = normalized && normalized !== rawLower ? [normalized] : [];
@@ -318,8 +446,13 @@ function ResultCard({ result, onPick }: { result: SearchResult; onPick: (entry: 
               </span>
             ) : null}
           </div>
-          <p className="mt-1 text-xs text-slate-600">{gloss || result.definition || ""}</p>
-          {pos ? <p className="mt-1 text-[11px] text-slate-500">{pos}</p> : null}
+          <p className="mt-1 text-xs text-slate-600">{gloss || "—"}</p>
+          {posDisplay ? (
+            <p className="mt-1 text-[11px] text-slate-500">
+              <span className="font-semibold text-slate-600">{posDisplay.primary}</span>
+              {posDisplay.secondary ? ` ${posDisplay.secondary}` : null}
+            </p>
+          ) : null}
           {orthVariants.length > 0 ? (
             <p className="mt-1 text-[11px] text-slate-500">Sem diacríticos: {orthVariants[0]}</p>
           ) : null}
@@ -331,7 +464,10 @@ function ResultCard({ result, onPick }: { result: SearchResult; onPick: (entry: 
             onPick({
               headword: result.first_word,
               gloss,
-              pos,
+              posAbbrev: posInfo.abbrev,
+              posLabel: posInfo.label,
+              posKind: posInfo.kind,
+              posAssumed: posInfo.assumed,
               type: result.type,
               orthVariants,
               rawDefinition: result.definition,
@@ -402,10 +538,10 @@ function NodeEditor({
           Combinar
         </Button>
         <Button type="button" variant="ghost" onClick={() => onPending({ kind: "possessor", targetId: node.id })}>
-          Adicionar possuidor
+          Adicionar complemento (de)
         </Button>
         <Button type="button" variant="ghost" onClick={() => onPending({ kind: "modifier", targetId: node.id })}>
-          Adicionar modificador
+          Adicionar adjunto
         </Button>
         <Button type="button" variant="ghost" onClick={() => onPending({ kind: "postposition", targetId: node.id })}>
           Adicionar pós-posição
@@ -486,9 +622,9 @@ function nodeLabel(node: BuilderNode): string {
     case "postposition":
       return `Pós-posição: ${node.postposition}`;
     case "possessor":
-      return "Posse";
+      return "Complemento (de)";
     case "modifier":
-      return "Modificador";
+      return "Adjunto";
     default:
       return "";
   }
@@ -496,7 +632,10 @@ function nodeLabel(node: BuilderNode): string {
 
 function nodeSubtitle(node: BuilderNode): string | undefined {
   if (node.kind === "root") {
-    return node.gloss || node.pos || node.type || undefined;
+    const label = node.posLabel ? (node.posAssumed ? `${node.posLabel} (assumido)` : node.posLabel) : undefined;
+    const posTag = node.posAbbrev ? `(${node.posAbbrev})` : undefined;
+    const pieces = [node.gloss, posTag, label].filter(Boolean);
+    return pieces.length > 0 ? pieces.join(" · ") : node.type || undefined;
   }
   if (node.kind === "derive" && node.agent) {
     return `agente: ${describeNode(node.agent)}`;
@@ -521,41 +660,6 @@ function StructuredTree({ node, depth }: { node: ReturnType<typeof toDisplayNode
         </div>
       ) : null}
     </div>
-  );
-}
-
-function extractGloss(definition?: string): string | undefined {
-  if (!definition) return undefined;
-  let text = definition.trim();
-  const posMatch = text.match(/^\(([^)]+)\)\s*-\s*/);
-  if (posMatch && looksLikePos(posMatch[1])) {
-    text = text.replace(/^\(([^)]+)\)\s*-\s*/, "");
-  }
-  text = text.replace(/^[-–]\s*/, "");
-  const cut = text.split(/[|;]/)[0]?.trim();
-  return cut || undefined;
-}
-
-function extractPos(definition?: string): string | undefined {
-  if (!definition) return undefined;
-  const match = definition.match(/^\(([^)]+)\)/);
-  if (!match) return undefined;
-  const raw = match[1].toLowerCase();
-  if (raw.includes("adv")) return "advérbio";
-  if (raw.includes("adj")) return "adjetivo";
-  if (raw.includes("pron")) return "pronome";
-  if (raw.includes("subs") || raw.includes("subst") || raw.includes("s.")) return "substantivo";
-  if (raw.includes("interj")) return "interjeição";
-  if (raw.includes("v.tr")) return "verbo transitivo";
-  if (raw.includes("v. intr") || raw.includes("v.intr")) return "verbo intransitivo";
-  if (raw.includes("v.")) return "verbo";
-  return undefined;
-}
-
-function looksLikePos(raw: string): boolean {
-  const lowered = raw.toLowerCase();
-  return ["v.", "adj", "adv", "pron", "subs", "subst", "s.", "interj"].some((key) =>
-    lowered.includes(key),
   );
 }
 

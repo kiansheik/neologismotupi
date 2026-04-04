@@ -3,6 +3,42 @@ import { normalizeExact, normalizeNoAccent } from "./orthography";
 const DICT_PATH = "/etymology/dict-conjugated.json";
 const NEO_PATH = "/etymology/neologisms.csv";
 
+const TUPI_RANGE_START = "ã";
+const TUPI_RANGE_END = "'yura";
+const BANLIST = new Set([
+  "NOTA",
+  "Daí",
+  "De",
+  "OBSERVAÇÃO",
+  "Daí,",
+  "aba",
+  "-ab",
+  "abatiputá",
+  "-agûama",
+  "a'ebé",
+  "agûaîxima",
+  "agûaragûasu",
+  "agûy",
+  "ambûer",
+  "apyrĩ",
+  "ambype",
+  "gûaîá",
+  "eno-",
+  "îabotimirĩ",
+  "îapĩ",
+  "Maíra",
+  "memetipó",
+  "moro-",
+  "muresi",
+  "pyru'ã",
+  "POROROCA",
+  "sybyamumbyaré",
+  "Muitos",
+  "Há",
+  "O",
+  "Cardim,",
+]);
+
 export type DictionaryEntry = {
   first_word: string;
   optional_number?: string;
@@ -33,7 +69,7 @@ export async function loadDictionaryIndex(): Promise<SearchIndexEntry[]> {
       fetchCompressedJSON(DICT_PATH),
       fetchCSV(NEO_PATH),
     ]);
-    const dictionaryEntries = mapCompressedData(dictData);
+    const dictionaryEntries = filterToTupiRange(mapCompressedData(dictData));
     const neoEntries = buildNeoJSON(neoRows);
     return buildSearchIndex([...dictionaryEntries, ...neoEntries]);
   })();
@@ -199,6 +235,24 @@ function mapCompressedData(data: Array<Record<string, any>>): DictionaryEntry[] 
     is_tupi_portuguese: item.t === 1 || item.t === true,
     type: "dict",
   }));
+}
+
+function filterToTupiRange(entries: DictionaryEntry[]): DictionaryEntry[] {
+  let include = false;
+  const filtered: DictionaryEntry[] = [];
+  for (const entry of entries) {
+    const headword = entry.first_word || "";
+    if (headword === TUPI_RANGE_START) {
+      include = true;
+    }
+    if (include && headword && !BANLIST.has(headword)) {
+      filtered.push(entry);
+    }
+    if (headword === TUPI_RANGE_END) {
+      include = false;
+    }
+  }
+  return filtered;
 }
 
 function buildNeoJSON(rows: Array<Record<string, string>>): DictionaryEntry[] {

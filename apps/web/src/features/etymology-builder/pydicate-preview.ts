@@ -1,7 +1,6 @@
 import { DERIVE_OPERATIONS } from "./builder-types";
-import type { BuilderNode } from "./builder-types";
-
-const SAFE_IDENTIFIER_RE = /^[\p{L}_][\p{L}\p{M}0-9_]*$/u;
+import type { BuilderNode, RootNode } from "./builder-types";
+import type { RootPosKind } from "./pos";
 
 export function renderPydicate(node: BuilderNode | null): string {
   if (!node) return "";
@@ -34,7 +33,7 @@ function renderNode(node: BuilderNode, wrap: boolean): string {
   let expr = "";
   switch (node.kind) {
     case "root":
-      expr = formatRoot(node.headword);
+      expr = formatRoot(node);
       break;
     case "compound":
       expr = node.children.map((child) => renderNode(child, true)).join(" + ");
@@ -49,7 +48,7 @@ function renderNode(node: BuilderNode, wrap: boolean): string {
       break;
     }
     case "postposition":
-      expr = `${formatRoot(node.postposition)} * ${renderNode(node.child, true)}`;
+      expr = `${formatInlineRoot(node.postposition, "postposition")} * ${renderNode(node.child, true)}`;
       break;
     case "possessor":
       expr = `${renderNode(node.possessor, true)} * ${renderNode(node.possessed, true)}`;
@@ -71,10 +70,36 @@ function needsWrap(expr: string): boolean {
   return expr.includes(" + ") || expr.includes(" * ");
 }
 
-function formatRoot(value: string): string {
-  if (SAFE_IDENTIFIER_RE.test(value)) {
-    return value;
-  }
+const POS_CTORS: Record<RootPosKind, string> = {
+  noun: "Noun",
+  verb_tr: "Verb",
+  verb_intr: "Verb",
+  verb: "Verb",
+  postposition: "Postposition",
+  adjective: "Noun",
+  adverb: "Adverb",
+  pronoun: "Pronoun",
+  interjection: "Interjection",
+  conjunction: "Conjunction",
+  demonstrative: "Demonstrative",
+  number: "Number",
+  particle: "Particle",
+  article: "Particle",
+  preposition: "Postposition",
+  unknown: "Noun",
+};
+
+function formatRoot(node: RootNode): string {
+  const ctor = POS_CTORS[node.posKind ?? "unknown"] ?? "Noun";
+  return formatCtorCall(ctor, node.headword);
+}
+
+function formatInlineRoot(value: string, kind: RootPosKind): string {
+  const ctor = POS_CTORS[kind] ?? "Noun";
+  return formatCtorCall(ctor, value);
+}
+
+function formatCtorCall(ctor: string, value: string): string {
   const escaped = value.replace(/\\/g, "\\\\").replace(/"/g, "\\\"");
-  return `Tok("${escaped}")`;
+  return `${ctor}("${escaped}")`;
 }

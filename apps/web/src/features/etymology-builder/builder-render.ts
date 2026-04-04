@@ -11,13 +11,17 @@ export type DisplayNode = {
 
 export function toDisplayNode(node: BuilderNode): DisplayNode {
   switch (node.kind) {
-    case "root":
+    case "root": {
+      const label = node.posLabel ? (node.posAssumed ? `${node.posLabel} (assumido)` : node.posLabel) : undefined;
+      const posTag = node.posAbbrev ? `(${node.posAbbrev})` : undefined;
+      const subtitle = [node.gloss, posTag, label].filter(Boolean).join(" · ") || undefined;
       return {
         id: node.id,
         kind: "root",
         title: node.headword,
-        subtitle: node.gloss || node.pos || node.type,
+        subtitle: subtitle ?? node.type,
       };
+    }
     case "compound":
       return {
         id: node.id,
@@ -45,11 +49,11 @@ export function toDisplayNode(node: BuilderNode): DisplayNode {
       return {
         id: node.id,
         kind: "possessor",
-        title: "Posse",
+        title: "Complemento (de)",
         children: [
-          { id: `${node.id}-possessor`, kind: "label", title: "Possuidor" },
+          { id: `${node.id}-possessor`, kind: "label", title: "Complemento" },
           toDisplayNode(node.possessor),
-          { id: `${node.id}-possessed`, kind: "label", title: "Possuído" },
+          { id: `${node.id}-possessed`, kind: "label", title: "Núcleo" },
           toDisplayNode(node.possessed),
         ],
       };
@@ -57,11 +61,11 @@ export function toDisplayNode(node: BuilderNode): DisplayNode {
       return {
         id: node.id,
         kind: "modifier",
-        title: "Modificador",
+        title: "Adjunto",
         children: [
-          { id: `${node.id}-modifier`, kind: "label", title: "Modificador" },
+          { id: `${node.id}-modifier`, kind: "label", title: "Adjunto" },
           toDisplayNode(node.modifier),
-          { id: `${node.id}-target`, kind: "label", title: "Alvo" },
+          { id: `${node.id}-target`, kind: "label", title: "Núcleo" },
           toDisplayNode(node.target),
         ],
       };
@@ -85,9 +89,9 @@ export function nodeActionLabel(node: BuilderNode): string {
     case "postposition":
       return "Pós-posição";
     case "possessor":
-      return "Posse";
+      return "Complemento";
     case "modifier":
-      return "Modificador";
+      return "Adjunto";
     default:
       return "";
   }

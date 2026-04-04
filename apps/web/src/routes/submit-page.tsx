@@ -396,54 +396,60 @@ export function SubmitPage() {
   }
 
   return (
-    <Card>
-      <h1 className="text-xl font-semibold text-brand-900">{t("submit.title")}</h1>
-      {/* Orthography Notice */}
-      <div className="mt-2 mb-3 rounded border border-blue-200 bg-blue-50 p-2 text-xs text-blue-900">
-        {t("submit.orthographyNotice")}
-      </div>
-      <p className="mt-1 text-xs text-slate-600">{t("form.requiredLegend")}</p>
-      <p className="mt-1 text-xs text-slate-600">{t("submit.onlyRequired")}</p>
-      <div className="mt-2 rounded-md border border-brand-100 bg-brand-50/30 px-3 py-2 text-xs text-slate-700">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <p className="text-[11px] font-semibold uppercase tracking-wide text-brand-800">
-              {t("submit.dailyVotesLabel")}
-            </p>
-            <p className="text-lg font-semibold text-brand-900">{votesToday}</p>
-            <p className="text-[11px] text-slate-600">{t("submit.dailyVotesUnits")}</p>
-          </div>
-          <div>
-            <p className="text-[11px] font-semibold uppercase tracking-wide text-brand-800">
-              {t("submit.dailyPostsLabel")}
-            </p>
-            <p className="text-sm font-semibold text-slate-800">
-              {isUnlimited
-                ? t("submit.dailyPostsUnlimited")
-                : t("submit.dailyPostsRemaining", { remaining: remainingPosts })}
-            </p>
-          </div>
-          {!isUnlimited ? (
-            <p className="text-[11px] text-amber-700">
-              {t("submit.dailyUnlockHint", { needed: nextVotesRequired })}
-            </p>
-          ) : (
-            <p className="text-[11px] text-emerald-700">{t("submit.dailyUnlockAll")}</p>
-          )}
+    <div className="space-y-4">
+      <EtymologyBuilder
+        onNoteChange={handleBuilderNoteChange}
+        onApplyNote={handleApplyBuilderNote}
+        isManualOverride={isMorphologyOverride}
+      />
+      <Card>
+        <h1 className="text-xl font-semibold text-brand-900">{t("submit.title")}</h1>
+        {/* Orthography Notice */}
+        <div className="mt-2 mb-3 rounded border border-blue-200 bg-blue-50 p-2 text-xs text-blue-900">
+          {t("submit.orthographyNotice")}
         </div>
-        <div className="mt-2 h-1.5 rounded-full bg-brand-100">
-          <div
-            className="h-1.5 rounded-full bg-brand-600 transition-all"
-            style={{ width: `${voteProgress}%` }}
-          />
+        <p className="mt-1 text-xs text-slate-600">{t("form.requiredLegend")}</p>
+        <p className="mt-1 text-xs text-slate-600">{t("submit.onlyRequired")}</p>
+        <div className="mt-2 rounded-md border border-brand-100 bg-brand-50/30 px-3 py-2 text-xs text-slate-700">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-brand-800">
+                {t("submit.dailyVotesLabel")}
+              </p>
+              <p className="text-lg font-semibold text-brand-900">{votesToday}</p>
+              <p className="text-[11px] text-slate-600">{t("submit.dailyVotesUnits")}</p>
+            </div>
+            <div>
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-brand-800">
+                {t("submit.dailyPostsLabel")}
+              </p>
+              <p className="text-sm font-semibold text-slate-800">
+                {isUnlimited
+                  ? t("submit.dailyPostsUnlimited")
+                  : t("submit.dailyPostsRemaining", { remaining: remainingPosts })}
+              </p>
+            </div>
+            {!isUnlimited ? (
+              <p className="text-[11px] text-amber-700">
+                {t("submit.dailyUnlockHint", { needed: nextVotesRequired })}
+              </p>
+            ) : (
+              <p className="text-[11px] text-emerald-700">{t("submit.dailyUnlockAll")}</p>
+            )}
+          </div>
+          <div className="mt-2 h-1.5 rounded-full bg-brand-100">
+            <div
+              className="h-1.5 rounded-full bg-brand-600 transition-all"
+              style={{ width: `${voteProgress}%` }}
+            />
+          </div>
         </div>
-      </div>
-      <form
-        className="mt-4 space-y-3"
-        onSubmit={(event) => {
-          void onSubmit(event).catch(() => undefined);
-        }}
-      >
+        <form
+          className="mt-4 space-y-3"
+          onSubmit={(event) => {
+            void onSubmit(event).catch(() => undefined);
+          }}
+        >
         <div>
           <label className="mb-1 block text-sm font-medium" htmlFor="headword">
             {t("submit.headword")} *
@@ -644,12 +650,6 @@ export function SubmitPage() {
           ) : null}
         </div>
 
-        <EtymologyBuilder
-          onNoteChange={handleBuilderNoteChange}
-          onApplyNote={handleApplyBuilderNote}
-          isManualOverride={isMorphologyOverride}
-        />
-
         <div>
           <label className="mb-1 block text-sm font-medium" htmlFor="morphology_notes">
             {t("submit.morphologyNotes")} ({t("form.optional")})
@@ -695,5 +695,6 @@ export function SubmitPage() {
         </Button>
       </form>
     </Card>
+  </div>
   );
 }

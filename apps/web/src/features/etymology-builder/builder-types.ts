@@ -1,3 +1,5 @@
+import type { RootPosKind } from "./pos";
+
 export type DeriveOperation =
   | "agent"
   | "patient"
@@ -16,35 +18,35 @@ export type DeriveOperationSpec = {
 
 export const DERIVE_OPERATIONS: Record<DeriveOperation, DeriveOperationSpec> = {
   agent: {
-    label: "Fazer agente / autor",
+    label: "Agente / autor",
     token: "sara",
-    note: "agente / fazedor",
+    note: "agente",
   },
   patient: {
-    label: "Fazer paciente / afetado",
+    label: "Paciente / afetado",
     token: "pyra",
-    note: "paciente / afetado",
+    note: "paciente",
   },
   patient_with_agent: {
     label: "Paciente com agente explícito",
     token: "emi",
-    note: "paciente com agente explícito",
+    note: "paciente (agente explícito)",
     needsAgent: true,
   },
   circumstantial: {
     label: "Circunstancial (lugar/tempo/meio)",
     token: "saba",
-    note: "circunstancial (lugar/tempo/meio)",
+    note: "circunstancial",
   },
   future: {
     label: "Futuro / intencionado",
     token: "rama",
-    note: "futuro / intencionado",
+    note: "futuro",
   },
   past: {
     label: "Passado / antigo",
     token: "pûera",
-    note: "passado / antigo",
+    note: "passado",
   },
   causative: {
     label: "Causativo",
@@ -56,7 +58,10 @@ export const DERIVE_OPERATIONS: Record<DeriveOperation, DeriveOperationSpec> = {
 export type RootEntry = {
   headword: string;
   gloss?: string;
-  pos?: string;
+  posAbbrev?: string;
+  posLabel?: string;
+  posKind?: RootPosKind;
+  posAssumed?: boolean;
   canonical?: string;
   sourceId?: string;
   orthVariants?: string[];

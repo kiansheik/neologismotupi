@@ -45,13 +45,11 @@ function collectSegments(node: BuilderNode, segments: string[]): void {
       return;
     }
     case "possessor": {
-      segments.push(`possuidor — ${describeNode(node.possessor)}`);
-      segments.push(`possuído — ${describeNode(node.possessed)}`);
+      segments.push(`complemento — ${describeNode(node.possessor)}`);
       return;
     }
     case "modifier": {
-      segments.push(`modificador — ${describeNode(node.modifier)}`);
-      segments.push(`alvo — ${describeNode(node.target)}`);
+      segments.push(`adjunto — ${describeNode(node.modifier)}`);
       return;
     }
     default:
