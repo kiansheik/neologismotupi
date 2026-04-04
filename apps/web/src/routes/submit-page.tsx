@@ -1,5 +1,5 @@
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
 import { Link, useNavigate } from "react-router-dom";
 import { z } from "zod";
@@ -20,6 +20,7 @@ import { AudioCapture, AudioQueueList } from "@/features/audio/components";
 import { uploadEntryAudio } from "@/features/audio/api";
 import { createEntry, getEntrySubmissionGate, listEntries } from "@/features/entries/api";
 import { listSources } from "@/features/sources/api";
+import { EtymologyBuilder } from "@/features/etymology-builder/EtymologyBuilder";
 import type { SourceSuggestion } from "@/lib/types";
 
 const HEADWORD_PATTERN = /^["']?[\p{L}](?:[\p{L}\p{M}'" -]*[\p{L}])?$/u;
@@ -56,6 +57,8 @@ export function SubmitPage() {
   const [possibleDuplicates, setPossibleDuplicates] = useState<DuplicateHint[]>([]);
   const [queuedAudio, setQueuedAudio] = useState<File[]>([]);
   const [isUploadingAudio, setIsUploadingAudio] = useState(false);
+  const [builderNote, setBuilderNote] = useState("");
+  const [isMorphologyOverride, setIsMorphologyOverride] = useState(false);
 
   const form = useForm<SubmitForm>({
     defaultValues: {
@@ -78,6 +81,7 @@ export function SubmitPage() {
 
   const watchedHeadword = form.watch("headword");
   const hasSource = form.watch("has_source");
+  const morphologyNotesValue = form.watch("morphology_notes");
   const watchedSourceAuthors = form.watch("source_authors");
   const watchedSourceTitle = form.watch("source_title");
   const sourceLookupQuery = useMemo(
@@ -126,6 +130,11 @@ export function SubmitPage() {
 
   const headwordValid = isValidHeadword(watchedHeadword);
   const showHeadwordRules = watchedHeadword.trim().length > 0 && !headwordValid;
+  const morphologyNotesField = form.register("morphology_notes", {
+    onChange: () => {
+      setIsMorphologyOverride(true);
+    },
+  });
 
   const addQueuedAudio = (file: File) => {
     setQueuedAudio((current) => [...current, file]);
@@ -136,6 +145,31 @@ export function SubmitPage() {
   const clearQueuedAudio = () => {
     setQueuedAudio([]);
   };
+
+  const handleBuilderNoteChange = useCallback(
+    (note: string) => {
+      setBuilderNote(note);
+      if (!isMorphologyOverride) {
+        form.setValue("morphology_notes", note, { shouldDirty: true });
+      }
+    },
+    [form, isMorphologyOverride],
+  );
+
+  const handleApplyBuilderNote = useCallback(
+    (note: string) => {
+      form.setValue("morphology_notes", note, { shouldDirty: true });
+      setIsMorphologyOverride(false);
+    },
+    [form],
+  );
+
+  useEffect(() => {
+    if (!builderNote) return;
+    if (morphologyNotesValue === builderNote) {
+      setIsMorphologyOverride(false);
+    }
+  }, [builderNote, morphologyNotesValue]);
 
   const applySourceSuggestion = (source: SourceSuggestion) => {
     form.setValue("source_authors", source.authors ?? "");
@@ -610,6 +644,12 @@ export function SubmitPage() {
           ) : null}
         </div>
 
+        <EtymologyBuilder
+          onNoteChange={handleBuilderNoteChange}
+          onApplyNote={handleApplyBuilderNote}
+          isManualOverride={isMorphologyOverride}
+        />
+
         <div>
           <label className="mb-1 block text-sm font-medium" htmlFor="morphology_notes">
             {t("submit.morphologyNotes")} ({t("form.optional")})
@@ -618,7 +658,7 @@ export function SubmitPage() {
           <Textarea
             id="morphology_notes"
             placeholder="bebé - voar; sara - agente; o que voa"
-            {...form.register("morphology_notes")}
+            {...morphologyNotesField}
           />
         </div>
         <div className="rounded-md border border-brand-100 bg-white/70 p-3">
