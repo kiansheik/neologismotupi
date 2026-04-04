@@ -42,6 +42,7 @@
   - Human-readable semicolon-style note synced to `morphology_notes`.
   - Structured tree preview.
   - Best-effort Pydicate-like preview + canonical piece list.
+- Derivation bank supports click or drag-and-drop onto a focused node.
 - Optional live runtime output via Pyodide (iframe) with local wheels.
   - Assets live in `apps/web/public/etymology/iframe_pyodide.html` and `apps/web/public/etymology/pyodide/*.whl`.
   - Pyodide itself is loaded from `https://cdn.jsdelivr.net/pyodide/v0.25.1/full/pyodide.js`.

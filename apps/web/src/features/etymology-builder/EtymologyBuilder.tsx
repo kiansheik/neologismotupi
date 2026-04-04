@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import type { DragEvent } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -23,8 +24,6 @@ import { compactDefinition, defaultPosInfo, formatPosDisplay, parsePosInfo, posI
 import type { RootPosKind } from "./pos";
 import { usePyodideRuntime } from "./pyodide-runtime";
 
-const DEFAULT_DERIVE: DeriveOperation = "agent";
-
 type EtymologyBuilderProps = {
   onNoteChange: (note: string) => void;
   onApplyNote: (note: string) => void;
@@ -35,6 +34,7 @@ export function EtymologyBuilder({ onNoteChange, onApplyNote, isManualOverride }
   const [isOpen, setIsOpen] = useState(true);
   const [root, setRoot] = useState<BuilderNode | null>(null);
   const [pendingInsert, setPendingInsert] = useState<PendingInsert | null>(null);
+  const [activeNodeId, setActiveNodeId] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [searchIndex, setSearchIndex] = useState<SearchIndexEntry[] | null>(null);
   const [searchError, setSearchError] = useState<string | null>(null);
@@ -114,6 +114,7 @@ export function EtymologyBuilder({ onNoteChange, onApplyNote, isManualOverride }
     setPendingInsert(null);
     setQuery("");
     setSearchMinimized(true);
+    setActiveNodeId((current) => current ?? newRoot.id);
   };
 
   const handleAddManual = () => {
@@ -143,12 +144,16 @@ export function EtymologyBuilder({ onNoteChange, onApplyNote, isManualOverride }
 
   const handleApplyDerive = (targetId: string, operation: DeriveOperation) => {
     setRoot((current) => (current ? wrapWithDerive(current, targetId, operation) : current));
+    setActiveNodeId(targetId);
   };
 
   const handleRemoveNode = (targetId: string) => {
     if (!root) return;
     const next = removeNode(root, targetId);
     setRoot(next);
+    if (activeNodeId === targetId) {
+      setActiveNodeId(next?.id ?? null);
+    }
   };
 
   const handleMoveChild = (compoundId: string, fromIndex: number, toIndex: number) => {
@@ -156,6 +161,9 @@ export function EtymologyBuilder({ onNoteChange, onApplyNote, isManualOverride }
   };
 
   const displayTree = root ? toDisplayNode(root) : null;
+  const activeTargetId = activeNodeId ?? root?.id ?? null;
+  const activeNode = activeTargetId && root ? findNode(root, activeTargetId) : null;
+  const activeNodeLabel = activeNode ? nodeLabel(activeNode) : null;
 
   return (
     <div className="rounded-md border border-brand-200 bg-white/70 p-3">
@@ -283,15 +291,51 @@ export function EtymologyBuilder({ onNoteChange, onApplyNote, isManualOverride }
                   <button
                     type="button"
                     className="text-xs text-red-700 underline"
-                    onClick={() => setRoot(null)}
+                    onClick={() => {
+                      setRoot(null);
+                      setActiveNodeId(null);
+                    }}
                   >
                     Limpar tudo
                   </button>
                 ) : null}
               </div>
               <p className="mt-1 text-xs text-slate-600">
-                Clique em uma raiz para inserir. Depois, use as ações para derivar, compor ou anexar.
+                Clique em uma raiz para inserir. Depois, selecione um nó e use as ações para derivar, compor ou anexar.
               </p>
+              <div className="mt-3 rounded-md border border-slate-200 bg-white/80 p-2">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <p className="text-xs font-semibold text-slate-700">Banco de derivação</p>
+                  <p className="text-[11px] text-slate-500">
+                    Foco: {activeNodeLabel || "selecione um nó"}
+                  </p>
+                </div>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {Object.entries(DERIVE_OPERATIONS).map(([key, op]) => (
+                    <button
+                      key={key}
+                      type="button"
+                      draggable
+                      onDragStart={(event) => {
+                        event.dataTransfer.setData("deriveOp", key);
+                      }}
+                      onClick={() => {
+                        if (!activeTargetId) return;
+                        handleApplyDerive(activeTargetId, key as DeriveOperation);
+                      }}
+                      className="rounded-full border border-brand-200 bg-white px-3 py-1 text-[11px] text-brand-900 hover:border-brand-400"
+                      title={op.label}
+                      disabled={!activeTargetId}
+                    >
+                      <span className="font-semibold">{op.token}</span>
+                      <span className="text-slate-600"> — {op.note}</span>
+                    </button>
+                  ))}
+                </div>
+                <p className="mt-2 text-[11px] text-slate-500">
+                  Arraste para um nó ou clique para aplicar ao foco atual.
+                </p>
+              </div>
               {!root ? (
                 <div className="mt-3 rounded-md border border-dashed border-brand-200 bg-white/60 p-3 text-xs text-slate-600">
                   Comece selecionando uma raiz no painel de busca.
@@ -305,6 +349,8 @@ export function EtymologyBuilder({ onNoteChange, onApplyNote, isManualOverride }
                     onPending={setPendingInsert}
                     onMoveChild={handleMoveChild}
                     onQuickPostposition={handleQuickPostposition}
+                    activeNodeId={activeTargetId}
+                    onSelectNode={setActiveNodeId}
                   />
                 </div>
               )}
@@ -489,6 +535,8 @@ function NodeEditor({
   onPending,
   onMoveChild,
   onQuickPostposition,
+  activeNodeId,
+  onSelectNode,
 }: {
   node: BuilderNode;
   onApplyDerive: (targetId: string, operation: DeriveOperation) => void;
@@ -496,16 +544,34 @@ function NodeEditor({
   onPending: (pending: PendingInsert | null) => void;
   onMoveChild: (compoundId: string, fromIndex: number, toIndex: number) => void;
   onQuickPostposition: (targetId: string, postposition: string) => void;
+  activeNodeId: string | null;
+  onSelectNode: (nodeId: string | null) => void;
 }) {
-  const [selectedOperation, setSelectedOperation] = useState<DeriveOperation>(DEFAULT_DERIVE);
+  const isActive = activeNodeId === node.id;
+  const handleDropDerive = (event: DragEvent<HTMLDivElement>) => {
+    const op = event.dataTransfer.getData("deriveOp");
+    if (op) {
+      event.preventDefault();
+      onApplyDerive(node.id, op as DeriveOperation);
+    }
+  };
 
   return (
-    <div className="rounded-md border border-brand-100 bg-white p-2">
+    <div
+      className={`rounded-md border p-2 ${isActive ? "border-brand-400 bg-brand-50/40" : "border-brand-100 bg-white"}`}
+      onDragOver={(event) => event.preventDefault()}
+      onDrop={handleDropDerive}
+    >
       <div className="flex items-start justify-between gap-2">
-        <div>
+        <button
+          type="button"
+          className="text-left"
+          onClick={() => onSelectNode(node.id)}
+          title="Selecionar este nó"
+        >
           <p className="text-sm font-semibold text-slate-800">{nodeLabel(node)}</p>
           {nodeSubtitle(node) ? <p className="text-xs text-slate-500">{nodeSubtitle(node)}</p> : null}
-        </div>
+        </button>
         <button
           type="button"
           className="text-xs text-red-700 underline"
@@ -516,20 +582,6 @@ function NodeEditor({
       </div>
 
       <div className="mt-2 flex flex-wrap items-center gap-2">
-        <select
-          className="rounded-md border border-slate-200 bg-white px-2 py-1 text-xs"
-          value={selectedOperation}
-          onChange={(event) => setSelectedOperation(event.target.value as DeriveOperation)}
-        >
-          {Object.entries(DERIVE_OPERATIONS).map(([key, op]) => (
-            <option key={key} value={key}>
-              {op.label}
-            </option>
-          ))}
-        </select>
-        <Button type="button" variant="ghost" onClick={() => onApplyDerive(node.id, selectedOperation)}>
-          Aplicar derivação
-        </Button>
         {node.kind === "compound" ? (
           <Button type="button" variant="ghost" onClick={() => onPending({ kind: "compound", targetId: node.id })}>
             Adicionar raiz aqui
@@ -557,10 +609,28 @@ function NodeEditor({
       {node.kind === "compound" ? (
         <div className="mt-3 space-y-2">
           {node.children.map((child, index) => (
-            <div key={child.id} className="rounded-md border border-slate-100 bg-slate-50 p-2">
+            <div
+              key={child.id}
+              className="rounded-md border border-slate-100 bg-slate-50 p-2"
+              draggable
+              onDragStart={(event) => {
+                event.dataTransfer.setData("compoundId", node.id);
+                event.dataTransfer.setData("fromIndex", String(index));
+              }}
+              onDragOver={(event) => event.preventDefault()}
+              onDrop={(event) => {
+                const compoundId = event.dataTransfer.getData("compoundId");
+                const fromIndexRaw = event.dataTransfer.getData("fromIndex");
+                if (compoundId !== node.id) return;
+                const fromIndex = Number(fromIndexRaw);
+                if (Number.isNaN(fromIndex)) return;
+                onMoveChild(node.id, fromIndex, index);
+              }}
+            >
               <div className="flex items-center justify-between text-[11px] text-slate-600">
                 <span>Parte {index + 1}</span>
                 <div className="flex items-center gap-2">
+                  <span className="cursor-grab text-[11px] text-slate-400">arraste</span>
                   <button
                     type="button"
                     className="text-[11px] text-brand-700"
@@ -587,6 +657,8 @@ function NodeEditor({
                   onPending={onPending}
                   onMoveChild={onMoveChild}
                   onQuickPostposition={onQuickPostposition}
+                  activeNodeId={activeNodeId}
+                  onSelectNode={onSelectNode}
                 />
               </div>
             </div>
