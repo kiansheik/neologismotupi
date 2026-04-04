@@ -2,6 +2,14 @@
 
 ## Files Added/Changed
 - `apps/web/src/features/etymology-builder/EtymologyBuilder.tsx`
+- `apps/web/src/features/etymology-builder/AdvancedModeEditor.tsx`
+- `apps/web/src/features/etymology-builder/SimpleModeWizard.tsx`
+- `apps/web/src/features/etymology-builder/ProModeEditor.tsx`
+- `apps/web/src/features/etymology-builder/ModeSwitcher.tsx`
+- `apps/web/src/features/etymology-builder/RootPicker.tsx`
+- `apps/web/src/features/etymology-builder/DictionaryResultCard.tsx`
+- `apps/web/src/features/etymology-builder/builder-store.ts`
+- `apps/web/src/features/etymology-builder/dictionary-hooks.ts`
 - `apps/web/src/features/etymology-builder/builder-types.ts`
 - `apps/web/src/features/etymology-builder/builder-state.ts`
 - `apps/web/src/features/etymology-builder/builder-render.ts`
@@ -14,6 +22,24 @@
 - `apps/web/src/routes/submit-page.tsx`
 - `apps/web/public/etymology/dict-conjugated.json` (copied from `nhe-enga/docs/` — gzip content)
 - `apps/web/public/etymology/neologisms.csv` (copied from `nhe-enga/`)
+
+## Mode Architecture
+- `EtymologyBuilder` now hosts a 3-mode switcher: Simple, Advanced, Pro.
+- `builder-store.ts` is the shared state layer (canonical `BuilderNode` tree + operations + derived note/pydicate outputs).
+- Simple and Advanced write to the same structured tree; Pro edits raw pydicate separately.
+
+## Simple Mode
+- Wizard flow optimized for common submission patterns.
+- Paths supported:
+  - Noun: compound roots, derived from verb, loan/adaptation, semantic extension.
+  - Verb: base verb with optional causative/postposition scaffolding.
+  - Expression: minimal capture with handoff to Advanced for complex cases.
+- Simple mode writes to the structured tree and shows a generated note preview.
+
+## Pro Mode (Raw Pydicate)
+- Raw pydicate textarea seeded from current structure on demand.
+- Runs the same Pyodide runtime for evaluation.
+- Explicitly does not promise round-trip parsing back into the tree.
 
 ## Search Normalization / Ordering
 - Mirrored from `nhe-enga/js/index.js`:
@@ -56,3 +82,4 @@
 - Full pronoun agreement editor.
 - Exact parity with all Pydicate operators or corpus-specific helpers.
 - Backend persistence of structured JSON.
+- Parsing raw Pro mode edits back into the structured tree.
