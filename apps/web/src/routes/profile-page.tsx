@@ -216,6 +216,14 @@ export function ProfilePage() {
         </p>
       </Card>
 
+      <EntryBrowser
+        compact
+        queryKey={`profile-${userId}`}
+        title={t("profile.submissionsTitle")}
+        emptyMessage={t("profile.noSubmissions")}
+        scope={{ proposer_user_id: userId }}
+      />
+
       <Card>
         <h2 className="text-lg font-semibold text-brand-900">{t("profile.audioTitle")}</h2>
         <div className="mt-3 space-y-3">
@@ -264,14 +272,6 @@ export function ProfilePage() {
           </div>
         ) : null}
       </Card>
-
-      <EntryBrowser
-        compact
-        queryKey={`profile-${userId}`}
-        title={t("profile.submissionsTitle")}
-        emptyMessage={t("profile.noSubmissions")}
-        scope={{ proposer_user_id: userId }}
-      />
     </section>
   );
 }

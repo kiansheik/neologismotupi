@@ -174,7 +174,7 @@ export function ModerationPage() {
         <div className="mt-3 grid gap-4 md:grid-cols-2">
           <div>
             <h2 className="text-sm font-semibold text-brand-800">{t("moderation.pendingEntries")}</h2>
-            <div className="mt-2 space-y-2">
+            <div className="mt-2 max-h-[420px] space-y-2 overflow-y-auto rounded-md border border-brand-100 bg-white/70 p-2 pr-3">
               {queueQuery.data?.entries.map((entry) => (
                 <article key={entry.id} className="rounded-md border border-brand-100 p-3">
                   <div className="flex items-center justify-between gap-2">
@@ -218,7 +218,7 @@ export function ModerationPage() {
 
           <div>
             <h2 className="text-sm font-semibold text-brand-800">{t("moderation.pendingExamples")}</h2>
-            <div className="mt-2 space-y-2">
+            <div className="mt-2 max-h-[420px] space-y-2 overflow-y-auto rounded-md border border-brand-100 bg-white/70 p-2 pr-3">
               {queueQuery.data?.examples.map((example) => (
                 <article key={example.id} className="rounded-md border border-brand-100 p-3">
                   <p className="text-xs text-slate-600">
