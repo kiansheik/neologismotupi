@@ -23,26 +23,30 @@
 - Dictionary data loaded from the same compressed file; neologisms CSV is parsed with the same `buildNeoJSON` logic from the site.
 - Dictionary entries are filtered to the same Tupi→Portuguese range and banlist used in `nhe-enga/verbs.py`.
 - POS parsing uses a regex plan in `pos.ts` to detect noun, verb (tr/intr), postposition, etc., defaulting to noun when unknown.
+  - Regex plan expanded to handle `(s)` / `(s.)`, `(v.tr.)`, `(v. intr.)`, `adj.:`, `pron.`, `posp.`, `cop.`, etc.
 
 ## Supported Operations (First Pass)
 - Root lookup with local dictionary search (Tupi or Portuguese meaning).
 - Compound composition (add/reorder roots).
 - Derivational wrappers:
-  - `sara` (agent/doer)
+  - `sara` / `ba'e` (agent/doer)
   - `pyra` (patient/affected)
   - `emi` (patient with explicit agent)
+  - `a` (basic nominalizer)
   - `saba` (circumstantial)
   - `rama` (future/intended)
   - `pûera` (past/former)
-  - `mo` (causative)
+  - `ndûara` (deadverbal adjective)
+  - `mo` / `ero` (causative)
 - Possessor attachment.
 - Postposition attachment (common list + dictionary-driven).
 - Modifier attachment.
 - Outputs:
-  - Human-readable semicolon-style note synced to `morphology_notes`.
+  - Human-readable semicolon-style note synced to `morphology_notes` (compact roots + operations list + resultado).
   - Structured tree preview.
   - Best-effort Pydicate-like preview + canonical piece list.
 - Derivation bank supports click or drag-and-drop onto a focused node.
+- Derivation bank grouped by category (nominalizers / classifiers / deadverbal / causatives).
 - Optional live runtime output via Pyodide (iframe) with local wheels.
   - Assets live in `apps/web/public/etymology/iframe_pyodide.html` and `apps/web/public/etymology/pyodide/*.whl`.
   - Pyodide itself is loaded from `https://cdn.jsdelivr.net/pyodide/v0.25.1/full/pyodide.js`.

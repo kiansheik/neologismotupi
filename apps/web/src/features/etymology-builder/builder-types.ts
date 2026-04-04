@@ -1,59 +1,96 @@
 import type { RootPosKind } from "./pos";
 
-export type DeriveOperation =
-  | "agent"
-  | "patient"
-  | "patient_with_agent"
-  | "circumstantial"
-  | "future"
-  | "past"
-  | "causative";
-
 export type DeriveOperationSpec = {
   label: string;
   token: string;
   note: string;
+  pydicate?: string;
   needsAgent?: boolean;
 };
 
-export const DERIVE_OPERATIONS: Record<DeriveOperation, DeriveOperationSpec> = {
-  agent: {
-    label: "Agente / autor",
+export const DERIVE_OPERATIONS = {
+  agent_sara: {
+    label: "Agente (sara)",
     token: "sara",
     note: "agente",
   },
-  patient: {
-    label: "Paciente / afetado",
-    token: "pyra",
-    note: "paciente",
+  agent_bae: {
+    label: "Agente (ba'e)",
+    token: "ba'e",
+    pydicate: "bae",
+    note: "agente",
   },
-  patient_with_agent: {
-    label: "Paciente com agente explícito",
+  patient_pyra: {
+    label: "Paciente (pyra)",
+    token: "pyra",
+    note: "paciente (sem agente)",
+  },
+  patient_emi: {
+    label: "Paciente (emi) com agente",
     token: "emi",
     note: "paciente (agente explícito)",
     needsAgent: true,
   },
-  circumstantial: {
-    label: "Circunstancial (lugar/tempo/meio)",
+  basic_a: {
+    label: "Nominalizador básico (-a)",
+    token: "a",
+    note: "ação / substantivo",
+    pydicate: "a",
+  },
+  circumstantial_saba: {
+    label: "Circunstancial (saba)",
     token: "saba",
     note: "circunstancial",
   },
-  future: {
-    label: "Futuro / intencionado",
+  future_rama: {
+    label: "Futuro (rama)",
     token: "rama",
     note: "futuro",
   },
-  past: {
-    label: "Passado / antigo",
+  past_puera: {
+    label: "Passado (pûera)",
     token: "pûera",
     note: "passado",
+    pydicate: "pûera",
   },
-  causative: {
-    label: "Causativo",
+  deadverbal_nduara: {
+    label: "Deadverbal (ndûara)",
+    token: "ndûara",
+    note: "adjetivo de adv.",
+    pydicate: "nduara",
+  },
+  causative_mo: {
+    label: "Causativo (mo)",
     token: "mo",
     note: "causativo",
   },
-};
+  causative_ero: {
+    label: "Causativo (ero)",
+    token: "ero",
+    note: "causativo (companhia/meio)",
+  },
+} as const satisfies Record<string, DeriveOperationSpec>;
+
+export type DeriveOperation = keyof typeof DERIVE_OPERATIONS;
+
+export const DERIVE_GROUPS: Array<{ label: string; ops: DeriveOperation[] }> = [
+  {
+    label: "Nominalizadores verbais",
+    ops: ["agent_sara", "agent_bae", "patient_pyra", "patient_emi", "basic_a", "circumstantial_saba"],
+  },
+  {
+    label: "Classificadores",
+    ops: ["future_rama", "past_puera"],
+  },
+  {
+    label: "Deadverbal",
+    ops: ["deadverbal_nduara"],
+  },
+  {
+    label: "Causativos",
+    ops: ["causative_mo", "causative_ero"],
+  },
+];
 
 export type RootEntry = {
   headword: string;
@@ -125,4 +162,29 @@ export type PendingInsert =
   | { kind: "postposition"; targetId: string }
   | { kind: "derive-agent"; targetId: string };
 
-export const COMMON_POSTPOSITIONS = ["amo", "supé", "pupé", "suí", "esé", "ri"];
+export const POSTPOSITION_OPTIONS: Array<{ value: string; label: string }> = [
+  { value: "amo", label: "amo (translacional)" },
+  { value: "supé", label: "supé (dativo)" },
+  { value: "pe", label: "pe (locativo)" },
+  { value: "eme", label: "eme (temporal)" },
+  { value: "iré", label: "iré (além/depois)" },
+  { value: "iremen", label: "iremen (logo após)" },
+  { value: "pupé", label: "pupé" },
+  { value: "suí", label: "suí" },
+  { value: "sosé", label: "sosé" },
+  { value: "koty", label: "koty" },
+  { value: "obaké", label: "obaké" },
+  { value: "enondé", label: "enondé" },
+  { value: "posé", label: "posé" },
+  { value: "ndi", label: "ndi" },
+  { value: "ndibé", label: "ndibé" },
+  { value: "bé", label: "bé" },
+  { value: "esé", label: "esé" },
+  { value: "ri", label: "ri" },
+  { value: "upi", label: "upi" },
+  { value: "porupi", label: "porupi" },
+  { value: "îabé", label: "îabé" },
+  { value: "îá", label: "îá" },
+];
+
+export const COMMON_POSTPOSITIONS = POSTPOSITION_OPTIONS.map((option) => option.value);

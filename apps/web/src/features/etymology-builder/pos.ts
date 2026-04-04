@@ -14,6 +14,9 @@ export type RootPosKind =
   | "particle"
   | "article"
   | "preposition"
+  | "proper_noun"
+  | "copula"
+  | "composition"
   | "unknown";
 
 export type PosInfo = {
@@ -31,21 +34,108 @@ type PosRule = {
 };
 
 const POS_RULES: PosRule[] = [
-  { kind: "verb_tr", abbrev: "v.tr.", label: "verbo transitivo", regex: /\bv\.?\s*tr\./i },
-  { kind: "verb_intr", abbrev: "v. intr.", label: "verbo intransitivo", regex: /\bv\.?\s*intr\./i },
-  { kind: "verb", abbrev: "v.", label: "verbo", regex: /\bv\./i },
-  { kind: "postposition", abbrev: "posp.", label: "pós-posição", regex: /\bposp\./i },
-  { kind: "adverb", abbrev: "adv.", label: "advérbio", regex: /\badv\./i },
-  { kind: "adjective", abbrev: "adj.", label: "adjetivo", regex: /\badj\./i },
-  { kind: "pronoun", abbrev: "pron.", label: "pronome", regex: /\bpron\./i },
-  { kind: "interjection", abbrev: "interj.", label: "interjeição", regex: /\binterj\./i },
-  { kind: "conjunction", abbrev: "conj.", label: "conjunção", regex: /\bconj\./i },
-  { kind: "demonstrative", abbrev: "dem.", label: "demonstrativo", regex: /\bdem\./i },
-  { kind: "number", abbrev: "num.", label: "numeral", regex: /\bnum\./i },
-  { kind: "particle", abbrev: "part.", label: "partícula", regex: /\bpart\./i },
-  { kind: "article", abbrev: "art.", label: "artigo", regex: /\bart\./i },
-  { kind: "preposition", abbrev: "prep.", label: "preposição", regex: /\bprep\./i },
-  { kind: "noun", abbrev: "s.", label: "substantivo", regex: /\b(s\.|subs?\.|subst\.)\b/i },
+  {
+    kind: "verb_tr",
+    abbrev: "v.tr.",
+    label: "verbo transitivo",
+    regex: /(\(v\.?\s*tr[^)]*\)|\bv\.?\s*tr\.?\b)/i,
+  },
+  {
+    kind: "verb_intr",
+    abbrev: "v. intr.",
+    label: "verbo intransitivo",
+    regex: /(\(v\.?\s*intr[^)]*\)|\bv\.?\s*intr\.?\b)/i,
+  },
+  {
+    kind: "postposition",
+    abbrev: "posp.",
+    label: "pós-posição",
+    regex: /(\(posp\.?\)|\bposp\.?\b)/i,
+  },
+  {
+    kind: "adverb",
+    abbrev: "adv.",
+    label: "advérbio",
+    regex: /(\(adv\.?\)|\badv\.?\b)/i,
+  },
+  {
+    kind: "adjective",
+    abbrev: "adj.",
+    label: "adjetivo",
+    regex: /(\(adj\.?\)|\badj\.?\b|adj\.\s*:)/i,
+  },
+  {
+    kind: "pronoun",
+    abbrev: "pron.",
+    label: "pronome",
+    regex: /(\(pron\.?\)|\bpron\.?\b)/i,
+  },
+  {
+    kind: "interjection",
+    abbrev: "interj.",
+    label: "interjeição",
+    regex: /(\(interj\.?\)|\binterj\.?\b)/i,
+  },
+  {
+    kind: "conjunction",
+    abbrev: "conj.",
+    label: "conjunção",
+    regex: /(\(conj\.?\)|\bconj\.?\b)/i,
+  },
+  {
+    kind: "demonstrative",
+    abbrev: "dem.",
+    label: "demonstrativo",
+    regex: /(\(dem\.?\)|\bdem\.?\b)/i,
+  },
+  {
+    kind: "number",
+    abbrev: "num.",
+    label: "numeral",
+    regex: /(\(num\.?\)|\bnum\.?\b)/i,
+  },
+  {
+    kind: "particle",
+    abbrev: "part.",
+    label: "partícula",
+    regex: /(\(part\.?\)|\bpart\.?\b)/i,
+  },
+  {
+    kind: "article",
+    abbrev: "art.",
+    label: "artigo",
+    regex: /(\(art\.?\)|\bart\.?\b)/i,
+  },
+  {
+    kind: "preposition",
+    abbrev: "prep.",
+    label: "preposição",
+    regex: /(\(prep\.?\)|\bprep\.?\b)/i,
+  },
+  {
+    kind: "copula",
+    abbrev: "cop.",
+    label: "cópula",
+    regex: /(\(cop\.?\)|\bcop\.?\b)/i,
+  },
+  {
+    kind: "proper_noun",
+    abbrev: "n. prop.",
+    label: "nome próprio",
+    regex: /(nome\s+próprio|n\.\s*prop\.?|prop\.\b)/i,
+  },
+  {
+    kind: "verb",
+    abbrev: "v.",
+    label: "verbo",
+    regex: /(\bv\.?\b|v\.\s*da\s*2ª|v\.\s*da\s*2a)/i,
+  },
+  {
+    kind: "noun",
+    abbrev: "s.",
+    label: "substantivo",
+    regex: /(\(s[.,\s)]|\bsubs?\.|\bsubst\.|\bs\.\b)/i,
+  },
 ];
 
 const POS_KIND_META: Record<RootPosKind, PosInfo> = {
@@ -64,6 +154,9 @@ const POS_KIND_META: Record<RootPosKind, PosInfo> = {
   particle: { kind: "particle", abbrev: "part.", label: "partícula" },
   article: { kind: "article", abbrev: "art.", label: "artigo" },
   preposition: { kind: "preposition", abbrev: "prep.", label: "preposição" },
+  proper_noun: { kind: "proper_noun", abbrev: "n. prop.", label: "nome próprio" },
+  copula: { kind: "copula", abbrev: "cop.", label: "cópula" },
+  composition: { kind: "composition", abbrev: "comp.", label: "composição" },
   unknown: { kind: "unknown", abbrev: "s.", label: "substantivo", assumed: true },
 };
 
@@ -73,8 +166,9 @@ export function posInfoForKind(kind: RootPosKind): PosInfo {
 
 export function parsePosInfo(definition?: string): PosInfo | undefined {
   if (!definition) return undefined;
+  const sample = definition.slice(0, 180);
   for (const rule of POS_RULES) {
-    if (rule.regex.test(definition)) {
+    if (rule.regex.test(sample)) {
       return { kind: rule.kind, abbrev: rule.abbrev, label: rule.label };
     }
   }
@@ -99,18 +193,22 @@ export function extractGloss(definition?: string): string | undefined {
   text = text.replace(/^[-–]\s*/, "");
   text = text.replace(/^=\s*/, "");
 
-  // Remove leading parentheticals (variants or POS markers).
-  let guard = 0;
-  while (text.startsWith("(") && guard < 4) {
-    const closeIndex = text.indexOf(")");
-    if (closeIndex <= 0) break;
-    text = text.slice(closeIndex + 1).trim();
-    text = text.replace(/^[-–:\s]+/, "");
-    guard += 1;
-  }
+  const stripLeadingParens = () => {
+    let guard = 0;
+    while (text.startsWith("(") && guard < 6) {
+      const closeIndex = text.indexOf(")");
+      if (closeIndex <= 0) break;
+      text = text.slice(closeIndex + 1).trim();
+      text = text.replace(/^[-–:\s]+/, "");
+      guard += 1;
+    }
+  };
+
+  stripLeadingParens();
 
   text = text.replace(/^\d+\)\s*/, "");
   text = text.replace(/^\d+\.\s*/, "");
+  stripLeadingParens();
 
   const bulletIndex = text.indexOf("●");
   if (bulletIndex >= 0) {
@@ -144,7 +242,7 @@ export function compactDefinition(definition?: string): string | undefined {
   if (gloss) return gloss;
   const trimmed = definition.replace(/\s+/g, " ").trim();
   if (!trimmed) return undefined;
-  return trimmed.length > 120 ? `${trimmed.slice(0, 117)}...` : trimmed;
+  return trimmed.length > 90 ? `${trimmed.slice(0, 87)}...` : trimmed;
 }
 
 export const POS_OPTIONS: Array<{ kind: RootPosKind; label: string; abbrev: string }> = [
@@ -161,4 +259,9 @@ export const POS_OPTIONS: Array<{ kind: RootPosKind; label: string; abbrev: stri
   { kind: "demonstrative", label: "Demonstrativo", abbrev: "dem." },
   { kind: "number", label: "Numeral", abbrev: "num." },
   { kind: "particle", label: "Partícula", abbrev: "part." },
+  { kind: "article", label: "Artigo", abbrev: "art." },
+  { kind: "preposition", label: "Preposição", abbrev: "prep." },
+  { kind: "copula", label: "Cópula", abbrev: "cop." },
+  { kind: "proper_noun", label: "Nome próprio", abbrev: "n. prop." },
+  { kind: "composition", label: "Composição", abbrev: "comp." },
 ];

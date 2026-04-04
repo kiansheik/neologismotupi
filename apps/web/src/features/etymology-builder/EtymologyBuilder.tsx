@@ -10,10 +10,11 @@ import {
   createRootNode,
   moveCompoundChild,
   removeNode,
+  swapDeriveWithChild,
   updatePostposition,
   wrapWithDerive,
 } from "./builder-state";
-import { COMMON_POSTPOSITIONS, DERIVE_OPERATIONS } from "./builder-types";
+import { COMMON_POSTPOSITIONS, DERIVE_GROUPS, DERIVE_OPERATIONS, POSTPOSITION_OPTIONS } from "./builder-types";
 import type { BuilderNode, DeriveOperation, PendingInsert, RootEntry } from "./builder-types";
 import { loadDictionaryIndex, searchDictionary } from "./dictionary-search";
 import type { SearchIndexEntry, SearchResult } from "./dictionary-search";
@@ -154,6 +155,11 @@ export function EtymologyBuilder({ onNoteChange, onApplyNote, isManualOverride }
     if (activeNodeId === targetId) {
       setActiveNodeId(next?.id ?? null);
     }
+  };
+
+  const handleSwapDerive = (targetId: string) => {
+    if (!root) return;
+    setRoot((current) => (current ? swapDeriveWithChild(current, targetId) : current));
   };
 
   const handleMoveChild = (compoundId: string, fromIndex: number, toIndex: number) => {
@@ -310,26 +316,38 @@ export function EtymologyBuilder({ onNoteChange, onApplyNote, isManualOverride }
                     Foco: {activeNodeLabel || "selecione um nó"}
                   </p>
                 </div>
-                <div className="mt-2 flex flex-wrap gap-2">
-                  {Object.entries(DERIVE_OPERATIONS).map(([key, op]) => (
-                    <button
-                      key={key}
-                      type="button"
-                      draggable
-                      onDragStart={(event) => {
-                        event.dataTransfer.setData("deriveOp", key);
-                      }}
-                      onClick={() => {
-                        if (!activeTargetId) return;
-                        handleApplyDerive(activeTargetId, key as DeriveOperation);
-                      }}
-                      className="rounded-full border border-brand-200 bg-white px-3 py-1 text-[11px] text-brand-900 hover:border-brand-400"
-                      title={op.label}
-                      disabled={!activeTargetId}
-                    >
-                      <span className="font-semibold">{op.token}</span>
-                      <span className="text-slate-600"> — {op.note}</span>
-                    </button>
+                <div className="mt-2 space-y-2">
+                  {DERIVE_GROUPS.map((group) => (
+                    <div key={group.label}>
+                      <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                        {group.label}
+                      </p>
+                      <div className="mt-1 flex flex-wrap gap-2">
+                        {group.ops.map((key) => {
+                          const op = DERIVE_OPERATIONS[key];
+                          return (
+                            <button
+                              key={key}
+                              type="button"
+                              draggable
+                              onDragStart={(event) => {
+                                event.dataTransfer.setData("deriveOp", key);
+                              }}
+                              onClick={() => {
+                                if (!activeTargetId) return;
+                                handleApplyDerive(activeTargetId, key);
+                              }}
+                              className="rounded-full border border-brand-200 bg-white px-3 py-1 text-[11px] text-brand-900 hover:border-brand-400"
+                              title={op.label}
+                              disabled={!activeTargetId}
+                            >
+                              <span className="font-semibold">{op.token}</span>
+                              <span className="text-slate-600"> — {op.note}</span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
                   ))}
                 </div>
                 <p className="mt-2 text-[11px] text-slate-500">
@@ -349,6 +367,7 @@ export function EtymologyBuilder({ onNoteChange, onApplyNote, isManualOverride }
                     onPending={setPendingInsert}
                     onMoveChild={handleMoveChild}
                     onQuickPostposition={handleQuickPostposition}
+                    onSwapDerive={handleSwapDerive}
                     activeNodeId={activeTargetId}
                     onSelectNode={setActiveNodeId}
                   />
@@ -535,6 +554,7 @@ function NodeEditor({
   onPending,
   onMoveChild,
   onQuickPostposition,
+  onSwapDerive,
   activeNodeId,
   onSelectNode,
 }: {
@@ -544,6 +564,7 @@ function NodeEditor({
   onPending: (pending: PendingInsert | null) => void;
   onMoveChild: (compoundId: string, fromIndex: number, toIndex: number) => void;
   onQuickPostposition: (targetId: string, postposition: string) => void;
+  onSwapDerive: (targetId: string) => void;
   activeNodeId: string | null;
   onSelectNode: (nodeId: string | null) => void;
 }) {
@@ -599,7 +620,12 @@ function NodeEditor({
         <Button type="button" variant="ghost" onClick={() => onPending({ kind: "postposition", targetId: node.id })}>
           Adicionar pós-posição
         </Button>
-        {node.kind === "derive" && node.operation === "patient_with_agent" && !node.agent ? (
+        {node.kind === "derive" && node.child.kind === "derive" ? (
+          <Button type="button" variant="ghost" onClick={() => onSwapDerive(node.id)}>
+            Inverter derivação
+          </Button>
+        ) : null}
+        {node.kind === "derive" && DERIVE_OPERATIONS[node.operation].needsAgent && !node.agent ? (
           <Button type="button" variant="ghost" onClick={() => onPending({ kind: "derive-agent", targetId: node.id })}>
             Definir agente
           </Button>
@@ -657,6 +683,7 @@ function NodeEditor({
                   onPending={onPending}
                   onMoveChild={onMoveChild}
                   onQuickPostposition={onQuickPostposition}
+                  onSwapDerive={onSwapDerive}
                   activeNodeId={activeNodeId}
                   onSelectNode={onSelectNode}
                 />
@@ -674,6 +701,7 @@ function NodeEditor({
               type="button"
               className="rounded-full border border-brand-200 px-2 py-0.5 text-[11px] text-brand-800"
               onClick={() => onQuickPostposition(node.id, postposition)}
+              title={POSTPOSITION_OPTIONS.find((option) => option.value === postposition)?.label}
             >
               {postposition}
             </button>

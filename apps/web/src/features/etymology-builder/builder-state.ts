@@ -98,6 +98,29 @@ export function wrapWithDerive(
   }));
 }
 
+export function swapDeriveWithChild(root: BuilderNode, targetId: string): BuilderNode {
+  return mapNode(root, (node) => {
+    if (node.kind !== "derive" || node.id !== targetId) {
+      return node;
+    }
+    if (node.child.kind !== "derive") {
+      return node;
+    }
+    const inner = node.child;
+    const nextInner: DeriveNode = {
+      ...node,
+      child: inner.child,
+      agent: node.agent,
+    };
+    const nextOuter: DeriveNode = {
+      ...inner,
+      child: nextInner,
+      agent: inner.agent,
+    };
+    return nextOuter;
+  });
+}
+
 export function setDeriveAgent(
   root: BuilderNode,
   targetId: string,
