@@ -8,7 +8,7 @@ export type DeriveOperationSpec = {
   needsAgent?: boolean;
 };
 
-export const DERIVE_OPERATIONS = {
+export const DERIVE_OPERATIONS: Record<string, DeriveOperationSpec> = {
   agent_sara: {
     label: "Agente (sara)",
     token: "sara",
@@ -69,7 +69,7 @@ export const DERIVE_OPERATIONS = {
     token: "ero",
     note: "causativo (companhia/meio)",
   },
-} as const satisfies Record<string, DeriveOperationSpec>;
+};
 
 export type DeriveOperation = keyof typeof DERIVE_OPERATIONS;
 

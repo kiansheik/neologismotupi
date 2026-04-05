@@ -89,7 +89,10 @@ export function SimplePipelineBuilder({
       })),
     [],
   );
-  const objectOptionalOps = new Set(["patient_pyra", "patient_emi"] as const);
+  const objectOptionalOps = new Set<ReturnType<typeof getPipelineDerivation>["op"]>([
+    "patient_pyra",
+    "patient_emi",
+  ]);
   const isDerivationDisabled = (opKey: ReturnType<typeof getPipelineDerivation>["op"]) => {
     if (!state.base) return true;
     if (meta.currentStage === "verb" && meta.transitivity === "unknown") return true;
