@@ -10,6 +10,8 @@ import { createId, createRootNode } from "./builder-state";
 import type { BuilderNode, DeriveOperation, RootEntry, VerbArgumentNode, VerbFrameNode } from "./builder-types";
 import { DERIVE_OPERATIONS } from "./builder-types";
 import { RootPicker } from "./RootPicker";
+import { usePyodideRuntime } from "./pyodide-runtime";
+import { extractVerbeteFromOutput } from "./runtime-output";
 
 type BuilderMode = "simple" | "advanced" | "pro";
 
@@ -18,6 +20,7 @@ type SimpleModeWizardProps = {
   onApplyNote: (note: string) => void;
   isManualOverride: boolean;
   onSwitchMode: (mode: BuilderMode) => void;
+  onApplyHeadword: (headword: string) => void;
 };
 
 type SimpleCategory = "noun" | "verb" | "expression";
@@ -45,7 +48,13 @@ type SimpleStage =
   | "expression-detail"
   | "preview";
 
-export function SimpleModeWizard({ store, onApplyNote, isManualOverride, onSwitchMode }: SimpleModeWizardProps) {
+export function SimpleModeWizard({
+  store,
+  onApplyNote,
+  isManualOverride,
+  onSwitchMode,
+  onApplyHeadword,
+}: SimpleModeWizardProps) {
   const [category, setCategory] = useState<SimpleCategory>("noun");
   const [stage, setStage] = useState<SimpleStage>("category");
   const [history, setHistory] = useState<SimpleStage[]>([]);
@@ -60,6 +69,7 @@ export function SimpleModeWizard({ store, onApplyNote, isManualOverride, onSwitc
   const [derivedRoot, setDerivedRoot] = useState<RootEntry | null>(null);
   const [derivedOperation, setDerivedOperation] = useState<DeriveOperation>("agent_sara");
   const [derivedAgent, setDerivedAgent] = useState<RootEntry | null>(null);
+  const [derivedObject, setDerivedObject] = useState<RootEntry | null>(null);
   const [derivedPossessor, setDerivedPossessor] = useState<RootEntry | null>(null);
   const [derivedModifier, setDerivedModifier] = useState<RootEntry | null>(null);
 
@@ -86,6 +96,7 @@ export function SimpleModeWizard({ store, onApplyNote, isManualOverride, onSwitc
   const [expressionNote, setExpressionNote] = useState("");
   const [expressionRoots, setExpressionRoots] = useState<Array<RootEntry | null>>([null, null, null]);
   const [expressionRelation, setExpressionRelation] = useState<"descriptive" | "related" | "combine">("combine");
+  const [runtimeEnabled, setRuntimeEnabled] = useState(true);
 
   const steps = useMemo<SimpleStage[]>(() => {
     if (category === "noun") {
@@ -154,6 +165,9 @@ export function SimpleModeWizard({ store, onApplyNote, isManualOverride, onSwitc
         const op = DERIVE_OPERATIONS[derivedOperation];
         items.push({ label: "Base", value: rootLabel(derivedRoot) });
         items.push({ label: "Derivação", value: `${op.token} — ${op.note}` });
+        if (derivedRoot?.posKind === "verb_tr") {
+          items.push({ label: "Objeto do verbo", value: rootLabel(derivedObject) });
+        }
         if (op.needsAgent) {
           items.push({ label: "Agente", value: rootLabel(derivedAgent) });
         }
@@ -225,6 +239,7 @@ export function SimpleModeWizard({ store, onApplyNote, isManualOverride, onSwitc
     derivedRoot,
     derivedOperation,
     derivedAgent,
+    derivedObject,
     derivedPossessor,
     derivedModifier,
     loanSource,
@@ -255,6 +270,15 @@ export function SimpleModeWizard({ store, onApplyNote, isManualOverride, onSwitc
       ? expressionText.trim().length > 0
       : Boolean(expressionRoots[0] || (expressionKind === "complex" && expressionText.trim().length > 0));
 
+  const derivedNeedsObject = derivedRoot?.posKind === "verb_tr";
+  const derivedReady = !derivedNeedsObject || Boolean(derivedObject);
+
+  const { state: runtimeState, iframeProps } = usePyodideRuntime(
+    store.pydicatePreview,
+    runtimeEnabled && stage === "preview",
+  );
+  const runtimeVerbete = extractVerbeteFromOutput(runtimeState.output);
+
   useEffect(() => {
     if (!steps.includes(stage)) {
       setStage(steps[0]);
@@ -277,6 +301,7 @@ export function SimpleModeWizard({ store, onApplyNote, isManualOverride, onSwitc
     derivedRoot,
     derivedOperation,
     derivedAgent,
+    derivedObject,
     derivedPossessor,
     derivedModifier,
     loanSource,
@@ -362,11 +387,29 @@ export function SimpleModeWizard({ store, onApplyNote, isManualOverride, onSwitc
       if (nounKind === "derived") {
         if (!derivedRoot) return { tree: null, focusId: null };
         const baseRoot = createRootNode(derivedRoot);
+        let derivedChild: BuilderNode = baseRoot;
+        if (derivedRoot.posKind === "verb_tr") {
+          if (!derivedObject) return { tree: null, focusId: null };
+          const objectNode: VerbArgumentNode = {
+            id: createId("verb_object"),
+            kind: "verb_argument",
+            role: "object",
+            status: "explicit",
+            value: createRootNode(derivedObject),
+          };
+          const frame: VerbFrameNode = {
+            id: createId("verb_frame"),
+            kind: "verb_frame",
+            verb: baseRoot,
+            object: objectNode,
+          };
+          derivedChild = frame;
+        }
         const deriveNode: BuilderNode = {
           id: createId("derive"),
           kind: "derive",
           operation: derivedOperation,
-          child: baseRoot,
+          child: derivedChild,
           agent: derivedAgent ? createRootNode(derivedAgent) : undefined,
         };
         const deriveFocusId = deriveNode.id;
@@ -696,6 +739,13 @@ export function SimpleModeWizard({ store, onApplyNote, isManualOverride, onSwitc
       {stage === "noun-derived-options" ? (
         <StepCard summary={summaryContent} title="Deseja adicionar algo mais?">
           <div className="grid gap-3">
+            {derivedNeedsObject ? (
+              <RootPicker
+                label="Objeto do verbo (obrigatório para v.tr.)"
+                value={derivedObject}
+                onChange={setDerivedObject}
+              />
+            ) : null}
             {derivedOperation === "patient_emi" ? (
               <RootPicker label="Agente explícito (opcional)" value={derivedAgent} onChange={setDerivedAgent} />
             ) : null}
@@ -703,9 +753,14 @@ export function SimpleModeWizard({ store, onApplyNote, isManualOverride, onSwitc
             <RootPicker label="Modificador (opcional)" value={derivedModifier} onChange={setDerivedModifier} />
           </div>
           <StepActions>
-            <Button type="button" onClick={() => goNext("preview")}>
+            <Button type="button" onClick={() => goNext("preview")} disabled={!derivedReady}>
               Ver prévia
             </Button>
+            {derivedNeedsObject && !derivedObject ? (
+              <p className="text-xs text-amber-700">
+                Verbo transitivo precisa de objeto antes da derivação.
+              </p>
+            ) : null}
           </StepActions>
         </StepCard>
       ) : null}
@@ -1004,13 +1059,61 @@ export function SimpleModeWizard({ store, onApplyNote, isManualOverride, onSwitc
           <div className="mt-2 rounded-md border border-brand-100 bg-white px-2 py-2 text-sm text-slate-800">
             {store.generatedNote || "Preencha os passos para gerar a nota."}
           </div>
+          <div className="mt-3 rounded-md border border-slate-200 bg-slate-50 px-2 py-2 text-xs text-slate-700">
+            <p className="text-[11px] font-semibold text-slate-600">Prévia pydicate (melhor esforço)</p>
+            <div className="mt-1 font-mono text-[11px] text-slate-800">
+              {store.pydicatePreview || "—"}
+            </div>
+          </div>
+          <div className="mt-3 rounded-md border border-slate-200 bg-white/70 px-2 py-2 text-xs text-slate-700">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <p className="text-[11px] font-semibold text-slate-600">Saída do pydicate (verbete)</p>
+              <label className="flex items-center gap-2 text-[11px] text-slate-600">
+                <input
+                  type="checkbox"
+                  className="h-3 w-3"
+                  checked={runtimeEnabled}
+                  onChange={(event) => setRuntimeEnabled(event.target.checked)}
+                />
+                Executar Pyodide
+              </label>
+            </div>
+            <div className="mt-2 rounded-md border border-slate-200 bg-white px-2 py-2 text-xs text-slate-800">
+              {runtimeEnabled && stage === "preview"
+                ? runtimeState.output || runtimeState.message || "—"
+                : "Runtime desativado."}
+            </div>
+            {runtimeEnabled && stage === "preview" ? (
+              <div className="mt-1 text-[11px] text-slate-500">
+                {runtimeState.status === "loading" ? "Carregando runtime..." : null}
+                {runtimeState.status === "running" ? "Executando..." : null}
+                {runtimeState.status === "error" && runtimeState.message ? runtimeState.message : null}
+              </div>
+            ) : null}
+            {runtimeEnabled && stage === "preview" ? <iframe {...iframeProps} className="hidden" /> : null}
+          </div>
           <div className="mt-2 flex flex-wrap items-center gap-2">
-            <Button type="button" variant="secondary" onClick={() => onApplyNote(store.generatedNote)} disabled={!store.generatedNote}>
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={() => {
+                onApplyNote(store.generatedNote);
+                if (runtimeVerbete) {
+                  onApplyHeadword(runtimeVerbete);
+                }
+              }}
+              disabled={!store.generatedNote}
+            >
               Usar no campo abaixo
             </Button>
             {isManualOverride ? (
               <p className="text-xs text-amber-700">
                 Texto editado manualmente. Clique em “Usar” para sobrescrever.
+              </p>
+            ) : null}
+            {runtimeVerbete ? (
+              <p className="text-xs text-slate-500">
+                Verbete gerado: {runtimeVerbete}
               </p>
             ) : null}
           </div>

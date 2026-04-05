@@ -36,6 +36,9 @@
   - Expression: fixed phrase or compositional roots; complex expressions include lightweight scaffolding + handoff.
 - Simple mode writes to the structured tree and shows a generated note preview.
 - Includes a live “Receita atual” summary so the wizard feels like a slot-based recipe instead of a form.
+- Simple preview now includes the pydicate draft plus the Pyodide runtime output (verbete).
+ - Derived nouns from transitive verbs require selecting an object before preview; the object is inserted into a verb frame before derivation.
+ - "Usar no campo abaixo" now also applies the runtime verbete (if available) to the headword field.
 
 ## Verb Argument Representation
 - Added `verb_frame` nodes that wrap a verb plus argument slots.

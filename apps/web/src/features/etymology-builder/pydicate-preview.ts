@@ -116,7 +116,11 @@ const POS_CTORS: Record<RootPosKind, string> = {
 };
 
 function formatRoot(node: RootNode): string {
-  const ctor = POS_CTORS[node.posKind ?? "unknown"] ?? "Noun";
+  const kind = node.posKind ?? "unknown";
+  const ctor = POS_CTORS[kind] ?? "Noun";
+  if (ctor === "Verb") {
+    return formatVerbCall(node);
+  }
   const hint = posHint(node);
   return formatCtorCall(ctor, node.headword, hint);
 }
@@ -146,6 +150,35 @@ function posHint(node: RootNode): string | undefined {
   return undefined;
 }
 
+function verbClassHint(node: RootNode): string | undefined {
+  const header = node.rawDefinition ? extractDefinitionHeader(node.rawDefinition) : undefined;
+  if (header && header.includes("v")) return header;
+  if (node.posAbbrev) {
+    return `(${node.posAbbrev})`;
+  }
+  return header;
+}
+
+function formatVerbCall(node: RootNode): string {
+  const isManual = node.type === "manual";
+  const isNeo = node.type === "neo";
+  if (!isManual && !isNeo) {
+    return formatCtorCall("Verb", node.headword);
+  }
+  const verbClass = verbClassHint(node);
+  const rawDefinition = node.rawDefinition?.trim() || node.gloss?.trim() || undefined;
+  if (verbClass && rawDefinition) {
+    return formatCtorCall("Verb", node.headword, verbClass, rawDefinition);
+  }
+  if (verbClass) {
+    return formatCtorCall("Verb", node.headword, verbClass);
+  }
+  if (rawDefinition) {
+    return formatCtorCall("Verb", node.headword, undefined, rawDefinition);
+  }
+  return formatCtorCall("Verb", node.headword);
+}
+
 function extractDefinitionHeader(definition: string): string | undefined {
   const match = definition.trim().match(/^(?:\([^)]*\)\s*){1,4}/);
   if (match && match[0]) {
@@ -154,12 +187,19 @@ function extractDefinitionHeader(definition: string): string | undefined {
   return undefined;
 }
 
-function formatCtorCall(ctor: string, value: string, hint?: string): string {
+function formatCtorCall(ctor: string, value: string, hint?: string, definition?: string): string {
   if (ctor === "Copula" || ctor === "Composition") {
     return `${ctor}()`;
   }
   const escaped = value.replace(/\\/g, "\\\\").replace(/"/g, "\\\"");
-  if (!hint) return `${ctor}("${escaped}")`;
-  const escapedHint = hint.replace(/\\/g, "\\\\").replace(/"/g, "\\\"");
-  return `${ctor}("${escaped}", "${escapedHint}")`;
+  const args = [`"${escaped}"`];
+  if (hint) {
+    const escapedHint = hint.replace(/\\/g, "\\\\").replace(/"/g, "\\\"");
+    args.push(`"${escapedHint}"`);
+  }
+  if (definition) {
+    const escapedDefinition = definition.replace(/\\/g, "\\\\").replace(/"/g, "\\\"");
+    args.push(`"${escapedDefinition}"`);
+  }
+  return `${ctor}(${args.join(", ")})`;
 }

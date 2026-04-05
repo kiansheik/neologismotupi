@@ -17,6 +17,7 @@ const IFRAME_SRC = "/etymology/iframe_pyodide.html";
 
 export function usePyodideRuntime(code: string, enabled: boolean) {
   const [state, setState] = useState<RuntimeState>({ status: "idle" });
+  const [isReady, setIsReady] = useState(false);
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
   const orderRef = useRef(0);
   const pendingHashRef = useRef<string | null>(null);
@@ -28,6 +29,7 @@ export function usePyodideRuntime(code: string, enabled: boolean) {
     if (!enabled) {
       readyRef.current = false;
       pendingHashRef.current = null;
+      setIsReady(false);
       setState({ status: "idle" });
       return;
     }
@@ -43,6 +45,7 @@ export function usePyodideRuntime(code: string, enabled: boolean) {
       if (!event.data) return;
       if (event.data.pyodideLoaded) {
         readyRef.current = true;
+        setIsReady(true);
         setState({ status: "ready" });
         return;
       }
@@ -68,7 +71,7 @@ export function usePyodideRuntime(code: string, enabled: boolean) {
   }, []);
 
   useEffect(() => {
-    if (!enabled || !readyRef.current) return;
+    if (!enabled || !isReady) return;
     if (!normalizedCode) {
       setState((prev) => ({ ...prev, output: "" }));
       return;
@@ -80,7 +83,7 @@ export function usePyodideRuntime(code: string, enabled: boolean) {
 
     return () => window.clearTimeout(handle);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [normalizedCode, enabled]);
+  }, [normalizedCode, enabled, isReady]);
 
   const sendCode = (payloadCode: string) => {
     const iframe = iframeRef.current;

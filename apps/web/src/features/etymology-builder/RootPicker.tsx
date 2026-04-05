@@ -28,8 +28,10 @@ export function RootPicker({ label, value, onChange, placeholder, allowManual = 
 
   const selectedSummary = useMemo(() => {
     if (!value) return null;
+    const fullDef = value.rawDefinition?.trim();
     const gloss = value.gloss ? compactDefinition(value.gloss) : undefined;
-    return gloss ? `${value.headword} — ${gloss}` : value.headword;
+    const summary = fullDef || gloss;
+    return summary ? `${value.headword} — ${summary}` : value.headword;
   }, [value]);
 
   useEffect(() => {

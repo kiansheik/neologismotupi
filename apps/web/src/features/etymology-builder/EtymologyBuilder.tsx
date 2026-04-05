@@ -13,9 +13,10 @@ type EtymologyBuilderProps = {
   onNoteChange: (note: string) => void;
   onApplyNote: (note: string) => void;
   isManualOverride: boolean;
+  onApplyHeadword: (headword: string) => void;
 };
 
-export function EtymologyBuilder({ onNoteChange, onApplyNote, isManualOverride }: EtymologyBuilderProps) {
+export function EtymologyBuilder({ onNoteChange, onApplyNote, isManualOverride, onApplyHeadword }: EtymologyBuilderProps) {
   const [isOpen, setIsOpen] = useState(true);
   const [mode, setMode] = useState<BuilderMode>("simple");
   const store = useEtymologyBuilderStore();
@@ -47,13 +48,14 @@ export function EtymologyBuilder({ onNoteChange, onApplyNote, isManualOverride }
               onApplyNote={onApplyNote}
               isManualOverride={isManualOverride}
               onSwitchMode={setMode}
+              onApplyHeadword={onApplyHeadword}
             />
           ) : null}
           {mode === "advanced" ? (
-            <AdvancedModeEditor store={store} onApplyNote={onApplyNote} isManualOverride={isManualOverride} />
+            <AdvancedModeEditor store={store} onApplyNote={onApplyNote} isManualOverride={isManualOverride} onApplyHeadword={onApplyHeadword} />
           ) : null}
           {mode === "pro" ? (
-            <ProModeEditor store={store} onApplyNote={onApplyNote} isManualOverride={isManualOverride} />
+            <ProModeEditor store={store} onApplyNote={onApplyNote} isManualOverride={isManualOverride} onApplyHeadword={onApplyHeadword} />
           ) : null}
         </div>
       )}

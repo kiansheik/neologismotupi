@@ -5,14 +5,16 @@ import { Textarea } from "@/components/ui/textarea";
 
 import type { BuilderStore } from "./builder-store";
 import { usePyodideRuntime } from "./pyodide-runtime";
+import { extractVerbeteFromOutput } from "./runtime-output";
 
 type ProModeEditorProps = {
   store: BuilderStore;
   onApplyNote: (note: string) => void;
   isManualOverride: boolean;
+  onApplyHeadword: (headword: string) => void;
 };
 
-export function ProModeEditor({ store, onApplyNote, isManualOverride }: ProModeEditorProps) {
+export function ProModeEditor({ store, onApplyNote, isManualOverride, onApplyHeadword }: ProModeEditorProps) {
   const [rawText, setRawText] = useState("");
   const [runtimeEnabled, setRuntimeEnabled] = useState(true);
   const [autoSeeded, setAutoSeeded] = useState(false);
@@ -28,6 +30,7 @@ export function ProModeEditor({ store, onApplyNote, isManualOverride }: ProModeE
   }, [store.pydicatePreview, autoSeeded]);
 
   const { state: runtimeState, iframeProps } = usePyodideRuntime(rawText, runtimeEnabled);
+  const runtimeVerbete = extractVerbeteFromOutput(runtimeState.output);
 
   return (
     <div className="space-y-4">
@@ -107,7 +110,12 @@ export function ProModeEditor({ store, onApplyNote, isManualOverride }: ProModeE
           <Button
             type="button"
             variant="secondary"
-            onClick={() => onApplyNote(store.generatedNote)}
+            onClick={() => {
+              onApplyNote(store.generatedNote);
+              if (runtimeVerbete) {
+                onApplyHeadword(runtimeVerbete);
+              }
+            }}
             disabled={!store.generatedNote}
           >
             Usar no campo abaixo
@@ -115,6 +123,11 @@ export function ProModeEditor({ store, onApplyNote, isManualOverride }: ProModeE
           {isManualOverride ? (
             <p className="text-xs text-amber-700">
               Texto editado manualmente. Clique em “Usar” para sobrescrever.
+            </p>
+          ) : null}
+          {runtimeVerbete ? (
+            <p className="text-xs text-slate-500">
+              Verbete gerado: {runtimeVerbete}
             </p>
           ) : null}
         </div>

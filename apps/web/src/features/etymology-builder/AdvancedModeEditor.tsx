@@ -14,16 +14,18 @@ import { describeNode } from "./note-export";
 import { posInfoForKind, POS_OPTIONS } from "./pos";
 import type { RootPosKind } from "./pos";
 import { usePyodideRuntime } from "./pyodide-runtime";
+import { extractVerbeteFromOutput } from "./runtime-output";
 
 type AdvancedModeEditorProps = {
   store: BuilderStore;
   onApplyNote: (note: string) => void;
   isManualOverride: boolean;
+  onApplyHeadword: (headword: string) => void;
 };
 
 type PreviewTab = "note" | "structure" | "pydicate";
 
-export function AdvancedModeEditor({ store, onApplyNote, isManualOverride }: AdvancedModeEditorProps) {
+export function AdvancedModeEditor({ store, onApplyNote, isManualOverride, onApplyHeadword }: AdvancedModeEditorProps) {
   const [query, setQuery] = useState("");
   const [searchMinimized, setSearchMinimized] = useState(false);
   const [manualHeadword, setManualHeadword] = useState("");
@@ -51,6 +53,7 @@ export function AdvancedModeEditor({ store, onApplyNote, isManualOverride }: Adv
     store.pydicatePreview,
     runtimeEnabled,
   );
+  const runtimeVerbete = extractVerbeteFromOutput(runtimeState.output);
 
   const pendingLabel = useMemo(() => {
     if (!store.pendingInsert) return null;
@@ -340,7 +343,12 @@ export function AdvancedModeEditor({ store, onApplyNote, isManualOverride }: Adv
                 <Button
                   type="button"
                   variant="secondary"
-                  onClick={() => onApplyNote(store.generatedNote)}
+                  onClick={() => {
+                    onApplyNote(store.generatedNote);
+                    if (runtimeVerbete) {
+                      onApplyHeadword(runtimeVerbete);
+                    }
+                  }}
                   disabled={!store.generatedNote}
                 >
                   Usar no campo abaixo
@@ -348,6 +356,11 @@ export function AdvancedModeEditor({ store, onApplyNote, isManualOverride }: Adv
                 {isManualOverride ? (
                   <p className="text-xs text-amber-700">
                     Texto editado manualmente. Clique em “Usar” para sobrescrever.
+                  </p>
+                ) : null}
+                {runtimeVerbete ? (
+                  <p className="text-xs text-slate-500">
+                    Verbete gerado: {runtimeVerbete}
                   </p>
                 ) : null}
               </div>

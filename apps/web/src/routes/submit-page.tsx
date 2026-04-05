@@ -164,6 +164,13 @@ export function SubmitPage() {
     [form],
   );
 
+  const handleApplyBuilderHeadword = useCallback(
+    (headword: string) => {
+      form.setValue("headword", headword, { shouldDirty: true });
+    },
+    [form],
+  );
+
   useEffect(() => {
     if (!builderNote) return;
     if (morphologyNotesValue === builderNote) {
@@ -397,11 +404,12 @@ export function SubmitPage() {
 
   return (
     <div className="space-y-4">
-      <EtymologyBuilder
-        onNoteChange={handleBuilderNoteChange}
-        onApplyNote={handleApplyBuilderNote}
-        isManualOverride={isMorphologyOverride}
-      />
+        <EtymologyBuilder
+          onNoteChange={handleBuilderNoteChange}
+          onApplyNote={handleApplyBuilderNote}
+          isManualOverride={isMorphologyOverride}
+          onApplyHeadword={handleApplyBuilderHeadword}
+        />
       <Card>
         <h1 className="text-xl font-semibold text-brand-900">{t("submit.title")}</h1>
         {/* Orthography Notice */}
