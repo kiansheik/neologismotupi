@@ -7,7 +7,7 @@ import { AgentPicker } from "./AgentPicker";
 import type { BuilderStore } from "./builder-store";
 import { makeObjectChoice } from "./builder-store";
 import type { RootEntry } from "./builder-types";
-import { DERIVE_OPERATIONS } from "./builder-types";
+import { DERIVE_OPERATIONS, POSTPOSITION_OPTIONS } from "./builder-types";
 import { PIPELINE_DERIVATION_GROUPS, getPipelineDerivation } from "./pipeline-derivations";
 import { inferPartOfSpeechValue, posLabelForEntry } from "./pipeline-utils";
 import { RootPicker } from "./RootPicker";
@@ -153,16 +153,17 @@ export function SimplePipelineBuilder({
   );
 
   return (
-    <div className="flex flex-col gap-4 lg:flex-row">
-      <div className="flex-1 space-y-4">
-        <div className="lg:hidden">
-          <div className="sticky top-2 z-10 max-h-[30vh] overflow-auto">{previewPanel}</div>
-        </div>
-        <section className="rounded-md border border-brand-100 bg-white/70 p-3">
-          <p className="text-sm font-semibold text-brand-900">Raiz base</p>
-          <p className="mt-1 text-xs text-slate-600">Selecione a raiz principal para iniciar a composição.</p>
-          <div className="mt-2">
-            <RootPicker
+    <div className="space-y-4">
+      <div className="flex flex-col gap-4 lg:flex-row">
+        <div className="flex-1 space-y-4">
+          <div className="lg:hidden">
+            <div className="sticky top-2 z-10 max-h-[30vh] overflow-auto">{previewPanel}</div>
+          </div>
+          <section className="rounded-md border border-brand-100 bg-white/70 p-3">
+            <p className="text-sm font-semibold text-brand-900">Raiz base</p>
+            <p className="mt-1 text-xs text-slate-600">Selecione a raiz principal para iniciar a composição.</p>
+            <div className="mt-2">
+              <RootPicker
             label="Raiz principal"
             value={state.base}
             onChange={(entry) => store.setBase(entry)}
@@ -197,7 +198,7 @@ export function SimplePipelineBuilder({
             ) : null}
           </div>
         ) : null}
-      </section>
+          </section>
 
         <section className="rounded-md border border-brand-100 bg-white/70 p-3">
           <p className="text-sm font-semibold text-brand-900">Operações (composição e derivações)</p>
@@ -367,6 +368,64 @@ export function SimplePipelineBuilder({
                     </div>
                   );
                 }
+                if (step.kind === "postposition") {
+                  const option = POSTPOSITION_OPTIONS.find((item) => item.value === step.value);
+                  return (
+                    <div key={step.id} className="rounded-md border border-slate-200 bg-white px-2 py-2 text-xs">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <div>
+                          <span className="font-semibold text-slate-800">Postposição</span>
+                          <span className="text-[11px] text-slate-500">
+                            {option ? ` · ${option.label}` : ` · ${step.value}`}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            className="text-[11px] text-slate-500 hover:text-slate-700"
+                            onClick={() => store.moveStep(index, Math.max(0, index - 1))}
+                            disabled={index === 0}
+                          >
+                            ↑
+                          </button>
+                          <button
+                            type="button"
+                            className="text-[11px] text-slate-500 hover:text-slate-700"
+                            onClick={() => store.moveStep(index, Math.min(state.steps.length - 1, index + 1))}
+                            disabled={index === state.steps.length - 1}
+                          >
+                            ↓
+                          </button>
+                          <button
+                            type="button"
+                            className="text-[11px] text-rose-600 hover:text-rose-700"
+                            onClick={() => store.removeStep(step.id)}
+                          >
+                            Remover
+                          </button>
+                        </div>
+                      </div>
+                      <div className="mt-2">
+                        <select
+                          className="w-full rounded-md border border-slate-200 bg-white px-2 py-1 text-xs"
+                          value={step.value}
+                          onChange={(event) =>
+                            store.setPostpositionStep(
+                              step.id,
+                              event.target.value as (typeof POSTPOSITION_OPTIONS)[number]["value"],
+                            )
+                          }
+                        >
+                          {POSTPOSITION_OPTIONS.map((optionItem) => (
+                            <option key={optionItem.value} value={optionItem.value}>
+                              {optionItem.label}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+                  );
+                }
                 const op = DERIVE_OPERATIONS[step.op];
                 return (
                   <div key={step.id} className="rounded-md border border-slate-200 bg-white px-2 py-2 text-xs">
@@ -449,7 +508,7 @@ export function SimplePipelineBuilder({
           </div>
 
           {meta.requiresObject && !meta.objectResolved ? (
-            <div className="mt-3 rounded-md border border-slate-200 bg-white/80">
+          <div className="mt-3 rounded-md border border-slate-200 bg-white/80">
             <div className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left">
               <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-600">Objeto</span>
               <span className="text-[11px] text-slate-500">Predicados transitivos</span>
@@ -470,6 +529,39 @@ export function SimplePipelineBuilder({
             </div>
             </div>
           ) : null}
+
+          <div className="mt-3 rounded-md border border-slate-200 bg-white/80">
+            <div className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left">
+              <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-600">Postposição</span>
+              <span className="text-[11px] text-slate-500">Aplicar ao predicado atual</span>
+            </div>
+            <div className="px-3 pb-3">
+              {state.base ? (
+                <div className="flex flex-wrap items-center gap-2">
+                  <select
+                    className="rounded-md border border-slate-200 bg-white px-2 py-1 text-xs"
+                    defaultValue=""
+                    onChange={(event) => {
+                      const value = event.target.value as (typeof POSTPOSITION_OPTIONS)[number]["value"];
+                      if (!value) return;
+                      store.addPostpositionStep(value);
+                      event.currentTarget.value = "";
+                    }}
+                  >
+                    <option value="">Selecionar…</option>
+                    {POSTPOSITION_OPTIONS.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                  <p className="text-[11px] text-slate-500">Adiciona uma nova etapa.</p>
+                </div>
+              ) : (
+                <p className="text-xs text-slate-500">Selecione a raiz base para liberar as postposições.</p>
+              )}
+            </div>
+          </div>
 
           <div className="mt-3 space-y-2">
             <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-600">Adicionar derivação</p>
@@ -513,14 +605,13 @@ export function SimplePipelineBuilder({
               ))
             )}
           </div>
-        </section>
-
-        {notePanel}
-
+          </section>
+        </div>
+        <aside className="hidden lg:block lg:w-80 xl:w-96">
+          <div className="lg:sticky lg:top-4">{previewPanel}</div>
+        </aside>
       </div>
-      <aside className="hidden lg:block lg:w-80 xl:w-96">
-        <div className="lg:sticky lg:top-4">{previewPanel}</div>
-      </aside>
+      {notePanel}
     </div>
   );
 }

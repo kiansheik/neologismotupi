@@ -41,6 +41,14 @@ export function renderPydicate(state: PipelineState): string {
       }
       return;
     }
+    if (step.kind === "postposition") {
+      const token = step.value === "ramo" ? "amo" : step.value;
+      expr = `${token} * ${wrapIfNeeded(expr)}`;
+      transitivity = null;
+      currentStage = "adverb";
+      classifierDepth = 0;
+      return;
+    }
     const spec = getPipelineDerivation(step.op);
     const op = DERIVE_OPERATIONS[step.op];
 

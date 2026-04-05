@@ -109,6 +109,12 @@ export function computePipelineMeta(state: PipelineState): PipelineMeta {
       }
       return;
     }
+    if (step.kind === "postposition") {
+      currentStage = "adverb";
+      transitivity = null;
+      objectSatisfied = true;
+      return;
+    }
     const spec = getPipelineDerivation(step.op);
     currentStage = spec.resultCategory === "verb" ? "verb" : "noun";
     if (spec.resultCategory === "verb") {
@@ -166,7 +172,10 @@ export function inferPartOfSpeechValue(
   meta: PipelineMeta,
 ): PartOfSpeechValue | null {
   if (!state.base) return null;
-  const hasDerivation = state.steps.some((step) => step.kind === "derive");
+  if (meta.currentStage === "adverb") return "adverb";
+  const hasDerivation = state.steps.some(
+    (step) => step.kind === "derive" || step.kind === "postposition",
+  );
   if (!hasDerivation) {
     return mapPosKindToPartOfSpeech(state.base.posKind ?? "unknown");
   }

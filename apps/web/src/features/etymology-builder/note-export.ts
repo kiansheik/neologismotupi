@@ -18,6 +18,9 @@ export function renderHumanNote(state: PipelineState): string {
         if (step.resolution.entry) return `obj.: ${describeEntryShort(step.resolution.entry)}`;
         return "obj.: pendente";
       }
+      if (step.kind === "postposition") {
+        return `posp.: ${step.value}`;
+      }
       const op = DERIVE_OPERATIONS[step.op];
       const label = `${op.token} (${op.note})`;
       if (op.needsAgent && step.agent) {

@@ -1,6 +1,12 @@
 import { useCallback, useMemo, useState } from "react";
 
-import type { DeriveOperation, ObjectResolution, PipelineState, RootEntry } from "./builder-types";
+import type {
+  DeriveOperation,
+  ObjectResolution,
+  PipelineState,
+  PostpositionValue,
+  RootEntry,
+} from "./builder-types";
 import { renderHumanNote } from "./note-export";
 import { renderPydicate } from "./pydicate-preview";
 import { computePipelineMeta, createId } from "./pipeline-utils";
@@ -16,6 +22,8 @@ export type BuilderStore = {
   updateComposeStep: (id: string, entry: RootEntry | null) => void;
   addObjectStep: (resolution?: ObjectResolution) => void;
   updateObjectStep: (id: string, resolution: ObjectResolution) => void;
+  addPostpositionStep: (value: PostpositionValue) => void;
+  setPostpositionStep: (id: string, value: PostpositionValue) => void;
   addDerivationStep: (operation: DeriveOperation) => void;
   removeStep: (id: string) => void;
   moveStep: (fromIndex: number, toIndex: number) => void;
@@ -85,6 +93,22 @@ export function useEtymologyBuilderStore(): BuilderStore {
     }));
   }, []);
 
+  const addPostpositionStep = useCallback((value: PostpositionValue) => {
+    setState((prev) => ({
+      ...prev,
+      steps: [...prev.steps, { id: createId("postposition"), kind: "postposition", value }],
+    }));
+  }, []);
+
+  const setPostpositionStep = useCallback((id: string, value: PostpositionValue) => {
+    setState((prev) => ({
+      ...prev,
+      steps: prev.steps.map((step) =>
+        step.id === id && step.kind === "postposition" ? { ...step, value } : step,
+      ),
+    }));
+  }, []);
+
   const addObjectStep = useCallback((resolution?: ObjectResolution) => {
     setState((prev) => ({
       ...prev,
@@ -150,6 +174,8 @@ export function useEtymologyBuilderStore(): BuilderStore {
     updateComposeStep,
     addObjectStep,
     updateObjectStep,
+    addPostpositionStep,
+    setPostpositionStep,
     addDerivationStep,
     removeStep,
     moveStep,
