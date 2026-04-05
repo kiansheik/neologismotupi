@@ -85,6 +85,7 @@ export type RootEntry = {
   orthVariants?: string[];
   type?: string;
   rawDefinition?: string;
+  pydicateLiteral?: string;
 };
 
 export type ObjectResolutionMode =
@@ -99,17 +100,14 @@ export type ObjectResolution = {
   entry?: RootEntry;
 };
 
-export type PipelineDerivation = {
-  id: string;
-  op: DeriveOperation;
-  agent?: RootEntry | null;
-};
+export type PipelineStep =
+  | { id: string; kind: "compose"; entry: RootEntry | null }
+  | { id: string; kind: "derive"; op: DeriveOperation; agent?: RootEntry | null }
+  | { id: string; kind: "object"; resolution: ObjectResolution };
 
 export type PipelineState = {
   base: RootEntry | null;
-  modifiers: RootEntry[];
-  object: ObjectResolution | null;
-  derivations: PipelineDerivation[];
+  steps: PipelineStep[];
   transitivityOverride?: "transitive" | "intransitive" | null;
 };
 

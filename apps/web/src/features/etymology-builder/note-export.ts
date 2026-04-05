@@ -8,28 +8,24 @@ export function renderHumanNote(state: PipelineState): string {
   const segments: string[] = [];
   segments.push(`base: ${describeEntry(state.base)}`);
 
-  if (state.modifiers.length > 0) {
-    segments.push(`mod.: ${state.modifiers.map(describeEntryShort).join(" / ")}`);
-  }
-
-  if (state.object) {
-    if (state.object.mode === "open") {
-      segments.push("obj.: em aberto");
-    } else if (state.object.entry) {
-      segments.push(`obj.: ${describeEntryShort(state.object.entry)}`);
-    }
-  }
-
-  if (state.derivations.length > 0) {
-    const ops = state.derivations.map((derivation) => {
-      const op = DERIVE_OPERATIONS[derivation.op];
+  if (state.steps.length > 0) {
+    const ops = state.steps.map((step) => {
+      if (step.kind === "compose") {
+        return step.entry ? `/ ${describeEntryShort(step.entry)}` : "composição: pendente";
+      }
+      if (step.kind === "object") {
+        if (step.resolution.mode === "open") return "obj.: em aberto";
+        if (step.resolution.entry) return `obj.: ${describeEntryShort(step.resolution.entry)}`;
+        return "obj.: pendente";
+      }
+      const op = DERIVE_OPERATIONS[step.op];
       const label = `${op.token} (${op.note})`;
-      if (op.needsAgent && derivation.agent) {
-        return `${label}; agente: ${describeEntryShort(derivation.agent)}`;
+      if (op.needsAgent && step.agent) {
+        return `${label}; agente: ${describeEntryShort(step.agent)}`;
       }
       return label;
     });
-    segments.push(`deriv.: ${ops.join(", ")}`);
+    segments.push(`passos: ${ops.join(", ")}`);
   }
 
   return segments.join("; ");

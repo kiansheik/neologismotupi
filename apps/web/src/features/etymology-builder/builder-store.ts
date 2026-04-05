@@ -12,15 +12,15 @@ export type BuilderStore = {
   generatedNote: string;
   pydicatePreview: string;
   setBase: (entry: RootEntry | null) => void;
-  addModifier: (entry: RootEntry) => void;
-  removeModifier: (index: number) => void;
-  moveModifier: (fromIndex: number, toIndex: number) => void;
-  setObjectChoice: (choice: ObjectResolution | null) => void;
-  setTransitivityOverride: (value: "transitive" | "intransitive" | null) => void;
-  addDerivation: (operation: DeriveOperation) => void;
-  removeDerivation: (id: string) => void;
-  moveDerivation: (fromIndex: number, toIndex: number) => void;
+  addComposeStep: (entry?: RootEntry | null) => void;
+  updateComposeStep: (id: string, entry: RootEntry | null) => void;
+  addObjectStep: (resolution?: ObjectResolution) => void;
+  updateObjectStep: (id: string, resolution: ObjectResolution) => void;
+  addDerivationStep: (operation: DeriveOperation) => void;
+  removeStep: (id: string) => void;
+  moveStep: (fromIndex: number, toIndex: number) => void;
   setDerivationAgent: (id: string, agent: RootEntry | null) => void;
+  setTransitivityOverride: (value: "transitive" | "intransitive" | null) => void;
   reset: () => void;
 };
 
@@ -31,9 +31,7 @@ const GENERIC_OBJECTS = {
 
 const INITIAL_STATE: PipelineState = {
   base: null,
-  modifiers: [],
-  object: null,
-  derivations: [],
+  steps: [],
   transitivityOverride: null,
 };
 
@@ -64,64 +62,78 @@ export function useEtymologyBuilderStore(): BuilderStore {
     });
   }, []);
 
-  const addModifier = useCallback((entry: RootEntry) => {
-    setState((prev) => ({ ...prev, modifiers: [...prev.modifiers, entry] }));
-  }, []);
-
-  const removeModifier = useCallback((index: number) => {
+  const addComposeStep = useCallback((entry?: RootEntry | null) => {
     setState((prev) => ({
       ...prev,
-      modifiers: prev.modifiers.filter((_, idx) => idx !== index),
+      steps: [...prev.steps, { id: createId("compose"), kind: "compose", entry: entry ?? null }],
     }));
   }, []);
 
-  const moveModifier = useCallback((fromIndex: number, toIndex: number) => {
-    setState((prev) => {
-      if (fromIndex === toIndex) return prev;
-      const next = [...prev.modifiers];
-      const [item] = next.splice(fromIndex, 1);
-      next.splice(toIndex, 0, item);
-      return { ...prev, modifiers: next };
-    });
+  const updateComposeStep = useCallback((id: string, entry: RootEntry | null) => {
+    setState((prev) => ({
+      ...prev,
+      steps: prev.steps.map((step) =>
+        step.id === id && step.kind === "compose" ? { ...step, entry } : step,
+      ),
+    }));
   }, []);
 
-  const setObjectChoice = useCallback((choice: ObjectResolution | null) => {
-    setState((prev) => ({ ...prev, object: choice }));
+  const addDerivationStep = useCallback((operation: DeriveOperation) => {
+    setState((prev) => ({
+      ...prev,
+      steps: [...prev.steps, { id: createId("derive"), kind: "derive", op: operation }],
+    }));
+  }, []);
+
+  const addObjectStep = useCallback((resolution?: ObjectResolution) => {
+    setState((prev) => ({
+      ...prev,
+      steps: [
+        ...prev.steps,
+        {
+          id: createId("object"),
+          kind: "object",
+          resolution: resolution ?? makeObjectChoice("open"),
+        },
+      ],
+    }));
+  }, []);
+
+  const updateObjectStep = useCallback((id: string, resolution: ObjectResolution) => {
+    setState((prev) => ({
+      ...prev,
+      steps: prev.steps.map((step) =>
+        step.id === id && step.kind === "object" ? { ...step, resolution } : step,
+      ),
+    }));
+  }, []);
+
+  const removeStep = useCallback((id: string) => {
+    setState((prev) => ({
+      ...prev,
+      steps: prev.steps.filter((step) => step.id !== id),
+    }));
+  }, []);
+
+  const moveStep = useCallback((fromIndex: number, toIndex: number) => {
+    setState((prev) => {
+      if (fromIndex === toIndex) return prev;
+      const next = [...prev.steps];
+      const [item] = next.splice(fromIndex, 1);
+      next.splice(toIndex, 0, item);
+      return { ...prev, steps: next };
+    });
   }, []);
 
   const setTransitivityOverride = useCallback((value: "transitive" | "intransitive" | null) => {
     setState((prev) => ({ ...prev, transitivityOverride: value }));
   }, []);
 
-  const addDerivation = useCallback((operation: DeriveOperation) => {
-    setState((prev) => ({
-      ...prev,
-      derivations: [...prev.derivations, { id: createId("derive"), op: operation }],
-    }));
-  }, []);
-
-  const removeDerivation = useCallback((id: string) => {
-    setState((prev) => ({
-      ...prev,
-      derivations: prev.derivations.filter((item) => item.id !== id),
-    }));
-  }, []);
-
-  const moveDerivation = useCallback((fromIndex: number, toIndex: number) => {
-    setState((prev) => {
-      if (fromIndex === toIndex) return prev;
-      const next = [...prev.derivations];
-      const [item] = next.splice(fromIndex, 1);
-      next.splice(toIndex, 0, item);
-      return { ...prev, derivations: next };
-    });
-  }, []);
-
   const setDerivationAgent = useCallback((id: string, agent: RootEntry | null) => {
     setState((prev) => ({
       ...prev,
-      derivations: prev.derivations.map((item) =>
-        item.id === id ? { ...item, agent } : item,
+      steps: prev.steps.map((item) =>
+        item.id === id && item.kind === "derive" ? { ...item, agent } : item,
       ),
     }));
   }, []);
@@ -134,15 +146,15 @@ export function useEtymologyBuilderStore(): BuilderStore {
     generatedNote,
     pydicatePreview,
     setBase,
-    addModifier,
-    removeModifier,
-    moveModifier,
-    setObjectChoice,
-    setTransitivityOverride,
-    addDerivation,
-    removeDerivation,
-    moveDerivation,
+    addComposeStep,
+    updateComposeStep,
+    addObjectStep,
+    updateObjectStep,
+    addDerivationStep,
+    removeStep,
+    moveStep,
     setDerivationAgent,
+    setTransitivityOverride,
     reset,
   };
 }
@@ -168,6 +180,7 @@ export function makeObjectChoice(mode: ObjectResolution["mode"], entry?: RootEnt
 
 function buildGenericEntry(headword: string, posKind: RootEntry["posKind"], gloss: string): RootEntry {
   const posInfo = posInfoForKind(posKind ?? "noun");
+  const pydicateLiteral = posKind === "pronoun" ? headword : undefined;
   return {
     headword,
     gloss,
@@ -177,5 +190,6 @@ function buildGenericEntry(headword: string, posKind: RootEntry["posKind"], glos
     posAssumed: false,
     type: "manual",
     rawDefinition: gloss,
+    pydicateLiteral,
   };
 }

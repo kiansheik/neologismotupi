@@ -1,4 +1,4 @@
-import type { ObjectResolution, PipelineState, RootEntry } from "./builder-types";
+import type { PipelineState, RootEntry } from "./builder-types";
 import type { RootPosKind } from "./pos";
 import { posInfoForKind } from "./pos";
 import { getPipelineDerivation } from "./pipeline-derivations";
@@ -22,7 +22,6 @@ export type PipelineMeta = {
   transitivity: TransitivityStatus | null;
   requiresObject: boolean;
   objectResolved: boolean;
-  objectChoice: ObjectResolution | null;
 };
 
 const NOUNLIKE_KINDS = new Set<RootPosKind>([
@@ -66,24 +65,36 @@ export function computePipelineMeta(state: PipelineState): PipelineMeta {
   const baseStage = state.base ? stageFromPosKind(state.base.posKind) : null;
   let currentStage = baseStage;
   let transitivity = inferTransitivity(state.base, state.transitivityOverride);
+  let objectSatisfied = !(currentStage === "verb" && transitivity === "transitive");
 
-  state.derivations.forEach((derivation) => {
-    const spec = getPipelineDerivation(derivation.op);
+  state.steps.forEach((step) => {
+    if (step.kind === "compose") {
+      return;
+    }
+    if (step.kind === "object") {
+      if (
+        currentStage === "verb" &&
+        transitivity === "transitive" &&
+        step.resolution.mode !== "open" &&
+        step.resolution.entry
+      ) {
+        objectSatisfied = true;
+      }
+      return;
+    }
+    const spec = getPipelineDerivation(step.op);
     currentStage = spec.resultCategory === "verb" ? "verb" : "noun";
     if (spec.resultCategory === "verb") {
       transitivity = spec.setsTransitivity ?? transitivity ?? "unknown";
+      objectSatisfied = transitivity !== "transitive";
     } else {
       transitivity = null;
+      objectSatisfied = true;
     }
   });
 
   const requiresObject = currentStage === "verb" && transitivity === "transitive";
-  const objectResolved = Boolean(
-    requiresObject &&
-      state.object &&
-      state.object.mode !== "open" &&
-      state.object.entry,
-  );
+  const objectResolved = requiresObject ? objectSatisfied : false;
 
   return {
     baseStage,
@@ -91,7 +102,6 @@ export function computePipelineMeta(state: PipelineState): PipelineMeta {
     transitivity,
     requiresObject,
     objectResolved,
-    objectChoice: state.object,
   };
 }
 

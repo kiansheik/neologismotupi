@@ -11,9 +11,44 @@ type PyodideResponse = {
   resp_html?: string;
   hash?: string;
   pyodideLoaded?: boolean;
+  pyodideError?: string;
 };
 
-const IFRAME_SRC = "/etymology/iframe_pyodide.html";
+const BASE_IFRAME_SRC = "/etymology/iframe_pyodide.html";
+const IFRAME_ID = "pyodide-runtime-iframe";
+
+let sharedIframe: HTMLIFrameElement | null = null;
+
+function ensureSharedIframe(src: string): HTMLIFrameElement | null {
+  if (typeof document === "undefined") return null;
+  if (sharedIframe && !document.body.contains(sharedIframe)) {
+    document.body.appendChild(sharedIframe);
+  }
+  if (!sharedIframe) {
+    const iframe = document.createElement("iframe");
+    iframe.id = IFRAME_ID;
+    iframe.title = "pyodide-runtime";
+    iframe.style.display = "none";
+    iframe.src = src;
+    iframe.dataset.pyodideReady = "false";
+    delete iframe.dataset.pyodideError;
+    document.body.appendChild(iframe);
+    sharedIframe = iframe;
+  } else if (sharedIframe.src !== new URL(src, window.location.href).toString()) {
+    sharedIframe.dataset.pyodideReady = "false";
+    delete sharedIframe.dataset.pyodideError;
+    sharedIframe.src = src;
+  }
+  return sharedIframe;
+}
+
+function buildIframeSrc(): string {
+  if (import.meta.env.DEV && typeof __PYCATE_DEV_WHEEL_BASE__ !== "undefined" && __PYCATE_DEV_WHEEL_BASE__) {
+    const params = new URLSearchParams({ wheelBase: __PYCATE_DEV_WHEEL_BASE__ });
+    return `${BASE_IFRAME_SRC}?${params.toString()}`;
+  }
+  return BASE_IFRAME_SRC;
+}
 
 export function usePyodideRuntime(code: string, enabled: boolean) {
   const [state, setState] = useState<RuntimeState>({ status: "idle" });
@@ -26,10 +61,19 @@ export function usePyodideRuntime(code: string, enabled: boolean) {
   const normalizedCode = useMemo(() => code.trim(), [code]);
 
   useEffect(() => {
+    const iframe = ensureSharedIframe(buildIframeSrc());
+    iframeRef.current = iframe;
+    if (iframe?.dataset.pyodideReady === "true") {
+      readyRef.current = true;
+      setIsReady(true);
+      if (enabled) {
+        setState({ status: "ready" });
+      }
+    }
+  }, [enabled]);
+
+  useEffect(() => {
     if (!enabled) {
-      readyRef.current = false;
-      pendingHashRef.current = null;
-      setIsReady(false);
       setState({ status: "idle" });
       return;
     }
@@ -46,7 +90,19 @@ export function usePyodideRuntime(code: string, enabled: boolean) {
       if (event.data.pyodideLoaded) {
         readyRef.current = true;
         setIsReady(true);
+        if (iframeRef.current) {
+          iframeRef.current.dataset.pyodideReady = "true";
+          delete iframeRef.current.dataset.pyodideError;
+        }
         setState({ status: "ready" });
+        return;
+      }
+      if (event.data.pyodideError) {
+        readyRef.current = false;
+        if (iframeRef.current) {
+          iframeRef.current.dataset.pyodideError = event.data.pyodideError;
+        }
+        setState({ status: "error", message: event.data.pyodideError });
         return;
       }
 
@@ -112,11 +168,6 @@ export function usePyodideRuntime(code: string, enabled: boolean) {
 
   return {
     state,
-    iframeProps: {
-      ref: iframeRef,
-      src: IFRAME_SRC,
-      title: "pyodide-runtime",
-    },
   };
 }
 

@@ -29,7 +29,7 @@ export function ProModeEditor({ store, onApplyNote, isManualOverride, onApplyHea
     }
   }, [store.pydicatePreview, autoSeeded]);
 
-  const { state: runtimeState, iframeProps } = usePyodideRuntime(rawText, runtimeEnabled);
+  const { state: runtimeState } = usePyodideRuntime(rawText, runtimeEnabled);
   const runtimeVerbete = extractVerbeteFromOutput(runtimeState.output);
 
   return (
@@ -95,7 +95,7 @@ export function ProModeEditor({ store, onApplyNote, isManualOverride, onApplyHea
         <div className="mt-2 rounded-md border border-slate-200 bg-white px-2 py-2 text-xs text-slate-800">
           {runtimeEnabled ? runtimeState.output || runtimeState.message || "—" : "Runtime desativado."}
         </div>
-        {runtimeEnabled ? <iframe {...iframeProps} className="hidden" /> : null}
+        {/* iframe is managed globally by usePyodideRuntime */}
       </section>
 
       <section className="rounded-md border border-brand-100 bg-white/70 p-3">

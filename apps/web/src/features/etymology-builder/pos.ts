@@ -92,7 +92,7 @@ const POS_RULES: PosRule[] = [
     kind: "number",
     abbrev: "num.",
     label: "numeral",
-    regex: /(\(num\.?\)|\bnum\.?\b)/i,
+    regex: /(\(num\.?\)|\bnum\.)/i,
   },
   {
     kind: "particle",

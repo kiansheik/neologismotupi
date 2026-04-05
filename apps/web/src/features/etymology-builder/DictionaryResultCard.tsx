@@ -1,3 +1,5 @@
+import { useState } from "react";
+
 import { Button } from "@/components/ui/button";
 
 import type { RootEntry } from "./builder-types";
@@ -12,11 +14,16 @@ type DictionaryResultCardProps = {
 };
 
 export function DictionaryResultCard({ result, onPick, compact }: DictionaryResultCardProps) {
+  const [expanded, setExpanded] = useState(false);
   const parsedPos = parsePosInfo(result.definition);
   const posInfo = parsedPos ?? defaultPosInfo();
   const posDisplay = formatPosDisplay(posInfo);
   const gloss = compactDefinition(result.definition);
   const definition = result.definition?.trim() || "";
+  const MAX_DEF_LEN = 150;
+  const shouldTruncate = definition.length > MAX_DEF_LEN;
+  const displayDefinition =
+    expanded || !shouldTruncate ? definition : `${definition.slice(0, MAX_DEF_LEN).trim()}…`;
   const rawLower = (result.first_word || "").toLowerCase();
   const normalized = normalizeNoAccent(result.first_word || "");
   const orthVariants = normalized && normalized !== rawLower ? [normalized] : [];
@@ -44,8 +51,17 @@ export function DictionaryResultCard({ result, onPick, compact }: DictionaryResu
             ) : null}
           </div>
           <p className={compact ? "mt-1 text-[11px] text-slate-600" : "mt-1 text-xs text-slate-600"}>
-            {definition || "—"}
+            {displayDefinition || "—"}
           </p>
+          {shouldTruncate ? (
+            <button
+              type="button"
+              className="mt-1 text-[11px] text-brand-700 underline"
+              onClick={() => setExpanded((prev) => !prev)}
+            >
+              {expanded ? "Mostrar menos" : "Mostrar mais"}
+            </button>
+          ) : null}
           {posDisplay ? (
             <p className="mt-1 text-[11px] text-slate-500">
               <span className="font-semibold text-slate-600">{posDisplay.primary}</span>

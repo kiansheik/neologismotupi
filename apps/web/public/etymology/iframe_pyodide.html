@@ -5,17 +5,26 @@ let nextOrderId = 0;
 let messageQueue = [];
 
 async function initializePython() {
-    globalPyodide = await loadPyodide();
-    await globalPyodide.loadPackage('micropip');
-    const micropip = globalPyodide.pyimport('micropip');
-    await micropip.install([
-      'sqlite3',
-      '/etymology/pyodide/tupi-0.1.2-py3-none-any.whl',
-      '/etymology/pyodide/pydicate-0.1.1-py3-none-any.whl'
-    ]);
-    globalPyodide.runPython(`from pydicate.lang.tupilang.pos import *;`);
-    this.pyodideReady = true;
-    window.parent.postMessage({ pyodideLoaded: true }, '*');
+    try {
+      globalPyodide = await loadPyodide();
+      await globalPyodide.loadPackage('micropip');
+      const micropip = globalPyodide.pyimport('micropip');
+      const params = new URLSearchParams(window.location.search);
+      const WHEEL_BASE = params.get('wheelBase') || 'https://kiansheik.io/nhe-enga/gramatica/pylibs';
+      const cacheBust = params.get('cb') || Date.now();
+      await micropip.install([
+        'sqlite3',
+        `${WHEEL_BASE}/tupi-0.1.2-py3-none-any.whl?cb=${cacheBust}`,
+        `${WHEEL_BASE}/pydicate-0.1.1-py3-none-any.whl?cb=${cacheBust}`
+      ]);
+      globalPyodide.runPython(`from pydicate.lang.tupilang.pos import *;`);
+      this.pyodideReady = true;
+      window.parent.postMessage({ pyodideLoaded: true }, '*');
+    } catch (error) {
+      const message = error && error.toString ? error.toString() : String(error);
+      this.pyodideError = message;
+      window.parent.postMessage({ pyodideError: message }, '*');
+    }
 }
 
 window.addEventListener('message', async (event) => {

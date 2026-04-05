@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import type { RootEntry } from "./builder-types";
 import { DictionaryResultCard } from "./DictionaryResultCard";
 import { useDictionaryIndex, useDictionaryResults } from "./dictionary-hooks";
-import { compactDefinition, posInfoForKind, POS_OPTIONS } from "./pos";
+import { compactDefinition, posInfoForKind, POS_OPTIONS, parsePosInfo } from "./pos";
 import type { RootPosKind } from "./pos";
 
 type RootPickerProps = {
@@ -15,28 +15,64 @@ type RootPickerProps = {
   onChange: (entry: RootEntry | null) => void;
   placeholder?: string;
   allowManual?: boolean;
+  filterPosKinds?: RootPosKind[];
+  manualPosKinds?: RootPosKind[];
 };
 
-export function RootPicker({ label, value, onChange, placeholder, allowManual = true }: RootPickerProps) {
+export function RootPicker({
+  label,
+  value,
+  onChange,
+  placeholder,
+  allowManual = true,
+  filterPosKinds,
+  manualPosKinds,
+}: RootPickerProps) {
   const { index, error } = useDictionaryIndex();
   const [query, setQuery] = useState("");
   const [manualHeadword, setManualHeadword] = useState("");
   const [manualGloss, setManualGloss] = useState("");
-  const [manualPosKind, setManualPosKind] = useState<RootPosKind>("noun");
+  const [selectedExpanded, setSelectedExpanded] = useState(false);
+  const [manualPosKind, setManualPosKind] = useState<RootPosKind>(
+    manualPosKinds?.[0] ?? "noun",
+  );
 
   const results = useDictionaryResults(index, query, 8);
+  const allowedPosKinds = useMemo(() => {
+    if (!filterPosKinds || filterPosKinds.length === 0) return null;
+    return new Set(filterPosKinds);
+  }, [filterPosKinds]);
+  const filteredResults = useMemo(() => {
+    if (!allowedPosKinds) return results;
+    return results.filter((result) => {
+      const parsed = parsePosInfo(result.definition);
+      return parsed ? allowedPosKinds.has(parsed.kind) : false;
+    });
+  }, [results, allowedPosKinds]);
+  const manualOptions = useMemo(() => {
+    if (!manualPosKinds || manualPosKinds.length === 0) return POS_OPTIONS;
+    const allowed = new Set(manualPosKinds);
+    return POS_OPTIONS.filter((option) => allowed.has(option.kind));
+  }, [manualPosKinds]);
 
   const selectedSummary = useMemo(() => {
     if (!value) return null;
     const fullDef = value.rawDefinition?.trim();
     const gloss = value.gloss ? compactDefinition(value.gloss) : undefined;
     const summary = fullDef || gloss;
-    return summary ? `${value.headword} — ${summary}` : value.headword;
-  }, [value]);
+    if (!summary) {
+      return { headword: value.headword, summary: null };
+    }
+    const maxLen = 150;
+    const shouldTruncate = summary.length > maxLen;
+    const display = !shouldTruncate || selectedExpanded ? summary : `${summary.slice(0, maxLen).trim()}…`;
+    return { headword: value.headword, summary: display, shouldTruncate };
+  }, [value, selectedExpanded]);
 
   useEffect(() => {
     if (value) {
       setQuery("");
+      setSelectedExpanded(false);
     }
   }, [value]);
 
@@ -54,9 +90,21 @@ export function RootPicker({ label, value, onChange, placeholder, allowManual = 
           </button>
         ) : null}
       </div>
-      {value ? (
+      {value && selectedSummary ? (
         <div className="mt-2 text-sm text-slate-800">
-          {selectedSummary}
+          <p className="font-semibold">{selectedSummary.headword}</p>
+          {selectedSummary.summary ? (
+            <p className="mt-1 text-[11px] text-slate-600">{selectedSummary.summary}</p>
+          ) : null}
+          {selectedSummary.shouldTruncate ? (
+            <button
+              type="button"
+              className="mt-1 text-[11px] text-brand-700 underline"
+              onClick={() => setSelectedExpanded((prev) => !prev)}
+            >
+              {selectedExpanded ? "Mostrar menos" : "Mostrar mais"}
+            </button>
+          ) : null}
         </div>
       ) : (
         <>
@@ -70,10 +118,10 @@ export function RootPicker({ label, value, onChange, placeholder, allowManual = 
           <div className="mt-3 space-y-2">
             {!index && !error ? <p className="text-xs text-slate-500">Carregando dicionário...</p> : null}
             {error ? <p className="text-xs text-red-700">{error}</p> : null}
-            {index && query && results.length === 0 ? (
+            {index && query && filteredResults.length === 0 ? (
               <p className="text-xs text-slate-500">Nenhum resultado.</p>
             ) : null}
-            {results.map((result) => (
+            {filteredResults.map((result) => (
               <DictionaryResultCard key={`${result.first_word}-${result.definition}`} result={result} onPick={onChange} compact />
             ))}
           </div>
@@ -92,7 +140,7 @@ export function RootPicker({ label, value, onChange, placeholder, allowManual = 
                     value={manualPosKind}
                     onChange={(event) => setManualPosKind(event.target.value as RootPosKind)}
                   >
-                    {POS_OPTIONS.map((option) => (
+                    {manualOptions.map((option) => (
                       <option key={option.kind} value={option.kind}>
                         {option.abbrev} — {option.label}
                       </option>
@@ -120,6 +168,7 @@ export function RootPicker({ label, value, onChange, placeholder, allowManual = 
                       posAssumed: false,
                       type: "manual",
                       rawDefinition: manualGloss.trim() || undefined,
+                      pydicateLiteral: manualPosKind === "pronoun" ? headword : undefined,
                     });
                     setManualHeadword("");
                     setManualGloss("");
