@@ -165,7 +165,7 @@ export function SimplePipelineBuilder({
   );
 
   return (
-    <div className="flex flex-col gap-4 lg:flex-row">
+    <div className="flex flex-col gap-4 pb-72 lg:flex-row lg:pb-0">
       <div className="flex-1 space-y-4">
         <section className="rounded-md border border-brand-100 bg-white/70 p-3">
           <p className="text-sm font-semibold text-brand-900">Raiz base</p>
@@ -523,9 +523,12 @@ export function SimplePipelineBuilder({
         </section>
 
       </div>
-      <aside className="lg:w-80 xl:w-96">
+      <aside className="hidden lg:block lg:w-80 xl:w-96">
         <div className="lg:sticky lg:top-4">{resultPanel}</div>
       </aside>
+      <div className="fixed bottom-3 left-3 right-3 z-30 lg:hidden">
+        <div className="max-h-[45vh] overflow-auto">{resultPanel}</div>
+      </div>
     </div>
   );
 }
