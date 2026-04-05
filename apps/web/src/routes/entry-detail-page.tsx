@@ -14,6 +14,7 @@ import { trackEvent } from "@/lib/analytics";
 import { splitEntryDefinition } from "@/lib/entry-definition";
 import { formatDate, formatDateTime, formatRelativeOrDate } from "@/i18n/formatters";
 import { getLocalizedApiErrorMessage } from "@/lib/localized-api-error";
+import { getCachedVote, resolveVote, setCachedVote, useVoteMemoryVersion } from "@/lib/vote-memory";
 import { StatusBadge } from "@/components/status-badge";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -380,6 +381,7 @@ export function EntryDetailPage() {
   const queryClient = useQueryClient();
   const { data: currentUser } = useCurrentUser();
   const { locale, t } = useI18n();
+  useVoteMemoryVersion();
   const [showEntryReportForm, setShowEntryReportForm] = useState(false);
   const [showEditForm, setShowEditForm] = useState(false);
   const [editingExampleId, setEditingExampleId] = useState<string | null>(null);
@@ -427,6 +429,7 @@ export function EntryDetailPage() {
   const voteMutation = useMutation({
     mutationFn: (value: -1 | 1) => voteEntry(String(entry?.id), { value }),
     onSuccess: (_, value) => {
+      setCachedVote(currentUser?.id, "entry", String(entry?.id ?? ""), value);
       trackEvent("entry_voted", { direction: value === 1 ? "up" : "down" });
       queryClient.invalidateQueries({ queryKey: ["entry", slug] });
       queryClient.invalidateQueries({ queryKey: ["entries"] });
@@ -465,6 +468,7 @@ export function EntryDetailPage() {
     mutationFn: (params: { exampleId: string; value: -1 | 1 }) =>
       voteExample(params.exampleId, { value: params.value }),
     onSuccess: (_, params) => {
+      setCachedVote(currentUser?.id, "example", params.exampleId, params.value);
       trackEvent("example_voted", { direction: params.value === 1 ? "up" : "down" });
       queryClient.invalidateQueries({ queryKey: ["entry", slug] });
       queryClient.invalidateQueries({ queryKey: ["entries"] });
@@ -508,6 +512,7 @@ export function EntryDetailPage() {
       setAudioVoteTargetId(params.audioId);
     },
     onSuccess: (_, params) => {
+      setCachedVote(currentUser?.id, "audio", params.audioId, params.value);
       trackEvent("audio_voted", { direction: params.value === 1 ? "up" : "down" });
       queryClient.invalidateQueries({ queryKey: ["entry", slug] });
     },
@@ -851,6 +856,7 @@ export function EntryDetailPage() {
     mutationFn: (params: { commentId: string; value: -1 | 1 }) =>
       voteComment(params.commentId, { value: params.value }),
     onSuccess: (_, params) => {
+      setCachedVote(currentUser?.id, "comment", params.commentId, params.value);
       trackEvent("comment_voted", { direction: params.value === 1 ? "up" : "down" });
       queryClient.invalidateQueries({ queryKey: ["entry", slug] });
       queryClient.invalidateQueries({ queryKey: ["entries"] });
@@ -1303,7 +1309,10 @@ export function EntryDetailPage() {
   const shouldShowGloss =
     Boolean(preferredGloss) &&
     normalizeComparableText(preferredGloss) !== normalizeComparableText(entry.short_definition);
-  const entryVote = entry.current_user_vote ?? 0;
+  const entryVote = resolveVote(
+    entry.current_user_vote,
+    getCachedVote(currentUser?.id, "entry", entry.id),
+  );
   const historyEvents =
     entry.history_events && entry.history_events.length > 0
       ? entry.history_events
@@ -1836,7 +1845,10 @@ export function EntryDetailPage() {
               const displayedExampleSourceCitation = example.source?.citation ?? example.source_citation;
               const exampleSourceWorkId = example.source?.work_id ?? null;
               const exampleSourceFirstUrl = example.source?.urls?.[0] ?? null;
-              const exampleVote = example.current_user_vote ?? 0;
+              const exampleVote = resolveVote(
+                example.current_user_vote,
+                getCachedVote(currentUser?.id, "example", example.id),
+              );
 
               return (
                 <article key={example.id} className="rounded-md border border-brand-100 p-3">
@@ -2211,7 +2223,10 @@ export function EntryDetailPage() {
         <div className="mt-3 space-y-3">
           {entry.comments.length ? (
             entry.comments.map((comment) => {
-              const commentVote = comment.current_user_vote ?? 0;
+              const commentVote = resolveVote(
+                comment.current_user_vote,
+                getCachedVote(currentUser?.id, "comment", comment.id),
+              );
               return (
                 <article key={comment.id} className="rounded-md border border-brand-100 p-3">
                 <div className="flex flex-wrap items-center justify-between gap-2">

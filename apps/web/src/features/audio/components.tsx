@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { ApiError } from "@/lib/api";
 import { getLocalizedApiErrorMessage } from "@/lib/localized-api-error";
 import type { AudioSample } from "@/lib/types";
+import { getCachedVote, resolveVote, useVoteMemoryVersion } from "@/lib/vote-memory";
 
 export type CompactAudioPlayerProps = {
   src: string;
@@ -426,6 +427,7 @@ export function AudioSampleList({
   deletingAudioId,
 }: AudioSampleListProps) {
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  useVoteMemoryVersion();
   useEffect(() => {
     if (!confirmDeleteId) {
       return;
@@ -447,7 +449,10 @@ export function AudioSampleList({
         const isVoting = votingAudioId === sample.id;
         const isDeleting = deletingAudioId === sample.id;
         const canVoteOnSample = canVote && sample.user_id !== currentUserId;
-        const audioVote = sample.current_user_vote ?? 0;
+        const audioVote = resolveVote(
+          sample.current_user_vote,
+          getCachedVote(currentUserId, "audio", sample.id),
+        );
         const uploaderLabel = sample.uploader_display_name ?? t("audio.unknownUploader");
         const uploaderUrl = sample.uploader_profile_url ?? null;
         const isConfirmingDelete = confirmDeleteId === sample.id;
