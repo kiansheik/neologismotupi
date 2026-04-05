@@ -30,7 +30,6 @@ export function SimplePipelineBuilder({
   onApplyPartOfSpeech,
 }: SimplePipelineBuilderProps) {
   const { state, meta } = store;
-  const [runtimeEnabled, setRuntimeEnabled] = useState(true);
   const [compositionOpen, setCompositionOpen] = useState(false);
 
   const runtimeCode = useMemo(() => {
@@ -41,7 +40,7 @@ export function SimplePipelineBuilder({
     return store.pydicatePreview;
   }, [store.pydicatePreview, meta.currentStage]);
 
-  const { state: runtimeState } = usePyodideRuntime(runtimeCode, runtimeEnabled);
+  const { state: runtimeState } = usePyodideRuntime(runtimeCode, true);
   const runtimeVerbete = extractVerbeteFromOutput(runtimeState.output);
   const runtimeDisplay = formatRuntimeOutput(runtimeState.output);
 
@@ -100,73 +99,65 @@ export function SimplePipelineBuilder({
     return false;
   };
 
-  const resultPanel = (
+  const previewPanel = (
     <section className="rounded-md border border-brand-100 bg-white/70 p-3">
-      <p className="text-sm font-semibold text-brand-900">Resultado atual</p>
-      <div className="mt-2 grid gap-3">
-        <div className="rounded-md border border-slate-200 bg-white px-2 py-2 text-xs text-slate-700">
-          <p className="text-[11px] text-slate-500">Classe atual: {typeLabel}</p>
-          <p className="text-[11px] text-slate-500">{objectLabel}</p>
-        </div>
-        <div className="rounded-md border border-slate-200 bg-white px-2 py-2 text-xs text-slate-700">
-          <div className="flex flex-wrap items-center gap-2">
-            <p className="text-[11px] font-semibold text-slate-600">Preview</p>
-            <label className="flex items-center gap-2 text-[11px] text-slate-600">
-              <input
-                type="checkbox"
-                className="h-3 w-3"
-                checked={runtimeEnabled}
-                onChange={(event) => setRuntimeEnabled(event.target.checked)}
-              />
-              Atualizar preview
-            </label>
-            {runtimeState.status === "loading" ? (
-              <span className="text-[11px] text-slate-500">{runtimeState.message || "Carregando..."}</span>
-            ) : null}
-            {runtimeState.status === "running" ? <span className="text-[11px] text-slate-500">Executando...</span> : null}
-            {runtimeState.status === "error" && runtimeState.message ? (
-              <span className="text-[11px] text-amber-700">{runtimeState.message}</span>
-            ) : null}
-          </div>
-          <div className="mt-2 rounded-md border border-slate-200 bg-white px-2 py-2 text-[11px] text-slate-800">
-            {runtimeEnabled ? runtimeDisplay || runtimeState.message || "—" : "Runtime desativado."}
-          </div>
-          {runtimeVerbete ? <p className="mt-1 text-[11px] text-slate-500">Verbete gerado: {runtimeVerbete}</p> : null}
-        </div>
-        <div className="rounded-md border border-slate-200 bg-white px-2 py-2 text-xs text-slate-700">
-          <p className="text-[11px] font-semibold text-slate-600">Nota gerada</p>
-          <p className="mt-1 text-[11px] text-slate-800">{store.generatedNote || "—"}</p>
-          <div className="mt-2 flex flex-wrap items-center gap-2">
-            <Button
-              type="button"
-              variant="secondary"
-              onClick={() => {
-                onApplyNote(store.generatedNote);
-                if (runtimeVerbete) {
-                  onApplyHeadword(runtimeVerbete);
-                }
-                if (partOfSpeechValue) {
-                  onApplyPartOfSpeech(partOfSpeechValue);
-                }
-              }}
-              disabled={!store.generatedNote}
-            >
-              Usar no campo abaixo
-            </Button>
-            {isManualOverride ? (
-              <p className="text-[11px] text-amber-700">
-                Texto editado manualmente. Clique em “Usar” para sobrescrever.
-              </p>
-            ) : null}
-          </div>
-        </div>
+      <p className="text-sm font-semibold text-brand-900">Preview</p>
+      <div className="mt-2 rounded-md border border-slate-200 bg-white px-2 py-2 text-[11px] text-slate-800">
+        {runtimeDisplay || runtimeState.message || "—"}
+      </div>
+      {runtimeState.status === "loading" ? (
+        <p className="mt-1 text-[11px] text-slate-500">{runtimeState.message || "Carregando..."}</p>
+      ) : null}
+      {runtimeState.status === "running" ? (
+        <p className="mt-1 text-[11px] text-slate-500">Executando...</p>
+      ) : null}
+      {runtimeState.status === "error" && runtimeState.message ? (
+        <p className="mt-1 text-[11px] text-amber-700">{runtimeState.message}</p>
+      ) : null}
+      {runtimeVerbete ? <p className="mt-1 text-[11px] text-slate-500">Verbete gerado: {runtimeVerbete}</p> : null}
+    </section>
+  );
+
+  const notePanel = (
+    <section className="rounded-md border border-brand-100 bg-white/70 p-3">
+      <p className="text-sm font-semibold text-brand-900">Nota gerada</p>
+      <div className="mt-2 rounded-md border border-slate-200 bg-white px-2 py-2 text-xs text-slate-700">
+        <p className="text-[11px] text-slate-500">Classe atual: {typeLabel}</p>
+        <p className="text-[11px] text-slate-500">{objectLabel}</p>
+      </div>
+      <p className="mt-2 text-[11px] text-slate-800">{store.generatedNote || "—"}</p>
+      <div className="mt-2 flex flex-wrap items-center gap-2">
+        <Button
+          type="button"
+          variant="secondary"
+          onClick={() => {
+            onApplyNote(store.generatedNote);
+            if (runtimeVerbete) {
+              onApplyHeadword(runtimeVerbete);
+            }
+            if (partOfSpeechValue) {
+              onApplyPartOfSpeech(partOfSpeechValue);
+            }
+          }}
+          disabled={!store.generatedNote}
+        >
+          Usar no campo abaixo
+        </Button>
+        {isManualOverride ? (
+          <p className="text-[11px] text-amber-700">
+            Texto editado manualmente. Clique em “Usar” para sobrescrever.
+          </p>
+        ) : null}
       </div>
     </section>
   );
 
   return (
-    <div className="flex flex-col gap-4 pb-72 lg:flex-row lg:pb-0">
+    <div className="flex flex-col gap-4 lg:flex-row">
       <div className="flex-1 space-y-4">
+        <div className="lg:hidden">
+          <div className="sticky top-2 z-10 max-h-[30vh] overflow-auto">{previewPanel}</div>
+        </div>
         <section className="rounded-md border border-brand-100 bg-white/70 p-3">
           <p className="text-sm font-semibold text-brand-900">Raiz base</p>
           <p className="mt-1 text-xs text-slate-600">Selecione a raiz principal para iniciar a composição.</p>
@@ -457,7 +448,8 @@ export function SimplePipelineBuilder({
             ) : null}
           </div>
 
-          <div className="mt-3 rounded-md border border-slate-200 bg-white/80">
+          {meta.requiresObject && !meta.objectResolved ? (
+            <div className="mt-3 rounded-md border border-slate-200 bg-white/80">
             <div className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left">
               <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-600">Objeto</span>
               <span className="text-[11px] text-slate-500">Predicados transitivos</span>
@@ -476,7 +468,8 @@ export function SimplePipelineBuilder({
                 <p className="text-xs text-slate-500">Selecione a raiz base para liberar o objeto.</p>
               )}
             </div>
-          </div>
+            </div>
+          ) : null}
 
           <div className="mt-3 space-y-2">
             <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-600">Adicionar derivação</p>
@@ -522,13 +515,12 @@ export function SimplePipelineBuilder({
           </div>
         </section>
 
+        {notePanel}
+
       </div>
       <aside className="hidden lg:block lg:w-80 xl:w-96">
-        <div className="lg:sticky lg:top-4">{resultPanel}</div>
+        <div className="lg:sticky lg:top-4">{previewPanel}</div>
       </aside>
-      <div className="fixed bottom-3 left-3 right-3 z-30 lg:hidden">
-        <div className="max-h-[45vh] overflow-auto">{resultPanel}</div>
-      </div>
     </div>
   );
 }
