@@ -90,6 +90,7 @@ function needsWrap(expr: string): boolean {
 const POS_CTORS: Record<RootPosKind, string> = {
   noun: "Noun",
   verb_tr: "Verb",
+  verb_intr_stative: "Verb",
   verb_intr: "Verb",
   verb: "Verb",
   postposition: "Postposition",
@@ -105,6 +106,7 @@ const POS_CTORS: Record<RootPosKind, string> = {
   preposition: "Postposition",
   proper_noun: "ProperNoun",
   copula: "Copula",
+  deadverbal: "Deadverbal",
   composition: "Composition",
   unknown: "Noun",
 };

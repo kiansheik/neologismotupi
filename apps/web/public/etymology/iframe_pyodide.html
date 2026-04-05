@@ -18,6 +18,24 @@ async function initializePython() {
         `${WHEEL_BASE}/pydicate-0.1.1-py3-none-any.whl?cb=${cacheBust}`
       ]);
       globalPyodide.runPython(`from pydicate.lang.tupilang.pos import *;`);
+      globalPyodide.runPython(`
+import re
+from tupi import AnnotatedString
+
+def dictionary_form(pred):
+    \"\"\"Render a dictionary-like form for verbs (base nominal without suffix).\"\"\"
+    try:
+        nom = pred.base_nominal(True)
+        annotated = nom.eval(annotated=True)
+    except Exception:
+        try:
+            annotated = pred.eval(annotated=True)
+        except Exception:
+            return repr(pred)
+    # Remove substantive suffixes (with or without explicit 'a')
+    annotated = re.sub(r\"a?\\[SUBSTANTIVE_SUFFIX:[^\\]]+\\]\", \"\", annotated)
+    return AnnotatedString(annotated).get_clean().strip()
+`);
       this.pyodideReady = true;
       window.parent.postMessage({ pyodideLoaded: true }, '*');
     } catch (error) {

@@ -24,6 +24,25 @@ export type PipelineMeta = {
   objectResolved: boolean;
 };
 
+export type PartOfSpeechValue =
+  | "noun"
+  | "verb_tr"
+  | "verb_intr"
+  | "verb_intr_stative"
+  | "adjective"
+  | "adverb"
+  | "expression"
+  | "pronoun"
+  | "particle"
+  | "postposition"
+  | "conjunction"
+  | "interjection"
+  | "demonstrative"
+  | "number"
+  | "proper_noun"
+  | "copula"
+  | "other";
+
 const NOUNLIKE_KINDS = new Set<RootPosKind>([
   "noun",
   "adjective",
@@ -35,12 +54,18 @@ const NOUNLIKE_KINDS = new Set<RootPosKind>([
   "proper_noun",
   "composition",
   "copula",
+  "deadverbal",
   "unknown",
 ]);
 
 export function stageFromPosKind(posKind?: RootPosKind): PipelineStageKind {
   if (!posKind) return "other";
-  if (posKind === "verb" || posKind === "verb_tr" || posKind === "verb_intr") {
+  if (
+    posKind === "verb" ||
+    posKind === "verb_tr" ||
+    posKind === "verb_intr" ||
+    posKind === "verb_intr_stative"
+  ) {
     return "verb";
   }
   if (posKind === "adverb") return "adverb";
@@ -56,7 +81,9 @@ export function inferTransitivity(
   if (override) return override;
   const kind = entry.posKind;
   if (kind === "verb_tr") return "transitive";
-  if (kind === "verb_intr") return "intransitive";
+  if (kind === "verb_intr" || kind === "verb_intr_stative") {
+    return "intransitive";
+  }
   if (kind === "verb") return "unknown";
   return null;
 }
@@ -111,4 +138,46 @@ export function posLabelForEntry(entry?: RootEntry | null): string {
   const abbrev = entry.posAbbrev || posInfo.abbrev;
   const label = entry.posLabel || posInfo.label;
   return `${abbrev} — ${label}`;
+}
+
+export function mapPosKindToPartOfSpeech(kind?: RootPosKind | null): PartOfSpeechValue {
+  if (!kind) return "other";
+  if (kind === "noun") return "noun";
+  if (kind === "verb_tr") return "verb_tr";
+  if (kind === "verb_intr") return "verb_intr";
+  if (kind === "verb_intr_stative") return "verb_intr_stative";
+  if (kind === "verb") return "other";
+  if (kind === "adjective") return "adjective";
+  if (kind === "adverb") return "adverb";
+  if (kind === "pronoun") return "pronoun";
+  if (kind === "particle") return "particle";
+  if (kind === "postposition") return "postposition";
+  if (kind === "conjunction") return "conjunction";
+  if (kind === "interjection") return "interjection";
+  if (kind === "demonstrative") return "demonstrative";
+  if (kind === "number") return "number";
+  if (kind === "proper_noun") return "proper_noun";
+  if (kind === "copula") return "copula";
+  return "other";
+}
+
+export function inferPartOfSpeechValue(
+  state: PipelineState,
+  meta: PipelineMeta,
+): PartOfSpeechValue | null {
+  if (!state.base) return null;
+  const hasDerivation = state.steps.some((step) => step.kind === "derive");
+  if (!hasDerivation) {
+    return mapPosKindToPartOfSpeech(state.base.posKind ?? "unknown");
+  }
+  if (meta.currentStage === "verb") {
+    if (meta.transitivity === "transitive") return "verb_tr";
+    if (meta.transitivity === "intransitive") {
+      return state.base.posKind === "verb_intr_stative" ? "verb_intr_stative" : "verb_intr";
+    }
+    return null;
+  }
+  if (meta.currentStage === "adverb") return "adverb";
+  if (meta.currentStage === "noun") return "noun";
+  return mapPosKindToPartOfSpeech(state.base.posKind ?? "unknown");
 }

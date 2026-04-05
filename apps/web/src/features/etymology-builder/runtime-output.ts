@@ -19,3 +19,17 @@ export function extractVerbeteFromOutput(output?: string): string | null {
   const trimmed = candidate.trim();
   return trimmed.length > 0 ? trimmed : null;
 }
+
+export function formatRuntimeOutput(output?: string): string {
+  if (!output) return "";
+  const trimmed = output.trim();
+  if (!trimmed) return "";
+  if (trimmed.includes("\n")) return output;
+  if (
+    (trimmed.startsWith("'") && trimmed.endsWith("'")) ||
+    (trimmed.startsWith("\"") && trimmed.endsWith("\""))
+  ) {
+    return trimmed.slice(1, -1);
+  }
+  return output;
+}

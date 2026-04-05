@@ -9,29 +9,46 @@ import { makeObjectChoice } from "./builder-store";
 import type { RootEntry } from "./builder-types";
 import { DERIVE_OPERATIONS } from "./builder-types";
 import { PIPELINE_DERIVATION_GROUPS, getPipelineDerivation } from "./pipeline-derivations";
-import { posLabelForEntry } from "./pipeline-utils";
+import { inferPartOfSpeechValue, posLabelForEntry } from "./pipeline-utils";
 import { RootPicker } from "./RootPicker";
 import { usePyodideRuntime } from "./pyodide-runtime";
-import { extractVerbeteFromOutput } from "./runtime-output";
+import { extractVerbeteFromOutput, formatRuntimeOutput } from "./runtime-output";
 
 type SimplePipelineBuilderProps = {
   store: BuilderStore;
   onApplyNote: (note: string) => void;
   isManualOverride: boolean;
   onApplyHeadword: (headword: string) => void;
+  onApplyPartOfSpeech: (value: string) => void;
 };
 
-export function SimplePipelineBuilder({ store, onApplyNote, isManualOverride, onApplyHeadword }: SimplePipelineBuilderProps) {
+export function SimplePipelineBuilder({
+  store,
+  onApplyNote,
+  isManualOverride,
+  onApplyHeadword,
+  onApplyPartOfSpeech,
+}: SimplePipelineBuilderProps) {
   const { state, meta } = store;
   const [runtimeEnabled, setRuntimeEnabled] = useState(true);
   const [compositionOpen, setCompositionOpen] = useState(false);
 
-  const { state: runtimeState } = usePyodideRuntime(store.pydicatePreview, runtimeEnabled);
+  const runtimeCode = useMemo(() => {
+    if (!store.pydicatePreview) return "";
+    if (meta.currentStage === "verb") {
+      return `dictionary_form(${store.pydicatePreview})`;
+    }
+    return store.pydicatePreview;
+  }, [store.pydicatePreview, meta.currentStage]);
+
+  const { state: runtimeState } = usePyodideRuntime(runtimeCode, runtimeEnabled);
   const runtimeVerbete = extractVerbeteFromOutput(runtimeState.output);
+  const runtimeDisplay = formatRuntimeOutput(runtimeState.output);
 
   const canAddDerivations =
     Boolean(state.base) && !(meta.currentStage === "verb" && meta.transitivity === "unknown");
   const currentStage = meta.currentStage;
+  const partOfSpeechValue = useMemo(() => inferPartOfSpeechValue(state, meta), [state, meta]);
 
   const lastObject = useMemo(() => {
     for (let i = state.steps.length - 1; i >= 0; i -= 1) {
@@ -109,7 +126,7 @@ export function SimplePipelineBuilder({ store, onApplyNote, isManualOverride, on
             ) : null}
           </div>
           <div className="mt-2 rounded-md border border-slate-200 bg-white px-2 py-2 text-[11px] text-slate-800">
-            {runtimeEnabled ? runtimeState.output || runtimeState.message || "—" : "Runtime desativado."}
+            {runtimeEnabled ? runtimeDisplay || runtimeState.message || "—" : "Runtime desativado."}
           </div>
           {runtimeVerbete ? <p className="mt-1 text-[11px] text-slate-500">Verbete gerado: {runtimeVerbete}</p> : null}
         </div>
@@ -124,6 +141,9 @@ export function SimplePipelineBuilder({ store, onApplyNote, isManualOverride, on
                 onApplyNote(store.generatedNote);
                 if (runtimeVerbete) {
                   onApplyHeadword(runtimeVerbete);
+                }
+                if (partOfSpeechValue) {
+                  onApplyPartOfSpeech(partOfSpeechValue);
                 }
               }}
               disabled={!store.generatedNote}

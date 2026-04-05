@@ -1,6 +1,7 @@
 export type RootPosKind =
   | "noun"
   | "verb_tr"
+  | "verb_intr_stative"
   | "verb_intr"
   | "verb"
   | "postposition"
@@ -16,6 +17,7 @@ export type RootPosKind =
   | "preposition"
   | "proper_noun"
   | "copula"
+  | "deadverbal"
   | "composition"
   | "unknown";
 
@@ -41,10 +43,16 @@ const POS_RULES: PosRule[] = [
     regex: /(\(v\.?\s*tr[^)]*\)|\bv\.?\s*tr\.?\b)/i,
   },
   {
+    kind: "verb_intr_stative",
+    abbrev: "v. intr. estativo",
+    label: "verbo intransitivo estativo",
+    regex: /(\b(v\.?\s*)?intr[^)]*(estativo|est\.)|\bintr\.\s*estativo\b|2ª\s*classe|2a\s*classe|v\.\s*da\s*2ª|v\.\s*da\s*2a)/i,
+  },
+  {
     kind: "verb_intr",
     abbrev: "v. intr.",
     label: "verbo intransitivo",
-    regex: /(\(v\.?\s*intr[^)]*\)|\bv\.?\s*intr\.?\b)/i,
+    regex: /(\(v\.?\s*intr[^)]*\)|\bv\.?\s*intr\.?\b|\bintr\.\s*(ativo|activo)\b|\bintr\.-(ativo|activo))/i,
   },
   {
     kind: "postposition",
@@ -119,6 +127,12 @@ const POS_RULES: PosRule[] = [
     regex: /(\(cop\.?\)|\bcop\.?\b)/i,
   },
   {
+    kind: "deadverbal",
+    abbrev: "deadv.",
+    label: "deadverbal",
+    regex: /(\bdeadverbal\b|\bdeadv\.?\b)/i,
+  },
+  {
     kind: "proper_noun",
     abbrev: "n. prop.",
     label: "nome próprio",
@@ -141,6 +155,7 @@ const POS_RULES: PosRule[] = [
 const POS_KIND_META: Record<RootPosKind, PosInfo> = {
   noun: { kind: "noun", abbrev: "s.", label: "substantivo" },
   verb_tr: { kind: "verb_tr", abbrev: "v.tr.", label: "verbo transitivo" },
+  verb_intr_stative: { kind: "verb_intr_stative", abbrev: "v. intr. estativo", label: "verbo intransitivo estativo" },
   verb_intr: { kind: "verb_intr", abbrev: "v. intr.", label: "verbo intransitivo" },
   verb: { kind: "verb", abbrev: "v.", label: "verbo" },
   postposition: { kind: "postposition", abbrev: "posp.", label: "pós-posição" },
@@ -156,6 +171,7 @@ const POS_KIND_META: Record<RootPosKind, PosInfo> = {
   preposition: { kind: "preposition", abbrev: "prep.", label: "preposição" },
   proper_noun: { kind: "proper_noun", abbrev: "n. prop.", label: "nome próprio" },
   copula: { kind: "copula", abbrev: "cop.", label: "cópula" },
+  deadverbal: { kind: "deadverbal", abbrev: "deadv.", label: "deadverbal (adj. de adv.)" },
   composition: { kind: "composition", abbrev: "comp.", label: "composição" },
   unknown: { kind: "unknown", abbrev: "s.", label: "substantivo", assumed: true },
 };
@@ -248,6 +264,7 @@ export function compactDefinition(definition?: string): string | undefined {
 export const POS_OPTIONS: Array<{ kind: RootPosKind; label: string; abbrev: string }> = [
   { kind: "noun", label: "Substantivo", abbrev: "s." },
   { kind: "verb_tr", label: "Verbo transitivo", abbrev: "v.tr." },
+  { kind: "verb_intr_stative", label: "Verbo intransitivo (estativo)", abbrev: "v. intr. estativo" },
   { kind: "verb_intr", label: "Verbo intransitivo", abbrev: "v. intr." },
   { kind: "verb", label: "Verbo (geral)", abbrev: "v." },
   { kind: "postposition", label: "Pós-posição", abbrev: "posp." },
@@ -262,6 +279,7 @@ export const POS_OPTIONS: Array<{ kind: RootPosKind; label: string; abbrev: stri
   { kind: "article", label: "Artigo", abbrev: "art." },
   { kind: "preposition", label: "Preposição", abbrev: "prep." },
   { kind: "copula", label: "Cópula", abbrev: "cop." },
+  { kind: "deadverbal", label: "Deadverbal (adj. de adv.)", abbrev: "deadv." },
   { kind: "proper_noun", label: "Nome próprio", abbrev: "n. prop." },
   { kind: "composition", label: "Composição", abbrev: "comp." },
 ];

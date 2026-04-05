@@ -5,21 +5,30 @@ import { Textarea } from "@/components/ui/textarea";
 
 import type { BuilderStore } from "./builder-store";
 import { usePyodideRuntime } from "./pyodide-runtime";
-import { extractVerbeteFromOutput } from "./runtime-output";
+import { inferPartOfSpeechValue } from "./pipeline-utils";
+import { extractVerbeteFromOutput, formatRuntimeOutput } from "./runtime-output";
 
 type ProModeEditorProps = {
   store: BuilderStore;
   onApplyNote: (note: string) => void;
   isManualOverride: boolean;
   onApplyHeadword: (headword: string) => void;
+  onApplyPartOfSpeech: (value: string) => void;
 };
 
-export function ProModeEditor({ store, onApplyNote, isManualOverride, onApplyHeadword }: ProModeEditorProps) {
+export function ProModeEditor({
+  store,
+  onApplyNote,
+  isManualOverride,
+  onApplyHeadword,
+  onApplyPartOfSpeech,
+}: ProModeEditorProps) {
   const [rawText, setRawText] = useState("");
   const [runtimeEnabled, setRuntimeEnabled] = useState(true);
   const [autoSeeded, setAutoSeeded] = useState(false);
   const draftText = store.pydicatePreview;
   const hasDiverged = rawText.trim().length > 0 && rawText.trim() !== draftText.trim();
+  const partOfSpeechValue = inferPartOfSpeechValue(store.state, store.meta);
 
   useEffect(() => {
     if (autoSeeded) return;
@@ -31,6 +40,7 @@ export function ProModeEditor({ store, onApplyNote, isManualOverride, onApplyHea
 
   const { state: runtimeState } = usePyodideRuntime(rawText, runtimeEnabled);
   const runtimeVerbete = extractVerbeteFromOutput(runtimeState.output);
+  const runtimeDisplay = formatRuntimeOutput(runtimeState.output);
 
   return (
     <div className="space-y-4">
@@ -93,7 +103,7 @@ export function ProModeEditor({ store, onApplyNote, isManualOverride, onApplyHea
           ) : null}
         </div>
         <div className="mt-2 rounded-md border border-slate-200 bg-white px-2 py-2 text-xs text-slate-800">
-          {runtimeEnabled ? runtimeState.output || runtimeState.message || "—" : "Runtime desativado."}
+          {runtimeEnabled ? runtimeDisplay || runtimeState.message || "—" : "Runtime desativado."}
         </div>
         {/* iframe is managed globally by usePyodideRuntime */}
       </section>
@@ -114,6 +124,9 @@ export function ProModeEditor({ store, onApplyNote, isManualOverride, onApplyHea
               onApplyNote(store.generatedNote);
               if (runtimeVerbete) {
                 onApplyHeadword(runtimeVerbete);
+              }
+              if (partOfSpeechValue) {
+                onApplyPartOfSpeech(partOfSpeechValue);
               }
             }}
             disabled={!store.generatedNote}
