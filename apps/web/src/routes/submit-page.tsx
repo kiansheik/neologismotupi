@@ -1,5 +1,5 @@
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
 import { Link, useNavigate } from "react-router-dom";
 import { z } from "zod";
@@ -20,6 +20,7 @@ import { AudioCapture, AudioQueueList } from "@/features/audio/components";
 import { uploadEntryAudio } from "@/features/audio/api";
 import { createEntry, getEntrySubmissionGate, listEntries } from "@/features/entries/api";
 import { listSources } from "@/features/sources/api";
+import { EtymologyBuilder } from "@/features/etymology-builder/EtymologyBuilder";
 import type { SourceSuggestion } from "@/lib/types";
 
 const HEADWORD_PATTERN = /^["']?[\p{L}](?:[\p{L}\p{M}'" -]*[\p{L}])?$/u;
@@ -56,6 +57,8 @@ export function SubmitPage() {
   const [possibleDuplicates, setPossibleDuplicates] = useState<DuplicateHint[]>([]);
   const [queuedAudio, setQueuedAudio] = useState<File[]>([]);
   const [isUploadingAudio, setIsUploadingAudio] = useState(false);
+  const [builderNote, setBuilderNote] = useState("");
+  const [isMorphologyOverride, setIsMorphologyOverride] = useState(false);
 
   const form = useForm<SubmitForm>({
     defaultValues: {
@@ -78,6 +81,7 @@ export function SubmitPage() {
 
   const watchedHeadword = form.watch("headword");
   const hasSource = form.watch("has_source");
+  const morphologyNotesValue = form.watch("morphology_notes");
   const watchedSourceAuthors = form.watch("source_authors");
   const watchedSourceTitle = form.watch("source_title");
   const sourceLookupQuery = useMemo(
@@ -126,6 +130,11 @@ export function SubmitPage() {
 
   const headwordValid = isValidHeadword(watchedHeadword);
   const showHeadwordRules = watchedHeadword.trim().length > 0 && !headwordValid;
+  const morphologyNotesField = form.register("morphology_notes", {
+    onChange: () => {
+      setIsMorphologyOverride(true);
+    },
+  });
 
   const addQueuedAudio = (file: File) => {
     setQueuedAudio((current) => [...current, file]);
@@ -136,6 +145,46 @@ export function SubmitPage() {
   const clearQueuedAudio = () => {
     setQueuedAudio([]);
   };
+
+  const handleBuilderNoteChange = useCallback(
+    (note: string) => {
+      setBuilderNote(note);
+      if (!isMorphologyOverride) {
+        form.setValue("morphology_notes", note, { shouldDirty: true });
+      }
+    },
+    [form, isMorphologyOverride],
+  );
+
+  const handleApplyBuilderNote = useCallback(
+    (note: string) => {
+      form.setValue("morphology_notes", note, { shouldDirty: true });
+      setIsMorphologyOverride(false);
+    },
+    [form],
+  );
+
+  const handleApplyBuilderHeadword = useCallback(
+    (headword: string) => {
+      form.setValue("headword", headword, { shouldDirty: true });
+    },
+    [form],
+  );
+
+  const handleApplyBuilderPartOfSpeech = useCallback(
+    (value: string) => {
+      if (!value) return;
+      form.setValue("part_of_speech", value, { shouldDirty: true });
+    },
+    [form],
+  );
+
+  useEffect(() => {
+    if (!builderNote) return;
+    if (morphologyNotesValue === builderNote) {
+      setIsMorphologyOverride(false);
+    }
+  }, [builderNote, morphologyNotesValue]);
 
   const applySourceSuggestion = (source: SourceSuggestion) => {
     form.setValue("source_authors", source.authors ?? "");
@@ -362,54 +411,62 @@ export function SubmitPage() {
   }
 
   return (
-    <Card>
-      <h1 className="text-xl font-semibold text-brand-900">{t("submit.title")}</h1>
-      {/* Orthography Notice */}
-      <div className="mt-2 mb-3 rounded border border-blue-200 bg-blue-50 p-2 text-xs text-blue-900">
-        {t("submit.orthographyNotice")}
-      </div>
-      <p className="mt-1 text-xs text-slate-600">{t("form.requiredLegend")}</p>
-      <p className="mt-1 text-xs text-slate-600">{t("submit.onlyRequired")}</p>
-      <div className="mt-2 rounded-md border border-brand-100 bg-brand-50/30 px-3 py-2 text-xs text-slate-700">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <p className="text-[11px] font-semibold uppercase tracking-wide text-brand-800">
-              {t("submit.dailyVotesLabel")}
-            </p>
-            <p className="text-lg font-semibold text-brand-900">{votesToday}</p>
-            <p className="text-[11px] text-slate-600">{t("submit.dailyVotesUnits")}</p>
-          </div>
-          <div>
-            <p className="text-[11px] font-semibold uppercase tracking-wide text-brand-800">
-              {t("submit.dailyPostsLabel")}
-            </p>
-            <p className="text-sm font-semibold text-slate-800">
-              {isUnlimited
-                ? t("submit.dailyPostsUnlimited")
-                : t("submit.dailyPostsRemaining", { remaining: remainingPosts })}
-            </p>
-          </div>
-          {!isUnlimited ? (
-            <p className="text-[11px] text-amber-700">
-              {t("submit.dailyUnlockHint", { needed: nextVotesRequired })}
-            </p>
-          ) : (
-            <p className="text-[11px] text-emerald-700">{t("submit.dailyUnlockAll")}</p>
-          )}
+    <div className="space-y-4">
+        <EtymologyBuilder
+          onNoteChange={handleBuilderNoteChange}
+          onApplyNote={handleApplyBuilderNote}
+          isManualOverride={isMorphologyOverride}
+          onApplyHeadword={handleApplyBuilderHeadword}
+          onApplyPartOfSpeech={handleApplyBuilderPartOfSpeech}
+        />
+      <Card>
+        <h1 className="text-xl font-semibold text-brand-900">{t("submit.title")}</h1>
+        {/* Orthography Notice */}
+        <div className="mt-2 mb-3 rounded border border-blue-200 bg-blue-50 p-2 text-xs text-blue-900">
+          {t("submit.orthographyNotice")}
         </div>
-        <div className="mt-2 h-1.5 rounded-full bg-brand-100">
-          <div
-            className="h-1.5 rounded-full bg-brand-600 transition-all"
-            style={{ width: `${voteProgress}%` }}
-          />
+        <p className="mt-1 text-xs text-slate-600">{t("form.requiredLegend")}</p>
+        <p className="mt-1 text-xs text-slate-600">{t("submit.onlyRequired")}</p>
+        <div className="mt-2 rounded-md border border-brand-100 bg-brand-50/30 px-3 py-2 text-xs text-slate-700">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-brand-800">
+                {t("submit.dailyVotesLabel")}
+              </p>
+              <p className="text-lg font-semibold text-brand-900">{votesToday}</p>
+              <p className="text-[11px] text-slate-600">{t("submit.dailyVotesUnits")}</p>
+            </div>
+            <div>
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-brand-800">
+                {t("submit.dailyPostsLabel")}
+              </p>
+              <p className="text-sm font-semibold text-slate-800">
+                {isUnlimited
+                  ? t("submit.dailyPostsUnlimited")
+                  : t("submit.dailyPostsRemaining", { remaining: remainingPosts })}
+              </p>
+            </div>
+            {!isUnlimited ? (
+              <p className="text-[11px] text-amber-700">
+                {t("submit.dailyUnlockHint", { needed: nextVotesRequired })}
+              </p>
+            ) : (
+              <p className="text-[11px] text-emerald-700">{t("submit.dailyUnlockAll")}</p>
+            )}
+          </div>
+          <div className="mt-2 h-1.5 rounded-full bg-brand-100">
+            <div
+              className="h-1.5 rounded-full bg-brand-600 transition-all"
+              style={{ width: `${voteProgress}%` }}
+            />
+          </div>
         </div>
-      </div>
-      <form
-        className="mt-4 space-y-3"
-        onSubmit={(event) => {
-          void onSubmit(event).catch(() => undefined);
-        }}
-      >
+        <form
+          className="mt-4 space-y-3"
+          onSubmit={(event) => {
+            void onSubmit(event).catch(() => undefined);
+          }}
+        >
         <div>
           <label className="mb-1 block text-sm font-medium" htmlFor="headword">
             {t("submit.headword")} *
@@ -497,10 +554,21 @@ export function SubmitPage() {
           >
             <option value="">{t("partOfSpeech.any")}</option>
             <option value="noun">{partOfSpeechLabel("noun", t)}</option>
-            <option value="verb">{partOfSpeechLabel("verb", t)}</option>
+            <option value="verb_tr">{partOfSpeechLabel("verb_tr", t)}</option>
+            <option value="verb_intr">{partOfSpeechLabel("verb_intr", t)}</option>
+            <option value="verb_intr_stative">{partOfSpeechLabel("verb_intr_stative", t)}</option>
             <option value="adjective">{partOfSpeechLabel("adjective", t)}</option>
             <option value="adverb">{partOfSpeechLabel("adverb", t)}</option>
             <option value="expression">{partOfSpeechLabel("expression", t)}</option>
+            <option value="pronoun">{partOfSpeechLabel("pronoun", t)}</option>
+            <option value="particle">{partOfSpeechLabel("particle", t)}</option>
+            <option value="postposition">{partOfSpeechLabel("postposition", t)}</option>
+            <option value="conjunction">{partOfSpeechLabel("conjunction", t)}</option>
+            <option value="interjection">{partOfSpeechLabel("interjection", t)}</option>
+            <option value="demonstrative">{partOfSpeechLabel("demonstrative", t)}</option>
+            <option value="number">{partOfSpeechLabel("number", t)}</option>
+            <option value="proper_noun">{partOfSpeechLabel("proper_noun", t)}</option>
+            <option value="copula">{partOfSpeechLabel("copula", t)}</option>
             <option value="other">{partOfSpeechLabel("other", t)}</option>
           </select>
         </div>
@@ -618,7 +686,7 @@ export function SubmitPage() {
           <Textarea
             id="morphology_notes"
             placeholder="bebé - voar; sara - agente; o que voa"
-            {...form.register("morphology_notes")}
+            {...morphologyNotesField}
           />
         </div>
         <div className="rounded-md border border-brand-100 bg-white/70 p-3">
@@ -655,5 +723,6 @@ export function SubmitPage() {
         </Button>
       </form>
     </Card>
+  </div>
   );
 }

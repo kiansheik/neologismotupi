@@ -202,7 +202,11 @@ export function EntryBrowser({
           >
             <option value="">{t("partOfSpeech.any")}</option>
             <option value="noun">{partOfSpeechLabel("noun", t)}</option>
-            <option value="verb">{partOfSpeechLabel("verb", t)}</option>
+            <option value="verb_tr">{partOfSpeechLabel("verb_tr", t)}</option>
+            <option value="verb_intr">{partOfSpeechLabel("verb_intr", t)}</option>
+            <option value="verb_intr_stative">
+              {partOfSpeechLabel("verb_intr_stative", t)}
+            </option>
             <option value="adjective">
               {partOfSpeechLabel("adjective", t)}
             </option>
@@ -210,6 +214,15 @@ export function EntryBrowser({
             <option value="expression">
               {partOfSpeechLabel("expression", t)}
             </option>
+            <option value="pronoun">{partOfSpeechLabel("pronoun", t)}</option>
+            <option value="particle">{partOfSpeechLabel("particle", t)}</option>
+            <option value="postposition">{partOfSpeechLabel("postposition", t)}</option>
+            <option value="conjunction">{partOfSpeechLabel("conjunction", t)}</option>
+            <option value="interjection">{partOfSpeechLabel("interjection", t)}</option>
+            <option value="demonstrative">{partOfSpeechLabel("demonstrative", t)}</option>
+            <option value="number">{partOfSpeechLabel("number", t)}</option>
+            <option value="proper_noun">{partOfSpeechLabel("proper_noun", t)}</option>
+            <option value="copula">{partOfSpeechLabel("copula", t)}</option>
             <option value="other">{partOfSpeechLabel("other", t)}</option>
           </select>
           <select

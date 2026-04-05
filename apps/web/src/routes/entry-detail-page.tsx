@@ -1614,12 +1614,21 @@ export function EntryDetailPage() {
               >
                 <option value="">{t("partOfSpeech.any")}</option>
                 <option value="noun">{t("partOfSpeech.noun")}</option>
-                <option value="verb">{t("partOfSpeech.verb")}</option>
+                <option value="verb_tr">{t("partOfSpeech.verb_tr")}</option>
+                <option value="verb_intr">{t("partOfSpeech.verb_intr")}</option>
+                <option value="verb_intr_stative">{t("partOfSpeech.verb_intr_stative")}</option>
                 <option value="adjective">{t("partOfSpeech.adjective")}</option>
                 <option value="adverb">{t("partOfSpeech.adverb")}</option>
                 <option value="expression">{t("partOfSpeech.expression")}</option>
                 <option value="pronoun">{t("partOfSpeech.pronoun")}</option>
                 <option value="particle">{t("partOfSpeech.particle")}</option>
+                <option value="postposition">{t("partOfSpeech.postposition")}</option>
+                <option value="conjunction">{t("partOfSpeech.conjunction")}</option>
+                <option value="interjection">{t("partOfSpeech.interjection")}</option>
+                <option value="demonstrative">{t("partOfSpeech.demonstrative")}</option>
+                <option value="number">{t("partOfSpeech.number")}</option>
+                <option value="proper_noun">{t("partOfSpeech.proper_noun")}</option>
+                <option value="copula">{t("partOfSpeech.copula")}</option>
                 <option value="other">{t("partOfSpeech.other")}</option>
               </select>
             </div>

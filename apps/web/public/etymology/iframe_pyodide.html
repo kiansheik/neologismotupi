@@ -1,0 +1,142 @@
+<script src="https://cdn.jsdelivr.net/pyodide/v0.25.1/full/pyodide.js"></script>
+<script>
+let globalPyodide;
+let nextOrderId = 0;
+let messageQueue = [];
+
+async function initializePython() {
+    try {
+      globalPyodide = await loadPyodide();
+      await globalPyodide.loadPackage('micropip');
+      const micropip = globalPyodide.pyimport('micropip');
+      const params = new URLSearchParams(window.location.search);
+      const WHEEL_BASE = params.get('wheelBase') || 'https://kiansheik.io/nhe-enga/gramatica/pylibs';
+      const cacheBust = params.get('cb') || Date.now();
+      await micropip.install([
+        'sqlite3',
+        `${WHEEL_BASE}/tupi-0.1.2-py3-none-any.whl?cb=${cacheBust}`,
+        `${WHEEL_BASE}/pydicate-0.1.1-py3-none-any.whl?cb=${cacheBust}`
+      ]);
+      globalPyodide.runPython(`from pydicate.lang.tupilang.pos import *;`);
+      globalPyodide.runPython(`
+import re
+from tupi import AnnotatedString
+
+def dictionary_form(pred):
+    \"\"\"Render a dictionary-like form for verbs (base nominal without suffix).\"\"\"
+    try:
+        nom = pred.base_nominal(True)
+        annotated = nom.eval(annotated=True)
+    except Exception:
+        try:
+            annotated = pred.eval(annotated=True)
+        except Exception:
+            return repr(pred)
+    # Remove substantive suffixes (with or without explicit 'a')
+    annotated = re.sub(r\"a?\\[SUBSTANTIVE_SUFFIX:[^\\]]+\\]\", \"\", annotated)
+    return AnnotatedString(annotated).get_clean().strip()
+`);
+      this.pyodideReady = true;
+      window.parent.postMessage({ pyodideLoaded: true }, '*');
+    } catch (error) {
+      const message = error && error.toString ? error.toString() : String(error);
+      this.pyodideError = message;
+      window.parent.postMessage({ pyodideError: message }, '*');
+    }
+}
+
+window.addEventListener('message', async (event) => {
+if (event.data && event.data.command && event.data.command.includes('processBlock')) {
+    messageQueue.push(event.data);
+    messageQueue.sort((a, b) => a.orderid - b.orderid);
+
+    if (messageQueue.length > 0 && nextOrderId > messageQueue[0].orderid) {
+      nextOrderId = 0;
+    }
+
+    while (messageQueue.length > 0 && messageQueue[0].orderid === nextOrderId) {
+      let data = messageQueue.shift();
+      const block_text = data.html;
+      const parser = new DOMParser();
+      const htmlDoc = parser.parseFromString(block_text, 'text/html');
+      const textContent = htmlDoc.body.textContent || '';
+      const command = `${textContent}`;
+
+      try {
+        // redirect stdout/stderr
+        globalPyodide.runPython(`
+import sys, io
+_stdout = sys.stdout
+_stderr = sys.stderr
+sys.stdout = io.StringIO()
+sys.stderr = io.StringIO()
+`);
+
+        let results = [];
+        const lines = command.split('\n');
+        for (const line of lines) {
+          const trimmed = line.trim();
+          if (!trimmed) continue;
+
+          try {
+            // Try evaluating as an expression
+            const value = globalPyodide.runPython(`repr(eval("""${trimmed.replace(/"/g, '\\"')}"""))`);
+            results.push(value);
+          } catch {
+            try {
+              // Fallback: execute as statement
+              globalPyodide.runPython(trimmed);
+            } catch (e) {
+              results.push(`[error] ${e.toString()}`);
+            }
+          }
+        }
+
+        const stdout = globalPyodide.runPython("sys.stdout.getvalue()");
+        const stderr = globalPyodide.runPython("sys.stderr.getvalue()");
+
+        globalPyodide.runPython(`
+sys.stdout = _stdout
+sys.stderr = _stderr
+`);
+
+        const fullOutput = [
+          stdout?.trim(),
+          ...results,
+          stderr ? `[stderr]\n${stderr.trim()}` : null,
+        ]
+          .filter(Boolean)
+          .join('\n');
+        let resp_command = 'processBlockResponse';
+        if (data.command === 'processBlockSilent') {
+          resp_command += 'Silent';
+        }
+        window.parent.postMessage(
+          {
+            command: resp_command,
+            pre_html: block_text,
+            resp_html: fullOutput,
+            hash: data.hash,
+          },
+          "*"
+        );
+      } catch (error) {
+        console.error(error);
+        window.parent.postMessage(
+          {
+            command: "processBlockResponse",
+            pre_html: block_text,
+            resp_html: `ERROR: ${error.toString()}`,
+            hash: data.hash,
+          },
+          "*"
+        );
+      }
+
+      nextOrderId++;
+    }
+  }
+});
+
+initializePython();
+</script>

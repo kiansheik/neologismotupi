@@ -32,6 +32,12 @@ export function partOfSpeechLabel(partOfSpeech: string, t: TranslateFn): string 
   switch (partOfSpeech) {
     case "noun":
       return t("partOfSpeech.noun");
+    case "verb_tr":
+      return t("partOfSpeech.verb_tr");
+    case "verb_intr":
+      return t("partOfSpeech.verb_intr");
+    case "verb_intr_stative":
+      return t("partOfSpeech.verb_intr_stative");
     case "verb":
       return t("partOfSpeech.verb");
     case "adjective":
@@ -44,6 +50,20 @@ export function partOfSpeechLabel(partOfSpeech: string, t: TranslateFn): string 
       return t("partOfSpeech.pronoun");
     case "particle":
       return t("partOfSpeech.particle");
+    case "postposition":
+      return t("partOfSpeech.postposition");
+    case "conjunction":
+      return t("partOfSpeech.conjunction");
+    case "interjection":
+      return t("partOfSpeech.interjection");
+    case "demonstrative":
+      return t("partOfSpeech.demonstrative");
+    case "number":
+      return t("partOfSpeech.number");
+    case "proper_noun":
+      return t("partOfSpeech.proper_noun");
+    case "copula":
+      return t("partOfSpeech.copula");
     default:
       return t("partOfSpeech.other");
   }
