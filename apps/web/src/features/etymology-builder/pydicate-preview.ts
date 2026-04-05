@@ -1,96 +1,70 @@
-import { DERIVE_OPERATIONS, POSTPOSITION_OPTIONS } from "./builder-types";
-import type { BuilderNode, RootNode } from "./builder-types";
+import { DERIVE_OPERATIONS } from "./builder-types";
+import type { PipelineState, RootEntry } from "./builder-types";
 import type { RootPosKind } from "./pos";
+import { inferTransitivity } from "./pipeline-utils";
+import { getPipelineDerivation } from "./pipeline-derivations";
 
-export function renderPydicate(node: BuilderNode | null): string {
-  if (!node) return "";
-  return renderNode(node, false);
-}
+export function renderPydicate(state: PipelineState): string {
+  if (!state.base) return "";
 
-export function collectPieces(node: BuilderNode | null): string[] {
-  if (!node) return [];
-  switch (node.kind) {
-    case "root":
-      return [node.headword];
-    case "compound":
-      return node.children.flatMap((child) => collectPieces(child));
-    case "derive": {
-      const token = DERIVE_OPERATIONS[node.operation].token;
-      return [token, ...collectPieces(node.child), ...(node.agent ? collectPieces(node.agent) : [])];
-    }
-    case "postposition":
-      return [node.postposition, ...collectPieces(node.child)];
-    case "possessor":
-      return [...collectPieces(node.possessor), ...collectPieces(node.possessed)];
-    case "modifier":
-      return [...collectPieces(node.modifier), ...collectPieces(node.target)];
-    case "verb_frame":
-      return [
-        ...collectPieces(node.verb),
-        ...(node.subject?.value ? collectPieces(node.subject.value) : []),
-        ...(node.object?.value ? collectPieces(node.object.value) : []),
-      ];
-    case "verb_argument":
-      return node.value ? collectPieces(node.value) : [];
-    default:
-      return [];
-  }
-}
+  let expr = formatRootEntry(state.base);
 
-function renderNode(node: BuilderNode, wrap: boolean): string {
-  let expr = "";
-  switch (node.kind) {
-    case "root":
-      expr = formatRoot(node);
-      break;
-    case "compound":
-      expr = node.children.map((child) => renderNode(child, true)).join(" + ");
-      break;
-    case "derive": {
-      const op = DERIVE_OPERATIONS[node.operation];
-      const token = op.pydicate ?? op.token;
-      if (op.needsAgent && node.agent) {
-        expr = `${token} * (${renderNode(node.child, true)} * ${renderNode(node.agent, true)})`;
-      } else {
-        expr = `${token} * ${renderNode(node.child, true)}`;
-      }
-      break;
-    }
-    case "postposition":
-      expr = `${formatPostposition(node.postposition)} * ${renderNode(node.child, true)}`;
-      break;
-    case "possessor":
-      expr = `${renderNode(node.possessor, true)} * ${renderNode(node.possessed, true)}`;
-      break;
-    case "modifier":
-      expr = `${renderNode(node.modifier, true)} * ${renderNode(node.target, true)}`;
-      break;
-    case "verb_frame": {
-      const pieces = [renderNode(node.verb, true)];
-      if (node.subject?.status === "explicit" && node.subject.value) {
-        pieces.push(renderNode(node.subject.value, true));
-      }
-      if (node.object?.status === "explicit" && node.object.value) {
-        pieces.push(renderNode(node.object.value, true));
-      }
-      expr = pieces.join(" * ");
-      break;
-    }
-    case "verb_argument":
-      expr = node.value ? renderNode(node.value, true) : "";
-      break;
-    default:
-      expr = "";
+  state.modifiers.forEach((modifier) => {
+    expr = `${wrapIfNeeded(expr)} / ${wrapIfNeeded(formatRootEntry(modifier))}`;
+  });
+
+  const objectEntry = state.object && state.object.mode !== "open" ? state.object.entry : undefined;
+  let transitivity = inferTransitivity(state.base, state.transitivityOverride);
+  let objectApplied = false;
+
+  const applyObjectIfNeeded = () => {
+    if (objectApplied) return;
+    if (!objectEntry) return;
+    if (transitivity !== "transitive") return;
+    expr = `${wrapIfNeeded(expr)} * ${wrapIfNeeded(formatRootEntry(objectEntry))}`;
+    objectApplied = true;
+  };
+
+  if (transitivity === "transitive") {
+    applyObjectIfNeeded();
   }
 
-  if (wrap && needsWrap(expr)) {
+  state.derivations.forEach((derivation) => {
+    const spec = getPipelineDerivation(derivation.op);
+    const op = DERIVE_OPERATIONS[derivation.op];
+
+    if (spec.resultCategory !== "verb") {
+      applyObjectIfNeeded();
+    }
+
+    const token = op.pydicate ?? op.token;
+    if (op.needsAgent && derivation.agent) {
+      expr = `${token} * (${wrapIfNeeded(expr)} * ${wrapIfNeeded(formatRootEntry(derivation.agent))})`;
+    } else {
+      expr = `${token} * ${wrapIfNeeded(expr)}`;
+    }
+
+    if (spec.resultCategory === "verb") {
+      transitivity = spec.setsTransitivity ?? transitivity ?? "unknown";
+    } else {
+      transitivity = null;
+    }
+  });
+
+  applyObjectIfNeeded();
+
+  return expr;
+}
+
+function wrapIfNeeded(expr: string): string {
+  if (needsWrap(expr)) {
     return `(${expr})`;
   }
   return expr;
 }
 
 function needsWrap(expr: string): boolean {
-  return expr.includes(" + ") || expr.includes(" * ");
+  return expr.includes(" + ") || expr.includes(" * ") || expr.includes(" / ");
 }
 
 const POS_CTORS: Record<RootPosKind, string> = {
@@ -115,68 +89,58 @@ const POS_CTORS: Record<RootPosKind, string> = {
   unknown: "Noun",
 };
 
-function formatRoot(node: RootNode): string {
-  const kind = node.posKind ?? "unknown";
+export function formatRootEntry(entry: RootEntry): string {
+  const kind = entry.posKind ?? "unknown";
   const ctor = POS_CTORS[kind] ?? "Noun";
   if (ctor === "Verb") {
-    return formatVerbCall(node);
+    return formatVerbCall(entry);
   }
-  const hint = posHint(node);
-  return formatCtorCall(ctor, node.headword, hint);
+  const hint = posHint(entry);
+  const shouldIncludeDefinition = entry.type === "manual" || entry.type === "neo";
+  const definition = shouldIncludeDefinition
+    ? entry.rawDefinition?.trim() || entry.gloss?.trim() || undefined
+    : undefined;
+  return formatCtorCall(ctor, entry.headword, hint, definition);
 }
 
-function formatInlineRoot(value: string, kind: RootPosKind, hint?: string): string {
-  const ctor = POS_CTORS[kind] ?? "Noun";
-  return formatCtorCall(ctor, value, hint);
-}
-
-const POSTPOSITION_VARIABLES = new Set(POSTPOSITION_OPTIONS.map((option) => option.value));
-
-function formatPostposition(value: string): string {
-  if (POSTPOSITION_VARIABLES.has(value)) {
-    return value;
-  }
-  return formatInlineRoot(value, "postposition");
-}
-
-function posHint(node: RootNode): string | undefined {
-  if (node.rawDefinition) {
-    const header = extractDefinitionHeader(node.rawDefinition);
+function posHint(entry: RootEntry): string | undefined {
+  if (entry.rawDefinition) {
+    const header = extractDefinitionHeader(entry.rawDefinition);
     if (header) return header;
   }
-  if (node.posAbbrev) {
-    return `(${node.posAbbrev})`;
+  if (entry.posAbbrev) {
+    return `(${entry.posAbbrev})`;
   }
   return undefined;
 }
 
-function verbClassHint(node: RootNode): string | undefined {
-  const header = node.rawDefinition ? extractDefinitionHeader(node.rawDefinition) : undefined;
+function verbClassHint(entry: RootEntry): string | undefined {
+  const header = entry.rawDefinition ? extractDefinitionHeader(entry.rawDefinition) : undefined;
   if (header && header.includes("v")) return header;
-  if (node.posAbbrev) {
-    return `(${node.posAbbrev})`;
+  if (entry.posAbbrev) {
+    return `(${entry.posAbbrev})`;
   }
   return header;
 }
 
-function formatVerbCall(node: RootNode): string {
-  const isManual = node.type === "manual";
-  const isNeo = node.type === "neo";
+function formatVerbCall(entry: RootEntry): string {
+  const isManual = entry.type === "manual";
+  const isNeo = entry.type === "neo";
   if (!isManual && !isNeo) {
-    return formatCtorCall("Verb", node.headword);
+    return formatCtorCall("Verb", entry.headword);
   }
-  const verbClass = verbClassHint(node);
-  const rawDefinition = node.rawDefinition?.trim() || node.gloss?.trim() || undefined;
+  const verbClass = verbClassHint(entry);
+  const rawDefinition = entry.rawDefinition?.trim() || entry.gloss?.trim() || undefined;
   if (verbClass && rawDefinition) {
-    return formatCtorCall("Verb", node.headword, verbClass, rawDefinition);
+    return formatCtorCall("Verb", entry.headword, verbClass, rawDefinition);
   }
   if (verbClass) {
-    return formatCtorCall("Verb", node.headword, verbClass);
+    return formatCtorCall("Verb", entry.headword, verbClass);
   }
   if (rawDefinition) {
-    return formatCtorCall("Verb", node.headword, undefined, rawDefinition);
+    return formatCtorCall("Verb", entry.headword, undefined, rawDefinition);
   }
-  return formatCtorCall("Verb", node.headword);
+  return formatCtorCall("Verb", entry.headword);
 }
 
 function extractDefinitionHeader(definition: string): string | undefined {

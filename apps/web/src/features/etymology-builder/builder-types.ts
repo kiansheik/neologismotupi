@@ -73,25 +73,6 @@ export const DERIVE_OPERATIONS = {
 
 export type DeriveOperation = keyof typeof DERIVE_OPERATIONS;
 
-export const DERIVE_GROUPS: Array<{ label: string; ops: DeriveOperation[] }> = [
-  {
-    label: "Nominalizadores verbais",
-    ops: ["agent_sara", "agent_bae", "patient_pyra", "patient_emi", "basic_a", "circumstantial_saba"],
-  },
-  {
-    label: "Classificadores",
-    ops: ["future_rama", "past_puera"],
-  },
-  {
-    label: "Deadverbal",
-    ops: ["deadverbal_nduara"],
-  },
-  {
-    label: "Causativos",
-    ops: ["causative_mo", "causative_ero"],
-  },
-];
-
 export type RootEntry = {
   headword: string;
   gloss?: string;
@@ -106,84 +87,31 @@ export type RootEntry = {
   rawDefinition?: string;
 };
 
-export type RootNode = RootEntry & {
-  id: string;
-  kind: "root";
+export type ObjectResolutionMode =
+  | "open"
+  | "generic_nonhuman"
+  | "generic_human"
+  | "root"
+  | "manual";
+
+export type ObjectResolution = {
+  mode: ObjectResolutionMode;
+  entry?: RootEntry;
 };
 
-export type CompoundNode = {
+export type PipelineDerivation = {
   id: string;
-  kind: "compound";
-  children: BuilderNode[];
+  op: DeriveOperation;
+  agent?: RootEntry | null;
 };
 
-export type DeriveNode = {
-  id: string;
-  kind: "derive";
-  operation: DeriveOperation;
-  child: BuilderNode;
-  agent?: BuilderNode;
+export type PipelineState = {
+  base: RootEntry | null;
+  modifiers: RootEntry[];
+  object: ObjectResolution | null;
+  derivations: PipelineDerivation[];
+  transitivityOverride?: "transitive" | "intransitive" | null;
 };
-
-export type PostpositionNode = {
-  id: string;
-  kind: "postposition";
-  postposition: string;
-  child: BuilderNode;
-};
-
-export type PossessorNode = {
-  id: string;
-  kind: "possessor";
-  possessor: BuilderNode;
-  possessed: BuilderNode;
-};
-
-export type ModifierNode = {
-  id: string;
-  kind: "modifier";
-  modifier: BuilderNode;
-  target: BuilderNode;
-};
-
-export type VerbArgumentRole = "subject" | "object";
-export type VerbArgumentStatus = "explicit" | "omitted" | "unspecified";
-
-export type VerbArgumentNode = {
-  id: string;
-  kind: "verb_argument";
-  role: VerbArgumentRole;
-  status: VerbArgumentStatus;
-  value?: BuilderNode;
-};
-
-export type VerbFrameNode = {
-  id: string;
-  kind: "verb_frame";
-  verb: BuilderNode;
-  subject?: VerbArgumentNode;
-  object?: VerbArgumentNode;
-};
-
-export type BuilderNode =
-  | RootNode
-  | CompoundNode
-  | DeriveNode
-  | PostpositionNode
-  | PossessorNode
-  | ModifierNode
-  | VerbArgumentNode
-  | VerbFrameNode;
-
-export type PendingInsert =
-  | { kind: "compound"; targetId?: string }
-  | { kind: "combine"; targetId: string }
-  | { kind: "possessor"; targetId: string }
-  | { kind: "modifier"; targetId: string }
-  | { kind: "postposition"; targetId: string }
-  | { kind: "derive-agent"; targetId: string }
-  | { kind: "verb-subject"; targetId: string }
-  | { kind: "verb-object"; targetId: string };
 
 export const POSTPOSITION_OPTIONS: Array<{ value: string; label: string }> = [
   { value: "amo", label: "amo (translacional)" },

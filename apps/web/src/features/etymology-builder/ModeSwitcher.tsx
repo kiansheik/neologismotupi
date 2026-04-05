@@ -1,4 +1,4 @@
-type BuilderMode = "simple" | "advanced" | "pro";
+type BuilderMode = "simple" | "pro";
 
 type ModeSwitcherProps = {
   mode: BuilderMode;
@@ -7,7 +7,6 @@ type ModeSwitcherProps = {
 
 const MODES: Array<{ id: BuilderMode; label: string; description: string }> = [
   { id: "simple", label: "Simple", description: "Guiado" },
-  { id: "advanced", label: "Advanced", description: "Estrutural" },
   { id: "pro", label: "Pro", description: "Pydicate" },
 ];
 

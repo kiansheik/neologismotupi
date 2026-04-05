@@ -2,12 +2,11 @@ import { useEffect, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 
-import { AdvancedModeEditor } from "./AdvancedModeEditor";
 import { useEtymologyBuilderStore } from "./builder-store";
 import { ModeSwitcher } from "./ModeSwitcher";
 import type { BuilderMode } from "./ModeSwitcher";
 import { ProModeEditor } from "./ProModeEditor";
-import { SimpleModeWizard } from "./SimpleModeWizard";
+import { SimplePipelineBuilder } from "./SimplePipelineBuilder";
 
 type EtymologyBuilderProps = {
   onNoteChange: (note: string) => void;
@@ -43,16 +42,12 @@ export function EtymologyBuilder({ onNoteChange, onApplyNote, isManualOverride, 
         <div className="mt-3 space-y-4">
           <ModeSwitcher mode={mode} onChange={setMode} />
           {mode === "simple" ? (
-            <SimpleModeWizard
+            <SimplePipelineBuilder
               store={store}
               onApplyNote={onApplyNote}
               isManualOverride={isManualOverride}
-              onSwitchMode={setMode}
               onApplyHeadword={onApplyHeadword}
             />
-          ) : null}
-          {mode === "advanced" ? (
-            <AdvancedModeEditor store={store} onApplyNote={onApplyNote} isManualOverride={isManualOverride} onApplyHeadword={onApplyHeadword} />
           ) : null}
           {mode === "pro" ? (
             <ProModeEditor store={store} onApplyNote={onApplyNote} isManualOverride={isManualOverride} onApplyHeadword={onApplyHeadword} />

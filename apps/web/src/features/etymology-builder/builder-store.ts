@@ -1,168 +1,181 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 
-import {
-  applyPendingInsert,
-  createRootNode,
-  moveCompoundChild,
-  removeNode,
-  swapDeriveWithChild,
-  updatePostposition,
-  wrapWithDerive,
-  setDeriveAgent,
-  addRootToTree,
-  addRootToCompound,
-  combineWithRoot,
-  attachModifier,
-  attachPossessor,
-  wrapWithPostposition,
-} from "./builder-state";
-import type { BuilderNode, DeriveOperation, PendingInsert, RootEntry, RootNode } from "./builder-types";
-import { collectPieces, renderPydicate } from "./pydicate-preview";
+import type { DeriveOperation, ObjectResolution, PipelineState, RootEntry } from "./builder-types";
 import { renderHumanNote } from "./note-export";
+import { renderPydicate } from "./pydicate-preview";
+import { computePipelineMeta, createId } from "./pipeline-utils";
+import { posInfoForKind } from "./pos";
 
 export type BuilderStore = {
-  root: BuilderNode | null;
-  pendingInsert: PendingInsert | null;
-  activeNodeId: string | null;
+  state: PipelineState;
+  meta: ReturnType<typeof computePipelineMeta>;
   generatedNote: string;
   pydicatePreview: string;
-  pieces: string[];
-  setPendingInsert: (pending: PendingInsert | null) => void;
-  setActiveNodeId: (nodeId: string | null) => void;
-  setRoot: (root: BuilderNode | null) => void;
-  setRootAndFocus: (root: BuilderNode | null, focusId?: string | null) => void;
-  applyRootEntry: (entry: RootEntry) => RootNode;
-  applyDerive: (targetId: string, operation: DeriveOperation) => void;
-  removeNode: (targetId: string) => void;
-  moveCompoundChild: (compoundId: string, fromIndex: number, toIndex: number) => void;
-  swapDerive: (targetId: string) => void;
-  updatePostposition: (targetId: string, postposition: string) => void;
-  attachPossessor: (targetId: string, possessor: RootEntry) => void;
-  attachModifier: (targetId: string, modifier: RootEntry) => void;
-  wrapPostposition: (targetId: string, postposition: string) => void;
-  addCompoundChild: (targetId: string | null, entry: RootEntry) => void;
-  combineWithRoot: (targetId: string, entry: RootEntry) => void;
-  setDeriveAgent: (targetId: string, entry: RootEntry) => void;
+  setBase: (entry: RootEntry | null) => void;
+  addModifier: (entry: RootEntry) => void;
+  removeModifier: (index: number) => void;
+  moveModifier: (fromIndex: number, toIndex: number) => void;
+  setObjectChoice: (choice: ObjectResolution | null) => void;
+  setTransitivityOverride: (value: "transitive" | "intransitive" | null) => void;
+  addDerivation: (operation: DeriveOperation) => void;
+  removeDerivation: (id: string) => void;
+  moveDerivation: (fromIndex: number, toIndex: number) => void;
+  setDerivationAgent: (id: string, agent: RootEntry | null) => void;
+  reset: () => void;
+};
+
+const GENERIC_OBJECTS = {
+  generic_nonhuman: buildGenericEntry("mba'e", "noun", "coisa"),
+  generic_human: buildGenericEntry("moro", "pronoun", "gente"),
+};
+
+const INITIAL_STATE: PipelineState = {
+  base: null,
+  modifiers: [],
+  object: null,
+  derivations: [],
+  transitivityOverride: null,
 };
 
 export function useEtymologyBuilderStore(): BuilderStore {
-  const [root, setRoot] = useState<BuilderNode | null>(null);
-  const [pendingInsert, setPendingInsert] = useState<PendingInsert | null>(null);
-  const [activeNodeId, setActiveNodeId] = useState<string | null>(null);
+  const [state, setState] = useState<PipelineState>(INITIAL_STATE);
 
-  const generatedNote = useMemo(() => renderHumanNote(root), [root]);
-  const pydicatePreview = useMemo(() => renderPydicate(root), [root]);
-  const pieces = useMemo(() => collectPieces(root), [root]);
+  const meta = useMemo(() => computePipelineMeta(state), [state]);
+  const generatedNote = useMemo(() => renderHumanNote(state), [state]);
+  const pydicatePreview = useMemo(() => renderPydicate(state), [state]);
 
-  useEffect(() => {
-    if (!root) {
-      setActiveNodeId(null);
-    }
-  }, [root]);
-
-  const setRootAndFocus = useCallback((nextRoot: BuilderNode | null, focusId?: string | null) => {
-    setRoot(nextRoot);
-    setActiveNodeId(focusId ?? nextRoot?.id ?? null);
-  }, []);
-
-  const applyRootEntry = useCallback(
-    (entry: RootEntry) => {
-      const newRoot = createRootNode(entry);
-      setRoot((current) => applyPendingInsert(current, pendingInsert, newRoot));
-      setPendingInsert(null);
-      setActiveNodeId((current) => current ?? newRoot.id);
-      return newRoot;
-    },
-    [pendingInsert],
-  );
-
-  const applyDerive = useCallback((targetId: string, operation: DeriveOperation) => {
-    setRoot((current) => (current ? wrapWithDerive(current, targetId, operation) : current));
-    setActiveNodeId(targetId);
-  }, []);
-
-  const removeNodeById = useCallback(
-    (targetId: string) => {
-      if (!root) return;
-      const next = removeNode(root, targetId);
-      setRoot(next);
-      if (activeNodeId === targetId) {
-        setActiveNodeId(next?.id ?? null);
+  const setBase = useCallback((entry: RootEntry | null) => {
+    setState((prev) => {
+      if (!entry) {
+        return { ...INITIAL_STATE };
       }
-    },
-    [root, activeNodeId],
-  );
-
-  const moveCompoundChildById = useCallback((compoundId: string, fromIndex: number, toIndex: number) => {
-    setRoot((current) => (current ? moveCompoundChild(current, compoundId, fromIndex, toIndex) : current));
-  }, []);
-
-  const swapDeriveById = useCallback((targetId: string) => {
-    setRoot((current) => (current ? swapDeriveWithChild(current, targetId) : current));
-  }, []);
-
-  const updatePostpositionById = useCallback((targetId: string, postposition: string) => {
-    setRoot((current) => (current ? updatePostposition(current, targetId, postposition) : current));
-  }, []);
-
-  const attachPossessorById = useCallback((targetId: string, entry: RootEntry) => {
-    const possessor = createRootNode(entry);
-    setRoot((current) => (current ? attachPossessor(current, targetId, possessor) : current));
-  }, []);
-
-  const attachModifierById = useCallback((targetId: string, entry: RootEntry) => {
-    const modifier = createRootNode(entry);
-    setRoot((current) => (current ? attachModifier(current, targetId, modifier) : current));
-  }, []);
-
-  const wrapPostpositionById = useCallback((targetId: string, postposition: string) => {
-    setRoot((current) => (current ? wrapWithPostposition(current, targetId, postposition) : current));
-  }, []);
-
-  const addCompoundChildById = useCallback((targetId: string | null, entry: RootEntry) => {
-    const child = createRootNode(entry);
-    setRoot((current) => {
-      if (!current) return child;
-      if (!targetId) return addRootToTree(current, child);
-      return addRootToCompound(current, targetId, child);
+      const same =
+        prev.base &&
+        prev.base.headword === entry.headword &&
+        prev.base.posKind === entry.posKind &&
+        prev.base.rawDefinition === entry.rawDefinition;
+      if (same) {
+        return { ...prev, base: entry };
+      }
+      return {
+        ...INITIAL_STATE,
+        base: entry,
+      };
     });
-    setActiveNodeId((current) => current ?? child.id);
   }, []);
 
-  const combineWithRootById = useCallback((targetId: string, entry: RootEntry) => {
-    const child = createRootNode(entry);
-    setRoot((current) => (current ? combineWithRoot(current, targetId, child) : current));
-    setActiveNodeId((current) => current ?? child.id);
+  const addModifier = useCallback((entry: RootEntry) => {
+    setState((prev) => ({ ...prev, modifiers: [...prev.modifiers, entry] }));
   }, []);
 
-  const setDeriveAgentById = useCallback((targetId: string, entry: RootEntry) => {
-    const agent = createRootNode(entry);
-    setRoot((current) => (current ? setDeriveAgent(current, targetId, agent) : current));
-    setActiveNodeId((current) => current ?? agent.id);
+  const removeModifier = useCallback((index: number) => {
+    setState((prev) => ({
+      ...prev,
+      modifiers: prev.modifiers.filter((_, idx) => idx !== index),
+    }));
   }, []);
+
+  const moveModifier = useCallback((fromIndex: number, toIndex: number) => {
+    setState((prev) => {
+      if (fromIndex === toIndex) return prev;
+      const next = [...prev.modifiers];
+      const [item] = next.splice(fromIndex, 1);
+      next.splice(toIndex, 0, item);
+      return { ...prev, modifiers: next };
+    });
+  }, []);
+
+  const setObjectChoice = useCallback((choice: ObjectResolution | null) => {
+    setState((prev) => ({ ...prev, object: choice }));
+  }, []);
+
+  const setTransitivityOverride = useCallback((value: "transitive" | "intransitive" | null) => {
+    setState((prev) => ({ ...prev, transitivityOverride: value }));
+  }, []);
+
+  const addDerivation = useCallback((operation: DeriveOperation) => {
+    setState((prev) => ({
+      ...prev,
+      derivations: [...prev.derivations, { id: createId("derive"), op: operation }],
+    }));
+  }, []);
+
+  const removeDerivation = useCallback((id: string) => {
+    setState((prev) => ({
+      ...prev,
+      derivations: prev.derivations.filter((item) => item.id !== id),
+    }));
+  }, []);
+
+  const moveDerivation = useCallback((fromIndex: number, toIndex: number) => {
+    setState((prev) => {
+      if (fromIndex === toIndex) return prev;
+      const next = [...prev.derivations];
+      const [item] = next.splice(fromIndex, 1);
+      next.splice(toIndex, 0, item);
+      return { ...prev, derivations: next };
+    });
+  }, []);
+
+  const setDerivationAgent = useCallback((id: string, agent: RootEntry | null) => {
+    setState((prev) => ({
+      ...prev,
+      derivations: prev.derivations.map((item) =>
+        item.id === id ? { ...item, agent } : item,
+      ),
+    }));
+  }, []);
+
+  const reset = useCallback(() => setState({ ...INITIAL_STATE }), []);
 
   return {
-    root,
-    pendingInsert,
-    activeNodeId,
+    state,
+    meta,
     generatedNote,
     pydicatePreview,
-    pieces,
-    setPendingInsert,
-    setActiveNodeId,
-    setRoot,
-    setRootAndFocus,
-    applyRootEntry,
-    applyDerive,
-    removeNode: removeNodeById,
-    moveCompoundChild: moveCompoundChildById,
-    swapDerive: swapDeriveById,
-    updatePostposition: updatePostpositionById,
-    attachPossessor: attachPossessorById,
-    attachModifier: attachModifierById,
-    wrapPostposition: wrapPostpositionById,
-    addCompoundChild: addCompoundChildById,
-    combineWithRoot: combineWithRootById,
-    setDeriveAgent: setDeriveAgentById,
+    setBase,
+    addModifier,
+    removeModifier,
+    moveModifier,
+    setObjectChoice,
+    setTransitivityOverride,
+    addDerivation,
+    removeDerivation,
+    moveDerivation,
+    setDerivationAgent,
+    reset,
+  };
+}
+
+export function makeObjectChoice(mode: "open"): ObjectResolution;
+export function makeObjectChoice(mode: "generic_nonhuman" | "generic_human"): ObjectResolution;
+export function makeObjectChoice(mode: "root" | "manual", entry: RootEntry): ObjectResolution;
+export function makeObjectChoice(mode: ObjectResolution["mode"], entry?: RootEntry): ObjectResolution {
+  if (mode === "open") {
+    return { mode };
+  }
+  if (mode === "generic_nonhuman") {
+    return { mode, entry: GENERIC_OBJECTS.generic_nonhuman };
+  }
+  if (mode === "generic_human") {
+    return { mode, entry: GENERIC_OBJECTS.generic_human };
+  }
+  if (entry) {
+    return { mode, entry };
+  }
+  return { mode };
+}
+
+function buildGenericEntry(headword: string, posKind: RootEntry["posKind"], gloss: string): RootEntry {
+  const posInfo = posInfoForKind(posKind ?? "noun");
+  return {
+    headword,
+    gloss,
+    posAbbrev: posInfo.abbrev,
+    posLabel: posInfo.label,
+    posKind: posInfo.kind,
+    posAssumed: false,
+    type: "manual",
+    rawDefinition: gloss,
   };
 }
