@@ -180,13 +180,7 @@ export function SimplePipelineBuilder({
         </div>
         {state.base ? (
           <div className="mt-2 rounded-md border border-slate-200 bg-white px-3 py-2 text-xs text-slate-700">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <span className="font-semibold text-slate-800">{state.base.headword}</span>
-              <span>{posLabelForEntry(state.base)}</span>
-            </div>
-            {state.base.rawDefinition || state.base.gloss ? (
-              <p className="mt-1 text-[11px] text-slate-600">{state.base.rawDefinition || state.base.gloss}</p>
-            ) : null}
+            <p className="text-[11px] text-slate-500">Classe: {posLabelForEntry(state.base)}</p>
             {meta.currentStage === "verb" && meta.transitivity === "unknown" ? (
               <div className="mt-2 flex flex-wrap items-center gap-2">
                 <span className="text-[11px] text-amber-700">Transitividade não definida.</span>
