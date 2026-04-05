@@ -51,6 +51,14 @@ function collectRoots(node: BuilderNode, acc: BuilderNode[] = [], seen: Set<stri
       collectRoots(node.modifier, acc, seen);
       collectRoots(node.target, acc, seen);
       break;
+    case "verb_frame":
+      collectRoots(node.verb, acc, seen);
+      if (node.subject?.value) collectRoots(node.subject.value, acc, seen);
+      if (node.object?.value) collectRoots(node.object.value, acc, seen);
+      break;
+    case "verb_argument":
+      if (node.value) collectRoots(node.value, acc, seen);
+      break;
     default:
       break;
   }
@@ -73,15 +81,24 @@ function collectOperations(node: BuilderNode, acc: string[] = []): string[] {
       collectOperations(node.child, acc);
       break;
     case "possessor":
-      acc.push(`complemento de ${describeNode(node.possessor)}`);
+      acc.push(`possuidor: ${describeNode(node.possessor)}`);
       collectOperations(node.possessed, acc);
       break;
     case "modifier":
-      acc.push(`adjunto ${describeNode(node.modifier)}`);
+      acc.push(`modificador: ${describeNode(node.modifier)}`);
       collectOperations(node.target, acc);
       break;
     case "compound":
       node.children.forEach((child) => collectOperations(child, acc));
+      break;
+    case "verb_frame":
+      collectOperations(node.verb, acc);
+      if (node.subject) collectOperations(node.subject, acc);
+      if (node.object) collectOperations(node.object, acc);
+      break;
+    case "verb_argument":
+      acc.push(describeVerbArgument(node));
+      if (node.value) collectOperations(node.value, acc);
       break;
     default:
       break;
@@ -112,9 +129,31 @@ export function describeNode(node: BuilderNode): string {
       return `${describeNode(node.possessed)} de ${describeNode(node.possessor)}`;
     case "modifier":
       return `${describeNode(node.target)} com ${describeNode(node.modifier)}`;
+    case "verb_frame": {
+      const pieces = [`verbo ${describeNode(node.verb)}`];
+      if (node.subject) pieces.push(describeVerbArgument(node.subject));
+      if (node.object) pieces.push(describeVerbArgument(node.object));
+      return pieces.join("; ");
+    }
+    case "verb_argument":
+      return describeVerbArgument(node);
     default:
       return "";
   }
+}
+
+function describeVerbArgument(node: Extract<BuilderNode, { kind: "verb_argument" }>): string {
+  const roleLabel = node.role === "subject" ? "sujeito" : "objeto";
+  if (node.status === "omitted") {
+    return `${roleLabel} omitido`;
+  }
+  if (node.status === "unspecified") {
+    return `${roleLabel} a definir`;
+  }
+  if (node.value) {
+    return `${roleLabel}: ${describeNode(node.value)}`;
+  }
+  return `${roleLabel} explícito`;
 }
 
 function describeDerive(operation: DeriveOperation, child: string, agent?: BuilderNode): string {

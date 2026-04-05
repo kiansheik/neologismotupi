@@ -7,7 +7,7 @@ import { Textarea } from "@/components/ui/textarea";
 
 import type { BuilderStore } from "./builder-store";
 import { createId, createRootNode } from "./builder-state";
-import type { BuilderNode, DeriveOperation, RootEntry } from "./builder-types";
+import type { BuilderNode, DeriveOperation, RootEntry, VerbArgumentNode, VerbFrameNode } from "./builder-types";
 import { DERIVE_OPERATIONS } from "./builder-types";
 import { RootPicker } from "./RootPicker";
 
@@ -76,12 +76,16 @@ export function SimpleModeWizard({ store, onApplyNote, isManualOverride, onSwitc
   const [verbRoot, setVerbRoot] = useState<RootEntry | null>(null);
   const [verbSubjectChoice, setVerbSubjectChoice] = useState<"show" | "omit" | "advanced">("advanced");
   const [verbObjectChoice, setVerbObjectChoice] = useState<"show" | "omit" | "advanced">("advanced");
+  const [verbSubjectRoot, setVerbSubjectRoot] = useState<RootEntry | null>(null);
+  const [verbObjectRoot, setVerbObjectRoot] = useState<RootEntry | null>(null);
   const [verbAddCausative, setVerbAddCausative] = useState(false);
   const [verbAddPostposition, setVerbAddPostposition] = useState(false);
   const [verbPostposition, setVerbPostposition] = useState("amo");
 
   const [expressionText, setExpressionText] = useState("");
   const [expressionNote, setExpressionNote] = useState("");
+  const [expressionRoots, setExpressionRoots] = useState<Array<RootEntry | null>>([null, null, null]);
+  const [expressionRelation, setExpressionRelation] = useState<"descriptive" | "related" | "combine">("combine");
 
   const steps = useMemo<SimpleStage[]>(() => {
     if (category === "noun") {
@@ -107,6 +111,150 @@ export function SimpleModeWizard({ store, onApplyNote, isManualOverride, onSwitc
 
   const stepIndex = steps.indexOf(stage) >= 0 ? steps.indexOf(stage) + 1 : 1;
 
+  const recipeItems = useMemo(() => {
+    const items: Array<{ label: string; value: string }> = [];
+    const rootLabel = (entry?: RootEntry | null) => entry?.headword || "—";
+    const relationLabel = (relation: "descriptive" | "related" | "place" | "combine") =>
+      relation === "descriptive"
+        ? "descritivo"
+        : relation === "related"
+          ? "relacionado a"
+          : relation === "place"
+            ? "lugar / instrumento"
+            : "combinar";
+    const expressionRelationLabel = (relation: "descriptive" | "related" | "combine") =>
+      relation === "descriptive" ? "descritivo" : relation === "related" ? "relacionado a" : "combinar";
+    const verbChoiceLabel = (
+      choice: "show" | "omit" | "advanced",
+      root: RootEntry | null,
+    ) => {
+      if (choice === "omit") return "omitido";
+      if (choice === "advanced") return "decidir depois";
+      return root ? `explícito: ${root.headword}` : "explícito";
+    };
+
+    if (category === "noun") {
+      const kindLabel =
+        nounKind === "compound"
+          ? "compósito"
+          : nounKind === "derived"
+            ? "derivado"
+            : nounKind === "loan"
+              ? "empréstimo"
+              : nounKind === "extension"
+                ? "extensão"
+                : "indefinido";
+      items.push({ label: "Tipo", value: `Substantivo — ${kindLabel}` });
+      if (nounKind === "compound") {
+        items.push({ label: "Raiz 1", value: rootLabel(compoundRoots[0]) });
+        items.push({ label: "Raiz 2", value: rootLabel(compoundRoots[1]) });
+        items.push({ label: "Raiz 3", value: rootLabel(compoundRoots[2]) });
+        items.push({ label: "Relação", value: relationLabel(compoundRelation) });
+      } else if (nounKind === "derived") {
+        const op = DERIVE_OPERATIONS[derivedOperation];
+        items.push({ label: "Base", value: rootLabel(derivedRoot) });
+        items.push({ label: "Derivação", value: `${op.token} — ${op.note}` });
+        if (op.needsAgent) {
+          items.push({ label: "Agente", value: rootLabel(derivedAgent) });
+        }
+        items.push({ label: "Possuidor", value: rootLabel(derivedPossessor) });
+        items.push({ label: "Modificador", value: rootLabel(derivedModifier) });
+      } else if (nounKind === "loan") {
+        items.push({ label: "Origem", value: loanSource || "—" });
+        items.push({ label: "Tipo", value: loanType === "calque" ? "calque" : "adaptação" });
+        if (loanType === "calque") {
+          items.push({ label: "Raiz 1", value: rootLabel(loanCalqueRoots[0]) });
+          items.push({ label: "Raiz 2", value: rootLabel(loanCalqueRoots[1]) });
+          items.push({ label: "Raiz 3", value: rootLabel(loanCalqueRoots[2]) });
+        } else {
+          items.push({ label: "Forma adaptada", value: loanAdapted || "—" });
+        }
+      } else if (nounKind === "extension") {
+        items.push({ label: "Base", value: rootLabel(extensionRoot) });
+        items.push({ label: "Nota", value: extensionNote || "—" });
+        items.push({ label: "Modificador", value: rootLabel(extensionExtraRoot) });
+      }
+    } else if (category === "verb") {
+      const kindLabel =
+        verbKind === "intransitive"
+          ? "intransitivo"
+          : verbKind === "transitive"
+            ? "transitivo"
+            : verbKind === "reflexive"
+              ? "reflexivo"
+              : verbKind === "causative"
+                ? "causativo"
+                : "indefinido";
+      items.push({ label: "Tipo", value: `Verbo — ${kindLabel}` });
+      items.push({ label: "Base", value: rootLabel(verbRoot) });
+      items.push({ label: "Sujeito", value: verbChoiceLabel(verbSubjectChoice, verbSubjectRoot) });
+      if (verbKind === "transitive") {
+        items.push({ label: "Objeto", value: verbChoiceLabel(verbObjectChoice, verbObjectRoot) });
+      }
+      items.push({ label: "Causativo", value: verbAddCausative ? "sim" : "não" });
+      items.push({ label: "Pós-posição", value: verbAddPostposition ? verbPostposition : "—" });
+    } else if (category === "expression") {
+      const kindLabel =
+        expressionKind === "fixed" ? "fixa" : expressionKind === "compositional" ? "composicional" : "complexa";
+      items.push({ label: "Tipo", value: `Expressão — ${kindLabel}` });
+      if (expressionKind === "fixed") {
+        items.push({ label: "Forma", value: expressionText || "—" });
+        items.push({ label: "Nota", value: expressionNote || "—" });
+      } else {
+        items.push({ label: "Raiz 1", value: rootLabel(expressionRoots[0]) });
+        items.push({ label: "Raiz 2", value: rootLabel(expressionRoots[1]) });
+        items.push({ label: "Raiz 3", value: rootLabel(expressionRoots[2]) });
+        items.push({ label: "Relação", value: expressionRelationLabel(expressionRelation) });
+        if (expressionKind === "complex") {
+          items.push({ label: "Texto base", value: expressionText || "—" });
+        }
+        if (expressionNote) {
+          items.push({ label: "Nota", value: expressionNote });
+        }
+      }
+    }
+
+    return items;
+  }, [
+    category,
+    nounKind,
+    verbKind,
+    expressionKind,
+    compoundRoots,
+    compoundRelation,
+    derivedRoot,
+    derivedOperation,
+    derivedAgent,
+    derivedPossessor,
+    derivedModifier,
+    loanSource,
+    loanType,
+    loanAdapted,
+    loanCalqueRoots,
+    extensionRoot,
+    extensionNote,
+    extensionExtraRoot,
+    verbRoot,
+    verbSubjectChoice,
+    verbObjectChoice,
+    verbSubjectRoot,
+    verbObjectRoot,
+    verbAddCausative,
+    verbAddPostposition,
+    verbPostposition,
+    expressionText,
+    expressionNote,
+    expressionRoots,
+    expressionRelation,
+  ]);
+
+  const summaryContent = stage === "category" ? null : <RecipeSummary items={recipeItems} />;
+
+  const expressionReady =
+    expressionKind === "fixed"
+      ? expressionText.trim().length > 0
+      : Boolean(expressionRoots[0] || (expressionKind === "complex" && expressionText.trim().length > 0));
+
   useEffect(() => {
     if (!steps.includes(stage)) {
       setStage(steps[0]);
@@ -116,8 +264,8 @@ export function SimpleModeWizard({ store, onApplyNote, isManualOverride, onSwitc
 
   useEffect(() => {
     if (stage !== "preview") return;
-    const tree = buildTree();
-    store.setRootAndFocus(tree);
+    const { tree, focusId } = buildTree();
+    store.setRootAndFocus(tree, focusId ?? null);
   }, [
     stage,
     category,
@@ -140,11 +288,17 @@ export function SimpleModeWizard({ store, onApplyNote, isManualOverride, onSwitc
     extensionNote,
     extensionExtraRoot,
     verbRoot,
+    verbSubjectChoice,
+    verbObjectChoice,
+    verbSubjectRoot,
+    verbObjectRoot,
     verbAddCausative,
     verbAddPostposition,
     verbPostposition,
     expressionText,
     expressionNote,
+    expressionRoots,
+    expressionRelation,
     store,
   ]);
 
@@ -163,29 +317,31 @@ export function SimpleModeWizard({ store, onApplyNote, isManualOverride, onSwitc
     });
   };
 
-  const buildTree = (): BuilderNode | null => {
+  const buildTree = (): { tree: BuilderNode | null; focusId?: string | null } => {
     if (category === "noun") {
       if (nounKind === "compound") {
         const [r1, r2, r3] = compoundRoots;
-        if (!r1) return null;
+        if (!r1) return { tree: null, focusId: null };
         const root1 = createRootNode(r1);
-        if (!r2) return root1;
+        if (!r2) return { tree: root1, focusId: root1.id };
         const root2 = createRootNode(r2);
         if (compoundRelation === "descriptive" && !r3) {
-          return {
+          const modifierNode: BuilderNode = {
             id: createId("modifier"),
             kind: "modifier",
             modifier: root1,
             target: root2,
           };
+          return { tree: modifierNode, focusId: modifierNode.id };
         }
         if (compoundRelation === "related" && !r3) {
-          return {
+          const possessorNode: BuilderNode = {
             id: createId("possessor"),
             kind: "possessor",
             possessor: root2,
             possessed: root1,
           };
+          return { tree: possessorNode, focusId: possessorNode.id };
         }
         const baseCompound: BuilderNode = {
           id: createId("compound"),
@@ -193,17 +349,18 @@ export function SimpleModeWizard({ store, onApplyNote, isManualOverride, onSwitc
           children: [root1, root2, ...(r3 ? [createRootNode(r3)] : [])],
         };
         if (compoundRelation === "place") {
-          return {
+          const deriveNode: BuilderNode = {
             id: createId("derive"),
             kind: "derive",
             operation: "circumstantial_saba",
             child: baseCompound,
           };
+          return { tree: deriveNode, focusId: deriveNode.id };
         }
-        return baseCompound;
+        return { tree: baseCompound, focusId: baseCompound.id };
       }
       if (nounKind === "derived") {
-        if (!derivedRoot) return null;
+        if (!derivedRoot) return { tree: null, focusId: null };
         const baseRoot = createRootNode(derivedRoot);
         const deriveNode: BuilderNode = {
           id: createId("derive"),
@@ -212,6 +369,7 @@ export function SimpleModeWizard({ store, onApplyNote, isManualOverride, onSwitc
           child: baseRoot,
           agent: derivedAgent ? createRootNode(derivedAgent) : undefined,
         };
+        const deriveFocusId = deriveNode.id;
         let current: BuilderNode = deriveNode;
         if (derivedPossessor) {
           current = {
@@ -229,80 +387,154 @@ export function SimpleModeWizard({ store, onApplyNote, isManualOverride, onSwitc
             target: current,
           };
         }
-        return current;
+        return { tree: current, focusId: deriveFocusId };
       }
       if (nounKind === "loan") {
-        if (!loanSource.trim()) return null;
+        if (!loanSource.trim()) return { tree: null, focusId: null };
         if (loanType === "calque") {
           const [r1, r2, r3] = loanCalqueRoots;
-          if (!r1) return null;
+          if (!r1) return { tree: null, focusId: null };
           const compound: BuilderNode = {
             id: createId("compound"),
             kind: "compound",
             children: [createRootNode(r1), ...(r2 ? [createRootNode(r2)] : []), ...(r3 ? [createRootNode(r3)] : [])],
           };
-          return compound;
+          return { tree: compound, focusId: compound.id };
         }
         const base = loanAdapted.trim() || loanSource.trim();
-        return createRootNode({
+        const manual = createRootNode({
           headword: base,
           gloss: loanNote.trim() ? `${loanNote.trim()} (empréstimo de ${loanSource.trim()})` : `empréstimo de ${loanSource.trim()}`,
           type: "manual",
         });
+        return { tree: manual, focusId: manual.id };
       }
       if (nounKind === "extension") {
-        if (!extensionRoot) return null;
+        if (!extensionRoot) return { tree: null, focusId: null };
         const baseRoot = createRootNode({
           ...extensionRoot,
           gloss: extensionNote.trim()
             ? `${extensionRoot.gloss ?? ""} → ${extensionNote.trim()}`.trim()
             : extensionRoot.gloss,
         });
+        const baseFocusId = baseRoot.id;
         if (extensionExtraRoot) {
-          return {
+          const modifierNode: BuilderNode = {
             id: createId("modifier"),
             kind: "modifier",
             modifier: createRootNode(extensionExtraRoot),
             target: baseRoot,
           };
+          return { tree: modifierNode, focusId: baseFocusId };
         }
-        return baseRoot;
+        return { tree: baseRoot, focusId: baseFocusId };
       }
-      return null;
+      return { tree: null, focusId: null };
     }
 
     if (category === "verb") {
-      if (!verbRoot) return null;
-      let current: BuilderNode = createRootNode(verbRoot);
+      if (!verbRoot) return { tree: null, focusId: null };
+      let verbNode: BuilderNode = createRootNode(verbRoot);
       if (verbAddCausative) {
-        current = {
+        verbNode = {
           id: createId("derive"),
           kind: "derive",
           operation: "causative_mo",
-          child: current,
+          child: verbNode,
         };
       }
       if (verbAddPostposition) {
-        current = {
+        verbNode = {
           id: createId("postposition"),
           kind: "postposition",
           postposition: verbPostposition,
-          child: current,
+          child: verbNode,
         };
       }
-      return current;
+      const subjectNode: VerbArgumentNode = {
+        id: createId("verb_subject"),
+        kind: "verb_argument",
+        role: "subject",
+        status: verbSubjectChoice === "show" ? "explicit" : verbSubjectChoice === "omit" ? "omitted" : "unspecified",
+        value: verbSubjectChoice === "show" && verbSubjectRoot ? createRootNode(verbSubjectRoot) : undefined,
+      };
+      const objectNode: VerbArgumentNode | undefined =
+        verbKind === "transitive"
+          ? {
+              id: createId("verb_object"),
+              kind: "verb_argument",
+              role: "object",
+              status: verbObjectChoice === "show" ? "explicit" : verbObjectChoice === "omit" ? "omitted" : "unspecified",
+              value: verbObjectChoice === "show" && verbObjectRoot ? createRootNode(verbObjectRoot) : undefined,
+            }
+          : undefined;
+      const frame: VerbFrameNode = {
+        id: createId("verb_frame"),
+        kind: "verb_frame",
+        verb: verbNode,
+        subject: subjectNode,
+        object: objectNode,
+      };
+      return { tree: frame, focusId: frame.id };
     }
 
     if (category === "expression") {
-      if (!expressionText.trim()) return null;
-      return createRootNode({
-        headword: expressionText.trim(),
-        gloss: expressionNote.trim() || undefined,
-        type: "manual",
-      });
+      if (expressionKind === "fixed") {
+        if (!expressionText.trim()) return { tree: null, focusId: null };
+        const manual = createRootNode({
+          headword: expressionText.trim(),
+          gloss: expressionNote.trim() || undefined,
+          type: "manual",
+        });
+        return { tree: manual, focusId: manual.id };
+      }
+
+      const [r1, r2, r3] = expressionRoots;
+      if (r1) {
+        const root1 = createRootNode(r1);
+        if (!r2) {
+          return { tree: root1, focusId: root1.id };
+        }
+        const root2 = createRootNode(r2);
+        if (expressionRelation === "descriptive" && !r3) {
+          const modifierNode: BuilderNode = {
+            id: createId("modifier"),
+            kind: "modifier",
+            modifier: root1,
+            target: root2,
+          };
+          return { tree: modifierNode, focusId: modifierNode.id };
+        }
+        if (expressionRelation === "related" && !r3) {
+          const possessorNode: BuilderNode = {
+            id: createId("possessor"),
+            kind: "possessor",
+            possessor: root2,
+            possessed: root1,
+          };
+          return { tree: possessorNode, focusId: possessorNode.id };
+        }
+        const compoundNode: BuilderNode = {
+          id: createId("compound"),
+          kind: "compound",
+          children: [root1, root2, ...(r3 ? [createRootNode(r3)] : [])],
+        };
+        return { tree: compoundNode, focusId: compoundNode.id };
+      }
+
+      if (expressionKind === "complex" && expressionText.trim()) {
+        const manual = createRootNode({
+          headword: expressionText.trim(),
+          gloss: expressionNote.trim() || undefined,
+          type: "manual",
+        });
+        return { tree: manual, focusId: manual.id };
+      }
+
+      return { tree: null, focusId: null };
     }
 
-    return null;
+    return { tree: null, focusId: null };
   };
 
   return (
@@ -320,7 +552,7 @@ export function SimpleModeWizard({ store, onApplyNote, isManualOverride, onSwitc
       </div>
 
       {stage === "category" ? (
-        <StepCard title="O que você está criando?">
+        <StepCard summary={summaryContent} title="O que você está criando?">
           <OptionGrid>
             <OptionButton active={category === "noun"} onClick={() => setCategory("noun")}>
               Substantivo
@@ -341,7 +573,7 @@ export function SimpleModeWizard({ store, onApplyNote, isManualOverride, onSwitc
       ) : null}
 
       {stage === "noun-kind" ? (
-        <StepCard title="Que tipo de substantivo?">
+        <StepCard summary={summaryContent} title="Que tipo de substantivo?">
           <OptionGrid>
             <OptionButton active={nounKind === "compound"} onClick={() => setNounKind("compound")}>
               Compósito de raízes
@@ -368,7 +600,7 @@ export function SimpleModeWizard({ store, onApplyNote, isManualOverride, onSwitc
       ) : null}
 
       {stage === "noun-compound" ? (
-        <StepCard title="Escolha as raízes do compósito">
+        <StepCard summary={summaryContent} title="Escolha as raízes do compósito">
           <div className="grid gap-3">
             <RootPicker label="Primeira raiz" value={compoundRoots[0]} onChange={(entry) => updateRootAt(0, entry, setCompoundRoots)} />
             <RootPicker label="Segunda raiz" value={compoundRoots[1]} onChange={(entry) => updateRootAt(1, entry, setCompoundRoots)} />
@@ -387,7 +619,7 @@ export function SimpleModeWizard({ store, onApplyNote, isManualOverride, onSwitc
       ) : null}
 
       {stage === "noun-compound-relation" ? (
-        <StepCard title="Como as raízes se relacionam?">
+        <StepCard summary={summaryContent} title="Como as raízes se relacionam?">
           <OptionGrid>
             <OptionButton active={compoundRelation === "descriptive"} onClick={() => setCompoundRelation("descriptive")}>
               Compósito descritivo
@@ -411,7 +643,7 @@ export function SimpleModeWizard({ store, onApplyNote, isManualOverride, onSwitc
       ) : null}
 
       {stage === "noun-derived-root" ? (
-        <StepCard title="Escolha o verbo de base">
+        <StepCard summary={summaryContent} title="Escolha o verbo de base">
           <RootPicker label="Verbo base" value={derivedRoot} onChange={setDerivedRoot} />
           <StepActions>
             <Button type="button" onClick={() => goNext("noun-derived-type")} disabled={!derivedRoot}>
@@ -422,7 +654,7 @@ export function SimpleModeWizard({ store, onApplyNote, isManualOverride, onSwitc
       ) : null}
 
       {stage === "noun-derived-type" ? (
-        <StepCard title="Que tipo de substantivo derivado?">
+        <StepCard summary={summaryContent} title="Que tipo de substantivo derivado?">
           <OptionGrid>
             <OptionButton active={derivedOperation === "agent_sara"} onClick={() => setDerivedOperation("agent_sara")}>
               Fazedor / agente
@@ -462,7 +694,7 @@ export function SimpleModeWizard({ store, onApplyNote, isManualOverride, onSwitc
       ) : null}
 
       {stage === "noun-derived-options" ? (
-        <StepCard title="Deseja adicionar algo mais?">
+        <StepCard summary={summaryContent} title="Deseja adicionar algo mais?">
           <div className="grid gap-3">
             {derivedOperation === "patient_emi" ? (
               <RootPicker label="Agente explícito (opcional)" value={derivedAgent} onChange={setDerivedAgent} />
@@ -479,7 +711,7 @@ export function SimpleModeWizard({ store, onApplyNote, isManualOverride, onSwitc
       ) : null}
 
       {stage === "noun-loan" ? (
-        <StepCard title="Origem do empréstimo">
+        <StepCard summary={summaryContent} title="Origem do empréstimo">
           <div className="grid gap-2">
             <Input
               value={loanSource}
@@ -504,7 +736,7 @@ export function SimpleModeWizard({ store, onApplyNote, isManualOverride, onSwitc
       ) : null}
 
       {stage === "noun-loan-detail" ? (
-        <StepCard title={loanType === "calque" ? "Raízes do calque" : "Detalhes da adaptação"}>
+        <StepCard summary={summaryContent} title={loanType === "calque" ? "Raízes do calque" : "Detalhes da adaptação"}>
           {loanType === "calque" ? (
             <div className="grid gap-3">
               <RootPicker label="Primeira raiz" value={loanCalqueRoots[0]} onChange={(entry) => updateRootAt(0, entry, setLoanCalqueRoots)} />
@@ -538,7 +770,7 @@ export function SimpleModeWizard({ store, onApplyNote, isManualOverride, onSwitc
       ) : null}
 
       {stage === "noun-extension" ? (
-        <StepCard title="Base da extensão semântica">
+        <StepCard summary={summaryContent} title="Base da extensão semântica">
           <RootPicker label="Raiz base" value={extensionRoot} onChange={setExtensionRoot} />
           <StepActions>
             <Button type="button" onClick={() => goNext("noun-extension-detail")} disabled={!extensionRoot}>
@@ -549,7 +781,7 @@ export function SimpleModeWizard({ store, onApplyNote, isManualOverride, onSwitc
       ) : null}
 
       {stage === "noun-extension-detail" ? (
-        <StepCard title="Detalhes da extensão">
+        <StepCard summary={summaryContent} title="Detalhes da extensão">
           <Textarea
             value={extensionNote}
             onChange={(event) => setExtensionNote(event.target.value)}
@@ -567,7 +799,7 @@ export function SimpleModeWizard({ store, onApplyNote, isManualOverride, onSwitc
       ) : null}
 
       {stage === "verb-kind" ? (
-        <StepCard title="Que tipo de verbo?">
+        <StepCard summary={summaryContent} title="Que tipo de verbo?">
           <OptionGrid>
             <OptionButton active={verbKind === "intransitive"} onClick={() => setVerbKind("intransitive")}>
               Intransitivo
@@ -594,7 +826,7 @@ export function SimpleModeWizard({ store, onApplyNote, isManualOverride, onSwitc
       ) : null}
 
       {stage === "verb-base" ? (
-        <StepCard title="Escolha o verbo base">
+        <StepCard summary={summaryContent} title="Escolha o verbo base">
           <RootPicker label="Verbo base" value={verbRoot} onChange={setVerbRoot} />
           <StepActions>
             <Button type="button" onClick={() => goNext("verb-arguments")} disabled={!verbRoot}>
@@ -605,7 +837,7 @@ export function SimpleModeWizard({ store, onApplyNote, isManualOverride, onSwitc
       ) : null}
 
       {stage === "verb-arguments" ? (
-        <StepCard title="Argumentos (opcional)">
+        <StepCard summary={summaryContent} title="Argumentos (opcional)">
           <p className="text-xs text-slate-600">
             Ajuste os argumentos no modo avançado se precisar de controle total.
           </p>
@@ -613,11 +845,21 @@ export function SimpleModeWizard({ store, onApplyNote, isManualOverride, onSwitc
             <div>
               <p className="font-semibold text-slate-700">Sujeito</p>
               <OptionInline value={verbSubjectChoice} onChange={setVerbSubjectChoice} />
+              {verbSubjectChoice === "show" ? (
+                <div className="mt-2">
+                  <RootPicker label="Sujeito (opcional)" value={verbSubjectRoot} onChange={setVerbSubjectRoot} />
+                </div>
+              ) : null}
             </div>
             {verbKind === "transitive" ? (
               <div>
                 <p className="font-semibold text-slate-700">Objeto</p>
                 <OptionInline value={verbObjectChoice} onChange={setVerbObjectChoice} />
+                {verbObjectChoice === "show" ? (
+                  <div className="mt-2">
+                    <RootPicker label="Objeto (opcional)" value={verbObjectRoot} onChange={setVerbObjectRoot} />
+                  </div>
+                ) : null}
               </div>
             ) : null}
           </div>
@@ -630,7 +872,7 @@ export function SimpleModeWizard({ store, onApplyNote, isManualOverride, onSwitc
       ) : null}
 
       {stage === "verb-options" ? (
-        <StepCard title="Adições opcionais">
+        <StepCard summary={summaryContent} title="Adições opcionais">
           <label className="flex items-center gap-2 text-xs text-slate-700">
             <input
               type="checkbox"
@@ -663,7 +905,7 @@ export function SimpleModeWizard({ store, onApplyNote, isManualOverride, onSwitc
       ) : null}
 
       {stage === "expression-kind" ? (
-        <StepCard title="Que tipo de expressão?">
+        <StepCard summary={summaryContent} title="Que tipo de expressão?">
           <OptionGrid>
             <OptionButton active={expressionKind === "fixed"} onClick={() => setExpressionKind("fixed")}>
               Expressão fixa
@@ -684,25 +926,72 @@ export function SimpleModeWizard({ store, onApplyNote, isManualOverride, onSwitc
       ) : null}
 
       {stage === "expression-detail" ? (
-        <StepCard title="Detalhes da expressão">
-          <Input
-            value={expressionText}
-            onChange={(event) => setExpressionText(event.target.value)}
-            placeholder="Forma ou frase base"
-          />
-          <Textarea
-            className="mt-2"
-            value={expressionNote}
-            onChange={(event) => setExpressionNote(event.target.value)}
-            placeholder="Nota curta (opcional)"
-          />
-          {expressionKind === "complex" ? (
-            <p className="mt-2 text-xs text-amber-700">
-              Estruturas complexas ficam melhores no modo avançado.
-            </p>
-          ) : null}
+        <StepCard summary={summaryContent} title="Detalhes da expressão">
+          {expressionKind === "fixed" ? (
+            <>
+              <Input
+                value={expressionText}
+                onChange={(event) => setExpressionText(event.target.value)}
+                placeholder="Forma ou frase base"
+              />
+              <Textarea
+                className="mt-2"
+                value={expressionNote}
+                onChange={(event) => setExpressionNote(event.target.value)}
+                placeholder="Nota curta (opcional)"
+              />
+            </>
+          ) : (
+            <>
+              <div className="grid gap-3">
+                <RootPicker label="Raiz principal" value={expressionRoots[0]} onChange={(entry) => updateRootAt(0, entry, setExpressionRoots)} />
+                <RootPicker label="Segunda raiz (opcional)" value={expressionRoots[1]} onChange={(entry) => updateRootAt(1, entry, setExpressionRoots)} />
+                <RootPicker label="Terceira raiz (opcional)" value={expressionRoots[2]} onChange={(entry) => updateRootAt(2, entry, setExpressionRoots)} />
+              </div>
+              <div className="mt-2">
+                <p className="text-xs font-semibold text-slate-700">Relação entre as partes</p>
+                <OptionGrid>
+                  <OptionButton active={expressionRelation === "descriptive"} onClick={() => setExpressionRelation("descriptive")}>
+                    Descritiva
+                  </OptionButton>
+                  <OptionButton active={expressionRelation === "related"} onClick={() => setExpressionRelation("related")}>
+                    Coisa relacionada a X
+                  </OptionButton>
+                  <OptionButton active={expressionRelation === "combine"} onClick={() => setExpressionRelation("combine")}>
+                    Apenas combinar
+                  </OptionButton>
+                </OptionGrid>
+              </div>
+              {expressionKind === "complex" ? (
+                <>
+                  <Input
+                    className="mt-2"
+                    value={expressionText}
+                    onChange={(event) => setExpressionText(event.target.value)}
+                    placeholder="Texto base (opcional)"
+                  />
+                  <Textarea
+                    className="mt-2"
+                    value={expressionNote}
+                    onChange={(event) => setExpressionNote(event.target.value)}
+                    placeholder="Nota curta (opcional)"
+                  />
+                  <p className="mt-2 text-xs text-amber-700">
+                    Estruturas complexas ficam melhores no modo avançado.
+                  </p>
+                </>
+              ) : (
+                <Textarea
+                  className="mt-2"
+                  value={expressionNote}
+                  onChange={(event) => setExpressionNote(event.target.value)}
+                  placeholder="Nota curta (opcional)"
+                />
+              )}
+            </>
+          )}
           <StepActions>
-            <Button type="button" onClick={() => goNext("preview")}>
+            <Button type="button" onClick={() => goNext("preview")} disabled={!expressionReady}>
               Ver prévia
             </Button>
           </StepActions>
@@ -710,7 +999,7 @@ export function SimpleModeWizard({ store, onApplyNote, isManualOverride, onSwitc
       ) : null}
 
       {stage === "preview" ? (
-        <StepCard title="Prévia e nota gerada">
+        <StepCard summary={summaryContent} title="Prévia e nota gerada">
           <p className="text-xs text-slate-600">A nota abaixo é gerada a partir da estrutura criada no modo simples.</p>
           <div className="mt-2 rounded-md border border-brand-100 bg-white px-2 py-2 text-sm text-slate-800">
             {store.generatedNote || "Preencha os passos para gerar a nota."}
@@ -739,12 +1028,30 @@ export function SimpleModeWizard({ store, onApplyNote, isManualOverride, onSwitc
   );
 }
 
-function StepCard({ title, children }: { title: string; children: ReactNode }) {
+function StepCard({ title, summary, children }: { title: string; summary?: ReactNode; children: ReactNode }) {
   return (
     <section className="rounded-md border border-brand-100 bg-white/70 p-3">
       <p className="text-sm font-semibold text-brand-900">{title}</p>
+      {summary ? <div className="mt-2">{summary}</div> : null}
       <div className="mt-2 space-y-3">{children}</div>
     </section>
+  );
+}
+
+function RecipeSummary({ items }: { items: Array<{ label: string; value: string }> }) {
+  if (items.length === 0) return null;
+  return (
+    <div className="rounded-md border border-brand-100 bg-brand-50/40 p-2 text-xs">
+      <p className="text-[11px] font-semibold text-brand-800">Receita atual</p>
+      <div className="mt-2 grid gap-1">
+        {items.map((item, index) => (
+          <div key={`${item.label}-${index}`} className="flex flex-wrap items-center justify-between gap-2">
+            <span className="text-slate-500">{item.label}</span>
+            <span className="text-slate-800">{item.value || "—"}</span>
+          </div>
+        ))}
+      </div>
+    </div>
   );
 }
 

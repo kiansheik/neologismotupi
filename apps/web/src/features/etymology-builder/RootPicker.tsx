@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -30,6 +30,12 @@ export function RootPicker({ label, value, onChange, placeholder, allowManual = 
     if (!value) return null;
     const gloss = value.gloss ? compactDefinition(value.gloss) : undefined;
     return gloss ? `${value.headword} — ${gloss}` : value.headword;
+  }, [value]);
+
+  useEffect(() => {
+    if (value) {
+      setQuery("");
+    }
   }, [value]);
 
   return (

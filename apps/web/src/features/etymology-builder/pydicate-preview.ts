@@ -24,6 +24,14 @@ export function collectPieces(node: BuilderNode | null): string[] {
       return [...collectPieces(node.possessor), ...collectPieces(node.possessed)];
     case "modifier":
       return [...collectPieces(node.modifier), ...collectPieces(node.target)];
+    case "verb_frame":
+      return [
+        ...collectPieces(node.verb),
+        ...(node.subject?.value ? collectPieces(node.subject.value) : []),
+        ...(node.object?.value ? collectPieces(node.object.value) : []),
+      ];
+    case "verb_argument":
+      return node.value ? collectPieces(node.value) : [];
     default:
       return [];
   }
@@ -56,6 +64,20 @@ function renderNode(node: BuilderNode, wrap: boolean): string {
       break;
     case "modifier":
       expr = `${renderNode(node.modifier, true)} * ${renderNode(node.target, true)}`;
+      break;
+    case "verb_frame": {
+      const pieces = [renderNode(node.verb, true)];
+      if (node.subject?.status === "explicit" && node.subject.value) {
+        pieces.push(renderNode(node.subject.value, true));
+      }
+      if (node.object?.status === "explicit" && node.object.value) {
+        pieces.push(renderNode(node.object.value, true));
+      }
+      expr = pieces.join(" * ");
+      break;
+    }
+    case "verb_argument":
+      expr = node.value ? renderNode(node.value, true) : "";
       break;
     default:
       expr = "";

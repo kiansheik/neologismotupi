@@ -146,13 +146,34 @@ export type ModifierNode = {
   target: BuilderNode;
 };
 
+export type VerbArgumentRole = "subject" | "object";
+export type VerbArgumentStatus = "explicit" | "omitted" | "unspecified";
+
+export type VerbArgumentNode = {
+  id: string;
+  kind: "verb_argument";
+  role: VerbArgumentRole;
+  status: VerbArgumentStatus;
+  value?: BuilderNode;
+};
+
+export type VerbFrameNode = {
+  id: string;
+  kind: "verb_frame";
+  verb: BuilderNode;
+  subject?: VerbArgumentNode;
+  object?: VerbArgumentNode;
+};
+
 export type BuilderNode =
   | RootNode
   | CompoundNode
   | DeriveNode
   | PostpositionNode
   | PossessorNode
-  | ModifierNode;
+  | ModifierNode
+  | VerbArgumentNode
+  | VerbFrameNode;
 
 export type PendingInsert =
   | { kind: "compound"; targetId?: string }
@@ -160,7 +181,9 @@ export type PendingInsert =
   | { kind: "possessor"; targetId: string }
   | { kind: "modifier"; targetId: string }
   | { kind: "postposition"; targetId: string }
-  | { kind: "derive-agent"; targetId: string };
+  | { kind: "derive-agent"; targetId: string }
+  | { kind: "verb-subject"; targetId: string }
+  | { kind: "verb-object"; targetId: string };
 
 export const POSTPOSITION_OPTIONS: Array<{ value: string; label: string }> = [
   { value: "amo", label: "amo (translacional)" },

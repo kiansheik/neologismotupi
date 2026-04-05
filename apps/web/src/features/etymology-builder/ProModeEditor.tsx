@@ -16,6 +16,8 @@ export function ProModeEditor({ store, onApplyNote, isManualOverride }: ProModeE
   const [rawText, setRawText] = useState("");
   const [runtimeEnabled, setRuntimeEnabled] = useState(true);
   const [autoSeeded, setAutoSeeded] = useState(false);
+  const draftText = store.pydicatePreview;
+  const hasDiverged = rawText.trim().length > 0 && rawText.trim() !== draftText.trim();
 
   useEffect(() => {
     if (autoSeeded) return;
@@ -32,17 +34,31 @@ export function ProModeEditor({ store, onApplyNote, isManualOverride }: ProModeE
       <section className="rounded-md border border-amber-200 bg-amber-50/40 p-3">
         <p className="text-sm font-semibold text-amber-900">Modo Pro</p>
         <p className="mt-1 text-xs text-amber-800">
-          Este modo aceita pydicate bruto. Alterações aqui não são reimportadas automaticamente para os modos simples/avançado.
+          Pydicate bruto. Alterações aqui não são reimportadas automaticamente para os modos simples/avançado.
         </p>
       </section>
 
       <section className="rounded-md border border-brand-100 bg-white/70 p-3">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <p className="text-sm font-semibold text-brand-900">Editor pydicate</p>
-          <Button type="button" variant="secondary" onClick={() => setRawText(store.pydicatePreview)}>
+          <Button
+            type="button"
+            variant="secondary"
+            onClick={() => {
+              if (hasDiverged && !window.confirm("Substituir o texto atual pelo rascunho da estrutura?")) {
+                return;
+              }
+              setRawText(draftText);
+            }}
+          >
             Carregar rascunho da estrutura
           </Button>
         </div>
+        {hasDiverged ? (
+          <p className="mt-1 text-[11px] text-amber-700">
+            O texto atual divergiu do rascunho da estrutura.
+          </p>
+        ) : null}
         <Textarea
           className="mt-2 min-h-[160px] font-mono text-xs"
           value={rawText}

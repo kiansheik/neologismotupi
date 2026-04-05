@@ -69,6 +69,10 @@ export function AdvancedModeEditor({ store, onApplyNote, isManualOverride }: Adv
         return targetLabel ? `Adicionar pós-posição em ${targetLabel}` : "Adicionar pós-posição";
       case "derive-agent":
         return targetLabel ? `Definir agente para ${targetLabel}` : "Definir agente";
+      case "verb-subject":
+        return targetLabel ? `Definir sujeito em ${targetLabel}` : "Definir sujeito";
+      case "verb-object":
+        return targetLabel ? `Definir objeto em ${targetLabel}` : "Definir objeto";
       default:
         return "Selecionar raiz";
     }
@@ -434,12 +438,16 @@ function NodeEditor({
   activeNodeId: string | null;
   onSelectNode: (nodeId: string | null) => void;
 }) {
-  const isActive = activeNodeId === node.id;
+  const isActive =
+    activeNodeId === node.id || (node.kind === "verb_argument" && node.value && activeNodeId === node.value.id);
+  const isVerbArgument = node.kind === "verb_argument";
   const handleDropDerive = (event: DragEvent<HTMLDivElement>) => {
     const op = event.dataTransfer.getData("deriveOp");
     if (op) {
       event.preventDefault();
-      onApplyDerive(node.id, op as DeriveOperation);
+      if (node.kind === "verb_argument" && !node.value) return;
+      const targetId = node.kind === "verb_argument" && node.value ? node.value.id : node.id;
+      onApplyDerive(targetId, op as DeriveOperation);
     }
   };
 
@@ -453,7 +461,9 @@ function NodeEditor({
         <button
           type="button"
           className="text-left"
-          onClick={() => onSelectNode(node.id)}
+          onClick={() =>
+            onSelectNode(node.kind === "verb_argument" && node.value ? node.value.id : node.id)
+          }
           title="Selecionar este nó"
         >
           <p className="text-sm font-semibold text-slate-800">{nodeLabel(node)}</p>
@@ -470,18 +480,22 @@ function NodeEditor({
             Adicionar raiz aqui
           </Button>
         ) : null}
-        <Button type="button" variant="ghost" onClick={() => onPending({ kind: "combine", targetId: node.id })}>
-          Combinar
-        </Button>
-        <Button type="button" variant="ghost" onClick={() => onPending({ kind: "possessor", targetId: node.id })}>
-          Adicionar possuidor
-        </Button>
-        <Button type="button" variant="ghost" onClick={() => onPending({ kind: "modifier", targetId: node.id })}>
-          Adicionar modificador
-        </Button>
-        <Button type="button" variant="ghost" onClick={() => onPending({ kind: "postposition", targetId: node.id })}>
-          Adicionar pós-posição
-        </Button>
+        {!isVerbArgument ? (
+          <>
+            <Button type="button" variant="ghost" onClick={() => onPending({ kind: "combine", targetId: node.id })}>
+              Combinar
+            </Button>
+            <Button type="button" variant="ghost" onClick={() => onPending({ kind: "possessor", targetId: node.id })}>
+              Adicionar possuidor
+            </Button>
+            <Button type="button" variant="ghost" onClick={() => onPending({ kind: "modifier", targetId: node.id })}>
+              Adicionar modificador
+            </Button>
+            <Button type="button" variant="ghost" onClick={() => onPending({ kind: "postposition", targetId: node.id })}>
+              Adicionar pós-posição
+            </Button>
+          </>
+        ) : null}
         {node.kind === "derive" && node.child.kind === "derive" ? (
           <Button type="button" variant="ghost" onClick={() => onSwapDerive(node.id)}>
             Inverter derivação
@@ -490,6 +504,38 @@ function NodeEditor({
         {node.kind === "derive" && DERIVE_OPERATIONS[node.operation].needsAgent && !node.agent ? (
           <Button type="button" variant="ghost" onClick={() => onPending({ kind: "derive-agent", targetId: node.id })}>
             Definir agente
+          </Button>
+        ) : null}
+        {node.kind === "verb_frame" ? (
+          <>
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={() => onPending({ kind: "verb-subject", targetId: node.subject?.id ?? node.id })}
+            >
+              Definir sujeito
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={() => onPending({ kind: "verb-object", targetId: node.object?.id ?? node.id })}
+            >
+              Definir objeto
+            </Button>
+          </>
+        ) : null}
+        {node.kind === "verb_argument" ? (
+          <Button
+            type="button"
+            variant="ghost"
+            onClick={() =>
+              onPending({
+                kind: node.role === "subject" ? "verb-subject" : "verb-object",
+                targetId: node.id,
+              })
+            }
+          >
+            Definir {node.role === "subject" ? "sujeito" : "objeto"}
           </Button>
         ) : null}
       </div>
@@ -555,6 +601,73 @@ function NodeEditor({
         </div>
       ) : null}
 
+      {node.kind === "verb_frame" ? (
+        <div className="mt-3 space-y-2">
+          <div className="rounded-md border border-slate-100 bg-slate-50 p-2">
+            <p className="text-[11px] font-semibold text-slate-600">Verbo</p>
+            <div className="mt-2">
+              <NodeEditor
+                node={node.verb}
+                onApplyDerive={onApplyDerive}
+                onRemove={onRemove}
+                onPending={onPending}
+                onMoveChild={onMoveChild}
+                onQuickPostposition={onQuickPostposition}
+                onSwapDerive={onSwapDerive}
+                activeNodeId={activeNodeId}
+                onSelectNode={onSelectNode}
+              />
+            </div>
+          </div>
+          <div className="rounded-md border border-slate-100 bg-slate-50 p-2">
+            <p className="text-[11px] font-semibold text-slate-600">Sujeito</p>
+            {node.subject ? (
+              <div className="mt-2">
+                <NodeEditor
+                  node={node.subject}
+                  onApplyDerive={onApplyDerive}
+                  onRemove={onRemove}
+                  onPending={onPending}
+                  onMoveChild={onMoveChild}
+                  onQuickPostposition={onQuickPostposition}
+                  onSwapDerive={onSwapDerive}
+                  activeNodeId={activeNodeId}
+                  onSelectNode={onSelectNode}
+                />
+              </div>
+            ) : (
+              <p className="mt-2 text-[11px] text-slate-500">Sujeito não definido.</p>
+            )}
+          </div>
+          <div className="rounded-md border border-slate-100 bg-slate-50 p-2">
+            <p className="text-[11px] font-semibold text-slate-600">Objeto</p>
+            {node.object ? (
+              <div className="mt-2">
+                <NodeEditor
+                  node={node.object}
+                  onApplyDerive={onApplyDerive}
+                  onRemove={onRemove}
+                  onPending={onPending}
+                  onMoveChild={onMoveChild}
+                  onQuickPostposition={onQuickPostposition}
+                  onSwapDerive={onSwapDerive}
+                  activeNodeId={activeNodeId}
+                  onSelectNode={onSelectNode}
+                />
+              </div>
+            ) : (
+              <p className="mt-2 text-[11px] text-slate-500">Objeto não definido.</p>
+            )}
+          </div>
+        </div>
+      ) : null}
+
+      {node.kind === "verb_argument" && !node.value ? (
+        <div className="mt-2 rounded-md border border-dashed border-slate-200 bg-white/70 p-2 text-[11px] text-slate-500">
+          Sem raiz definida para este argumento.
+        </div>
+      ) : null}
+
       {node.kind === "postposition" ? (
         <div className="mt-2 flex flex-wrap gap-2 text-xs">
           {POSTPOSITION_OPTIONS.map((postposition) => (
@@ -587,6 +700,10 @@ function nodeLabel(node: BuilderNode): string {
       return "Possuidor";
     case "modifier":
       return "Modificador";
+    case "verb_frame":
+      return "Predicado verbal";
+    case "verb_argument":
+      return node.role === "subject" ? "Sujeito" : "Objeto";
     default:
       return "";
   }
@@ -601,6 +718,15 @@ function nodeSubtitle(node: BuilderNode): string | undefined {
   }
   if (node.kind === "derive" && node.agent) {
     return `agente: ${describeNode(node.agent)}`;
+  }
+  if (node.kind === "verb_frame") {
+    return `verbo: ${describeNode(node.verb)}`;
+  }
+  if (node.kind === "verb_argument") {
+    if (node.status === "omitted") return "omitido";
+    if (node.status === "unspecified") return "a definir";
+    if (node.value) return describeNode(node.value);
+    return "explícito";
   }
   return undefined;
 }
@@ -642,6 +768,14 @@ function findNode(node: BuilderNode, targetId: string): BuilderNode | null {
       return findNode(node.possessor, targetId) || findNode(node.possessed, targetId);
     case "modifier":
       return findNode(node.modifier, targetId) || findNode(node.target, targetId);
+    case "verb_frame":
+      return (
+        findNode(node.verb, targetId) ||
+        (node.subject ? findNode(node.subject, targetId) : null) ||
+        (node.object ? findNode(node.object, targetId) : null)
+      );
+    case "verb_argument":
+      return node.value ? findNode(node.value, targetId) : null;
     default:
       return null;
   }

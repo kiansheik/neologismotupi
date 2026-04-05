@@ -49,9 +49,9 @@ export function toDisplayNode(node: BuilderNode): DisplayNode {
       return {
         id: node.id,
         kind: "possessor",
-        title: "Complemento (de)",
+        title: "Possuidor",
         children: [
-          { id: `${node.id}-possessor`, kind: "label", title: "Complemento" },
+          { id: `${node.id}-possessor`, kind: "label", title: "Possuidor" },
           toDisplayNode(node.possessor),
           { id: `${node.id}-possessed`, kind: "label", title: "Núcleo" },
           toDisplayNode(node.possessed),
@@ -61,14 +61,38 @@ export function toDisplayNode(node: BuilderNode): DisplayNode {
       return {
         id: node.id,
         kind: "modifier",
-        title: "Adjunto",
+        title: "Modificador",
         children: [
-          { id: `${node.id}-modifier`, kind: "label", title: "Adjunto" },
+          { id: `${node.id}-modifier`, kind: "label", title: "Modificador" },
           toDisplayNode(node.modifier),
           { id: `${node.id}-target`, kind: "label", title: "Núcleo" },
           toDisplayNode(node.target),
         ],
       };
+    case "verb_frame": {
+      return {
+        id: node.id,
+        kind: "verb_frame",
+        title: "Predicado verbal",
+        children: [
+          { id: `${node.id}-verb`, kind: "label", title: "Verbo" },
+          toDisplayNode(node.verb),
+          ...(node.subject ? [toDisplayNode(node.subject)] : []),
+          ...(node.object ? [toDisplayNode(node.object)] : []),
+        ],
+      };
+    }
+    case "verb_argument": {
+      const roleLabel = node.role === "subject" ? "Sujeito" : "Objeto";
+      const statusLabel =
+        node.status === "explicit" ? "explícito" : node.status === "omitted" ? "omitido" : "a definir";
+      return {
+        id: node.id,
+        kind: "verb_argument",
+        title: `${roleLabel} (${statusLabel})`,
+        children: node.value ? [toDisplayNode(node.value)] : undefined,
+      };
+    }
     default:
       return {
         id: node.id,
@@ -89,9 +113,13 @@ export function nodeActionLabel(node: BuilderNode): string {
     case "postposition":
       return "Pós-posição";
     case "possessor":
-      return "Complemento";
+      return "Possuidor";
     case "modifier":
-      return "Adjunto";
+      return "Modificador";
+    case "verb_frame":
+      return "Predicado verbal";
+    case "verb_argument":
+      return "Argumento";
     default:
       return "";
   }

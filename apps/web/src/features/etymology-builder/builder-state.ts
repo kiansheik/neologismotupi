@@ -9,6 +9,9 @@ import type {
   PostpositionNode,
   RootEntry,
   RootNode,
+  VerbArgumentNode,
+  VerbArgumentRole,
+  VerbFrameNode,
 } from "./builder-types";
 
 let idCounter = 0;
@@ -194,6 +197,41 @@ export function attachModifier(
   }));
 }
 
+export function setVerbArgumentValue(
+  root: BuilderNode,
+  targetId: string,
+  role: VerbArgumentRole,
+  value: BuilderNode,
+): BuilderNode {
+  return mapNode(root, (node) => {
+    if (node.kind === "verb_frame" && node.id === targetId) {
+      const currentArg = role === "subject" ? node.subject : node.object;
+      const nextArg: VerbArgumentNode = {
+        id: currentArg?.id ?? createId(`verb_${role}`),
+        kind: "verb_argument",
+        role,
+        status: "explicit",
+        value,
+      };
+      const nextFrame: VerbFrameNode = {
+        ...node,
+        subject: role === "subject" ? nextArg : node.subject,
+        object: role === "object" ? nextArg : node.object,
+      };
+      return nextFrame;
+    }
+    if (node.kind === "verb_argument" && node.id === targetId) {
+      if (node.role !== role) return node;
+      return {
+        ...node,
+        status: "explicit",
+        value,
+      };
+    }
+    return node;
+  });
+}
+
 export function removeNode(root: BuilderNode, targetId: string): BuilderNode | null {
   if (root.id === targetId) {
     return null;
@@ -248,6 +286,33 @@ export function removeNode(root: BuilderNode, targetId: string): BuilderNode | n
         target: nextTarget,
       };
       return nextNode;
+    }
+    case "verb_frame": {
+      const nextVerb = removeNode(root.verb, targetId);
+      if (!nextVerb) return null;
+      const nextSubject = root.subject ? removeNode(root.subject, targetId) : undefined;
+      const nextObject = root.object ? removeNode(root.object, targetId) : undefined;
+      return {
+        ...root,
+        verb: nextVerb,
+        subject: nextSubject ?? undefined,
+        object: nextObject ?? undefined,
+      };
+    }
+    case "verb_argument": {
+      if (!root.value) return root;
+      const nextValue = removeNode(root.value, targetId);
+      if (!nextValue) {
+        return {
+          ...root,
+          value: undefined,
+          status: root.status === "explicit" ? "unspecified" : root.status,
+        };
+      }
+      return {
+        ...root,
+        value: nextValue,
+      };
     }
     default:
       return root;
@@ -309,6 +374,10 @@ export function applyPendingInsert(
       return wrapWithPostposition(root, pending.targetId, newRoot.headword);
     case "derive-agent":
       return setDeriveAgent(root, pending.targetId, newRoot);
+    case "verb-subject":
+      return setVerbArgumentValue(root, pending.targetId, "subject", newRoot);
+    case "verb-object":
+      return setVerbArgumentValue(root, pending.targetId, "object", newRoot);
     default:
       return root;
   }
@@ -341,6 +410,18 @@ function mapNode(root: BuilderNode, fn: (node: BuilderNode) => BuilderNode): Bui
         ...root,
         modifier: mapNode(root.modifier, fn),
         target: mapNode(root.target, fn),
+      };
+    case "verb_frame":
+      return {
+        ...root,
+        verb: mapNode(root.verb, fn),
+        subject: root.subject ? mapNode(root.subject, fn) : undefined,
+        object: root.object ? mapNode(root.object, fn) : undefined,
+      };
+    case "verb_argument":
+      return {
+        ...root,
+        value: root.value ? mapNode(root.value, fn) : undefined,
       };
     default:
       return root;
@@ -383,6 +464,18 @@ function replaceNode(
         ...root,
         modifier: replaceNode(root.modifier, targetId, replacer),
         target: replaceNode(root.target, targetId, replacer),
+      };
+    case "verb_frame":
+      return {
+        ...root,
+        verb: replaceNode(root.verb, targetId, replacer),
+        subject: root.subject ? replaceNode(root.subject, targetId, replacer) : undefined,
+        object: root.object ? replaceNode(root.object, targetId, replacer) : undefined,
+      };
+    case "verb_argument":
+      return {
+        ...root,
+        value: root.value ? replaceNode(root.value, targetId, replacer) : undefined,
       };
     default:
       return root;

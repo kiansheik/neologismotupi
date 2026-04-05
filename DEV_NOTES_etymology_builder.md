@@ -32,9 +32,19 @@
 - Wizard flow optimized for common submission patterns.
 - Paths supported:
   - Noun: compound roots, derived from verb, loan/adaptation, semantic extension.
-  - Verb: base verb with optional causative/postposition scaffolding.
-  - Expression: minimal capture with handoff to Advanced for complex cases.
+  - Verb: base verb with optional causative/postposition + explicit subject/object slots.
+  - Expression: fixed phrase or compositional roots; complex expressions include lightweight scaffolding + handoff.
 - Simple mode writes to the structured tree and shows a generated note preview.
+- Includes a live “Receita atual” summary so the wizard feels like a slot-based recipe instead of a form.
+
+## Verb Argument Representation
+- Added `verb_frame` nodes that wrap a verb plus argument slots.
+- Added `verb_argument` nodes with:
+  - `role`: `subject` / `object`
+  - `status`: `explicit` / `omitted` / `unspecified`
+  - optional `value` (root or structure)
+- Simple mode now builds these nodes directly, so subject/object choices are preserved into Advanced.
+- Advanced mode exposes subject/object slots and allows setting them via the dictionary picker.
 
 ## Pro Mode (Raw Pydicate)
 - Raw pydicate textarea seeded from current structure on demand.
@@ -67,6 +77,7 @@
 - Possessor attachment.
 - Postposition attachment (common list + dictionary-driven).
 - Modifier attachment.
+- Verb framing with explicit/omitted subject/object slots.
 - Outputs:
   - Human-readable semicolon-style note synced to `morphology_notes` (compact roots + operations list + resultado).
   - Structured tree preview.

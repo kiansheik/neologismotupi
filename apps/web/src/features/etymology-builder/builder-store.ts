@@ -30,7 +30,7 @@ export type BuilderStore = {
   setPendingInsert: (pending: PendingInsert | null) => void;
   setActiveNodeId: (nodeId: string | null) => void;
   setRoot: (root: BuilderNode | null) => void;
-  setRootAndFocus: (root: BuilderNode | null) => void;
+  setRootAndFocus: (root: BuilderNode | null, focusId?: string | null) => void;
   applyRootEntry: (entry: RootEntry) => RootNode;
   applyDerive: (targetId: string, operation: DeriveOperation) => void;
   removeNode: (targetId: string) => void;
@@ -60,9 +60,9 @@ export function useEtymologyBuilderStore(): BuilderStore {
     }
   }, [root]);
 
-  const setRootAndFocus = useCallback((nextRoot: BuilderNode | null) => {
+  const setRootAndFocus = useCallback((nextRoot: BuilderNode | null, focusId?: string | null) => {
     setRoot(nextRoot);
-    setActiveNodeId(nextRoot?.id ?? null);
+    setActiveNodeId(focusId ?? nextRoot?.id ?? null);
   }, []);
 
   const applyRootEntry = useCallback(
