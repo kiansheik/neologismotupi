@@ -130,6 +130,7 @@ export function RootPicker({
               <p className="text-[11px] font-semibold text-slate-600">Adicionar manualmente</p>
               <div className="mt-2 grid gap-2">
                 <Input
+                  className="w-full"
                   value={manualHeadword}
                   onChange={(event) => setManualHeadword(event.target.value)}
                   placeholder="Forma base (ex.: mba'e)"
@@ -147,6 +148,7 @@ export function RootPicker({
                     ))}
                   </select>
                   <Input
+                    className="w-full"
                     value={manualGloss}
                     onChange={(event) => setManualGloss(event.target.value)}
                     placeholder="Definição curta (opcional)"
