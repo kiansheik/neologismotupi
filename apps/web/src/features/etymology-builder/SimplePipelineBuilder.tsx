@@ -3,6 +3,7 @@ import type { CSSProperties } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { useI18n } from "@/i18n";
 
 import { AgentPicker } from "./AgentPicker";
 import type { BuilderStore } from "./builder-store";
@@ -38,6 +39,8 @@ export function SimplePipelineBuilder({
   const mobilePreviewRef = useRef<HTMLDivElement | null>(null);
   const [mobilePreviewStyle, setMobilePreviewStyle] = useState<CSSProperties>({});
   const [mobilePreviewHeight, setMobilePreviewHeight] = useState<number | null>(null);
+  const [mobilePreviewPinned, setMobilePreviewPinned] = useState(false);
+  const { t } = useI18n();
 
   const runtimeCode = useMemo(() => {
     if (!store.pydicatePreview) return "";
@@ -129,6 +132,8 @@ export function SimplePipelineBuilder({
       const topOffset = 8;
       const start = columnTop - topOffset;
       const end = columnBottom - previewHeight - topOffset;
+      const pinned = scrollY >= start && scrollY < end;
+      setMobilePreviewPinned(pinned);
 
       if (scrollY < start) {
         setMobilePreviewStyle({});
@@ -173,10 +178,25 @@ export function SimplePipelineBuilder({
     };
   }, []);
 
+  const previewPanelClass = mobilePreviewPinned
+    ? "rounded-md border border-brand-200 bg-white p-3 shadow-md"
+    : "rounded-md border border-brand-100 bg-white/70 p-3";
+
   const previewPanel = (
-    <section className="rounded-md border border-brand-100 bg-white/70 p-3">
-      <p className="text-sm font-semibold text-brand-900">Preview</p>
-      <div className="mt-2 rounded-md border border-slate-200 bg-white px-2 py-2 text-[11px] text-slate-800">
+    <section className={previewPanelClass}>
+      <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-700">
+        {t("builder.previewTitle")}
+      </p>
+      <div
+        className={
+          "mt-2 rounded-md border px-2 py-2 text-[12px] font-semibold text-center " +
+          (runtimeState.status === "error"
+            ? "border-red-200 bg-red-50 text-red-800"
+            : runtimeDisplay
+              ? "border-emerald-200 bg-emerald-50 text-emerald-900"
+              : "border-slate-200 bg-white text-slate-800")
+        }
+      >
         {runtimeDisplay || runtimeState.message || "—"}
       </div>
       {runtimeState.status === "loading" ? (
@@ -188,7 +208,6 @@ export function SimplePipelineBuilder({
       {runtimeState.status === "error" && runtimeState.message ? (
         <p className="mt-1 text-[11px] text-amber-700">{runtimeState.message}</p>
       ) : null}
-      {runtimeVerbete ? <p className="mt-1 text-[11px] text-slate-500">Verbete gerado: {runtimeVerbete}</p> : null}
     </section>
   );
 

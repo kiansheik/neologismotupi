@@ -218,6 +218,7 @@ export const ptBR = {
     "Campo obrigatório. Use uma palavra ou expressão curta em português que melhor represente o sentido.",
   "submit.help.glossBlurb":
     "{term.glossCap} é uma palavra ou expressão curta que melhor representa o {term.entry} na língua de destino. Preencha a {term.gloss} em português (obrigatória) e, se quiser, a {term.gloss} em inglês.",
+  "builder.previewTitle": "Prévia ao vivo",
   "submit.help.partOfSpeech": "Escolha a classe gramatical que melhor representa o uso.",
   "submit.help.definition":
     "Descreva o significado do {term.entry} em português, como em um dicionário, sem repetir o próprio termo. Se a {term.gloss} já for suficiente, pode deixar em branco.",
@@ -792,6 +793,7 @@ export const enUS: Record<TranslationKey, string> = {
     "Required field. Use a short Portuguese word or phrase that best represents the meaning.",
   "submit.help.glossBlurb":
     "A {term.gloss} is a short word or phrase that best represents the {term.entry} in the target language. Fill Portuguese {term.gloss} (required) and optionally English {term.gloss}.",
+  "builder.previewTitle": "Live preview",
   "submit.help.partOfSpeech": "Choose the grammatical class that best matches usage.",
   "submit.help.definition":
     "Optional. Describe the {term.entry} in Portuguese as in a dictionary, without self-referencing the term. If the {term.gloss} is enough, you can leave it blank.",
