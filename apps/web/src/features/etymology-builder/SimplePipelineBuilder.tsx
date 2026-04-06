@@ -1,4 +1,5 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import type { CSSProperties } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -31,6 +32,12 @@ export function SimplePipelineBuilder({
 }: SimplePipelineBuilderProps) {
   const { state, meta } = store;
   const [compositionOpen, setCompositionOpen] = useState(false);
+  const [postpositionMode, setPostpositionMode] = useState<"preset" | "root" | "manual">("preset");
+  const [manualPostposition, setManualPostposition] = useState("");
+  const mobileColumnRef = useRef<HTMLDivElement | null>(null);
+  const mobilePreviewRef = useRef<HTMLDivElement | null>(null);
+  const [mobilePreviewStyle, setMobilePreviewStyle] = useState<CSSProperties>({});
+  const [mobilePreviewHeight, setMobilePreviewHeight] = useState<number | null>(null);
 
   const runtimeCode = useMemo(() => {
     if (!store.pydicatePreview) return "";
@@ -99,6 +106,73 @@ export function SimplePipelineBuilder({
     return false;
   };
 
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const mql = window.matchMedia("(min-width: 1024px)");
+
+    const update = () => {
+      const column = mobileColumnRef.current;
+      const preview = mobilePreviewRef.current;
+      if (!column || !preview) return;
+      if (mql.matches) {
+        setMobilePreviewStyle({});
+        return;
+      }
+      const scrollY = window.scrollY || window.pageYOffset;
+      const columnRect = column.getBoundingClientRect();
+      const columnTop = scrollY + columnRect.top;
+      const columnBottom = columnTop + column.offsetHeight;
+      const previewHeight = preview.offsetHeight;
+      if (!Number.isNaN(previewHeight)) {
+        setMobilePreviewHeight(previewHeight);
+      }
+      const topOffset = 8;
+      const start = columnTop - topOffset;
+      const end = columnBottom - previewHeight - topOffset;
+
+      if (scrollY < start) {
+        setMobilePreviewStyle({});
+        return;
+      }
+
+      if (scrollY >= end) {
+        setMobilePreviewStyle({
+          position: "absolute",
+          top: `${columnBottom - columnTop - previewHeight}px`,
+          left: "0",
+          width: "100%",
+        });
+        return;
+      }
+
+      setMobilePreviewStyle({
+        position: "fixed",
+        top: `${topOffset}px`,
+        left: `${columnRect.left}px`,
+        width: `${columnRect.width}px`,
+        zIndex: 10,
+      });
+    };
+
+    const onScroll = () => {
+      window.requestAnimationFrame(update);
+    };
+
+    const ro = new ResizeObserver(update);
+    if (mobilePreviewRef.current) ro.observe(mobilePreviewRef.current);
+    if (mobileColumnRef.current) ro.observe(mobileColumnRef.current);
+
+    window.addEventListener("scroll", onScroll, { passive: true });
+    window.addEventListener("resize", update);
+    update();
+
+    return () => {
+      window.removeEventListener("scroll", onScroll);
+      window.removeEventListener("resize", update);
+      ro.disconnect();
+    };
+  }, []);
+
   const previewPanel = (
     <section className="rounded-md border border-brand-100 bg-white/70 p-3">
       <p className="text-sm font-semibold text-brand-900">Preview</p>
@@ -155,11 +229,13 @@ export function SimplePipelineBuilder({
   return (
     <div className="space-y-4">
       <div className="flex flex-col gap-4 lg:flex-row">
-        <div className="flex-1 space-y-4">
-          <div className="lg:hidden">
-            <div className="sticky top-2 z-10 max-h-[30vh] overflow-auto">{previewPanel}</div>
+        <div className="flex-1 space-y-4 lg:relative" ref={mobileColumnRef}>
+        <div className="lg:hidden" style={{ height: mobilePreviewHeight ?? undefined }}>
+          <div ref={mobilePreviewRef} style={mobilePreviewStyle}>
+            <div className="max-h-[30vh] overflow-auto">{previewPanel}</div>
           </div>
-          <section className="rounded-md border border-brand-100 bg-white/70 p-3">
+        </div>
+        <section className="rounded-md border border-brand-100 bg-white/70 p-3">
             <p className="text-sm font-semibold text-brand-900">Raiz base</p>
             <p className="mt-1 text-xs text-slate-600">Selecione a raiz principal para iniciar a composição.</p>
             <div className="mt-2">
@@ -198,7 +274,7 @@ export function SimplePipelineBuilder({
             ) : null}
           </div>
         ) : null}
-          </section>
+        </section>
 
         <section className="rounded-md border border-brand-100 bg-white/70 p-3">
           <p className="text-sm font-semibold text-brand-900">Operações (composição e derivações)</p>
@@ -406,22 +482,16 @@ export function SimplePipelineBuilder({
                         </div>
                       </div>
                       <div className="mt-2">
-                        <select
-                          className="w-full rounded-md border border-slate-200 bg-white px-2 py-1 text-xs"
-                          value={step.value}
-                          onChange={(event) =>
-                            store.setPostpositionStep(
-                              step.id,
-                              event.target.value as (typeof POSTPOSITION_OPTIONS)[number]["value"],
-                            )
-                          }
-                        >
-                          {POSTPOSITION_OPTIONS.map((optionItem) => (
-                            <option key={optionItem.value} value={optionItem.value}>
-                              {optionItem.label}
-                            </option>
-                          ))}
-                        </select>
+                        {step.entry ? (
+                          <p className="text-[11px] text-slate-500">
+                            {step.entry.headword}
+                            {step.entry.gloss ? ` — ${step.entry.gloss}` : ""}
+                          </p>
+                        ) : (
+                          <p className="text-[11px] text-slate-500">
+                            {option ? option.label : step.value}
+                          </p>
+                        )}
                       </div>
                     </div>
                   );
@@ -537,25 +607,90 @@ export function SimplePipelineBuilder({
             </div>
             <div className="px-3 pb-3">
               {state.base ? (
-                <div className="flex flex-wrap items-center gap-2">
-                  <select
-                    className="rounded-md border border-slate-200 bg-white px-2 py-1 text-xs"
-                    defaultValue=""
-                    onChange={(event) => {
-                      const value = event.target.value as (typeof POSTPOSITION_OPTIONS)[number]["value"];
-                      if (!value) return;
-                      store.addPostpositionStep(value);
-                      event.currentTarget.value = "";
-                    }}
-                  >
-                    <option value="">Selecionar…</option>
-                    {POSTPOSITION_OPTIONS.map((option) => (
-                      <option key={option.value} value={option.value}>
-                        {option.label}
-                      </option>
-                    ))}
-                  </select>
-                  <p className="text-[11px] text-slate-500">Adiciona uma nova etapa.</p>
+                <div className="space-y-2">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <button
+                      type="button"
+                      className={optionClass(postpositionMode === "preset")}
+                      onClick={() => setPostpositionMode("preset")}
+                    >
+                      Lista
+                    </button>
+                    <button
+                      type="button"
+                      className={optionClass(postpositionMode === "root")}
+                      onClick={() => setPostpositionMode("root")}
+                    >
+                      Buscar
+                    </button>
+                    <button
+                      type="button"
+                      className={optionClass(postpositionMode === "manual")}
+                      onClick={() => setPostpositionMode("manual")}
+                    >
+                      Manual
+                    </button>
+                  </div>
+                  {postpositionMode === "preset" ? (
+                    <div className="flex flex-wrap items-center gap-2">
+                      <select
+                        className="rounded-md border border-slate-200 bg-white px-2 py-1 text-xs"
+                        defaultValue=""
+                        onChange={(event) => {
+                          const value = event.target.value;
+                          if (!value) return;
+                          store.addPostpositionStep(value, undefined, "preset");
+                          event.currentTarget.value = "";
+                        }}
+                      >
+                        <option value="">Selecionar…</option>
+                        {POSTPOSITION_OPTIONS.map((option) => (
+                          <option key={option.value} value={option.value}>
+                            {option.label}
+                          </option>
+                        ))}
+                      </select>
+                      <p className="text-[11px] text-slate-500">Adiciona uma nova etapa.</p>
+                    </div>
+                  ) : null}
+                  {postpositionMode === "root" ? (
+                    <RootPicker
+                      label="Buscar postposição"
+                      value={null}
+                      onChange={(entry) => {
+                        if (!entry) return;
+                        store.addPostpositionStep(entry.headword, entry, "root");
+                      }}
+                      filterPosKinds={["postposition"]}
+                      manualPosKinds={["postposition"]}
+                      placeholder="Buscar postposição..."
+                    />
+                  ) : null}
+                  {postpositionMode === "manual" ? (
+                    <div className="rounded-md border border-slate-200 bg-white/80 p-2">
+                      <p className="text-[11px] font-semibold text-slate-600">Adicionar manualmente</p>
+                      <div className="mt-2 flex flex-wrap items-center gap-2">
+                        <Input
+                          value={manualPostposition}
+                          onChange={(event) => setManualPostposition(event.target.value)}
+                          placeholder="ex.: ramo"
+                        />
+                        <Button
+                          type="button"
+                          variant="secondary"
+                          onClick={() => {
+                            const trimmed = manualPostposition.trim();
+                            if (!trimmed) return;
+                            store.addPostpositionStep(trimmed, undefined, "manual");
+                            setManualPostposition("");
+                          }}
+                          disabled={!manualPostposition.trim()}
+                        >
+                          Adicionar
+                        </Button>
+                      </div>
+                    </div>
+                  ) : null}
                 </div>
               ) : (
                 <p className="text-xs text-slate-500">Selecione a raiz base para liberar as postposições.</p>
@@ -605,7 +740,8 @@ export function SimplePipelineBuilder({
               ))
             )}
           </div>
-          </section>
+        </section>
+
         </div>
         <aside className="hidden lg:block lg:w-80 xl:w-96">
           <div className="lg:sticky lg:top-4">{previewPanel}</div>

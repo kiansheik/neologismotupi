@@ -4,6 +4,7 @@ import type {
   DeriveOperation,
   ObjectResolution,
   PipelineState,
+  PostpositionSource,
   PostpositionValue,
   RootEntry,
 } from "./builder-types";
@@ -22,7 +23,7 @@ export type BuilderStore = {
   updateComposeStep: (id: string, entry: RootEntry | null) => void;
   addObjectStep: (resolution?: ObjectResolution) => void;
   updateObjectStep: (id: string, resolution: ObjectResolution) => void;
-  addPostpositionStep: (value: PostpositionValue) => void;
+  addPostpositionStep: (value: PostpositionValue, entry?: RootEntry, source?: PostpositionSource) => void;
   setPostpositionStep: (id: string, value: PostpositionValue) => void;
   addDerivationStep: (operation: DeriveOperation) => void;
   removeStep: (id: string) => void;
@@ -93,10 +94,20 @@ export function useEtymologyBuilderStore(): BuilderStore {
     }));
   }, []);
 
-  const addPostpositionStep = useCallback((value: PostpositionValue) => {
+  const addPostpositionStep = useCallback(
+    (value: PostpositionValue, entry?: RootEntry, source?: PostpositionSource) => {
     setState((prev) => ({
       ...prev,
-      steps: [...prev.steps, { id: createId("postposition"), kind: "postposition", value }],
+      steps: [
+        ...prev.steps,
+        {
+          id: createId("postposition"),
+          kind: "postposition",
+          value,
+          entry,
+          source,
+        },
+      ],
     }));
   }, []);
 
@@ -108,6 +119,7 @@ export function useEtymologyBuilderStore(): BuilderStore {
       ),
     }));
   }, []);
+
 
   const addObjectStep = useCallback((resolution?: ObjectResolution) => {
     setState((prev) => ({

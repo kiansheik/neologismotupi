@@ -73,7 +73,9 @@ export const DERIVE_OPERATIONS: Record<string, DeriveOperationSpec> = {
 
 export type DeriveOperation = keyof typeof DERIVE_OPERATIONS;
 
-export type PostpositionValue = (typeof POSTPOSITION_OPTIONS)[number]["value"];
+export type PostpositionValue = string;
+
+export type PostpositionSource = "preset" | "root" | "manual";
 
 export type RootEntry = {
   headword: string;
@@ -106,7 +108,13 @@ export type PipelineStep =
   | { id: string; kind: "compose"; entry: RootEntry | null }
   | { id: string; kind: "derive"; op: DeriveOperation; agent?: RootEntry | null }
   | { id: string; kind: "object"; resolution: ObjectResolution }
-  | { id: string; kind: "postposition"; value: PostpositionValue };
+  | {
+      id: string;
+      kind: "postposition";
+      value: PostpositionValue;
+      entry?: RootEntry;
+      source?: PostpositionSource;
+    };
 
 export type PipelineState = {
   base: RootEntry | null;
@@ -115,7 +123,6 @@ export type PipelineState = {
 };
 
 export const POSTPOSITION_OPTIONS: Array<{ value: string; label: string }> = [
-  { value: "amo", label: "amo (translacional)" },
   { value: "ramo", label: "ramo (translacional)" },
   { value: "supé", label: "supé (dativo)" },
   { value: "pe", label: "pe (locativo)" },
