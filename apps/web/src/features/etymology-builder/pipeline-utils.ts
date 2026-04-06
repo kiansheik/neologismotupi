@@ -186,7 +186,6 @@ export function inferPartOfSpeechValue(
     }
     return null;
   }
-  if (meta.currentStage === "adverb") return "adverb";
   if (meta.currentStage === "noun") return "noun";
   return mapPosKindToPartOfSpeech(state.base.posKind ?? "unknown");
 }
