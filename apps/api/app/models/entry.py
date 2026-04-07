@@ -36,6 +36,8 @@ class Entry(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     normalized_headword: Mapped[str] = mapped_column(String(180), nullable=False, index=True)
     gloss_pt: Mapped[str | None] = mapped_column(String(255), nullable=True)
     gloss_en: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    normalized_gloss_pt: Mapped[str | None] = mapped_column(String(255), nullable=True, index=True)
+    normalized_gloss_en: Mapped[str | None] = mapped_column(String(255), nullable=True, index=True)
     part_of_speech: Mapped[str | None] = mapped_column(String(64), nullable=True)
     short_definition: Mapped[str] = mapped_column(Text, nullable=False)
     source_citation: Mapped[str | None] = mapped_column(String(500), nullable=True)

@@ -24,6 +24,12 @@
   --accent-strong: 15 63 34;
   --accent-soft: 223 240 230;
   --accent-contrast: 255 255 255;
+  --vote-up-bg: 223 240 230;
+  --vote-up-border: 191 214 173;
+  --vote-up-text: 20 83 45;
+  --vote-down-bg: 254 226 226;
+  --vote-down-border: 252 165 165;
+  --vote-down-text: 185 28 28;
   --focus: 138 114 70;
   --tooltip: 15 23 42;
   --glow-1: 223 240 230;
@@ -71,6 +77,12 @@
   --accent-strong: 38 122 80;
   --accent-soft: 37 72 54;
   --accent-contrast: 255 255 255;
+  --vote-up-bg: 23 53 40;
+  --vote-up-border: 47 143 95;
+  --vote-up-text: 176 235 204;
+  --vote-down-bg: 72 28 28;
+  --vote-down-border: 213 91 91;
+  --vote-down-text: 254 212 212;
   --focus: 183 152 94;
   --tooltip: 12 14 18;
   --glow-1: 31 58 46;

@@ -467,13 +467,14 @@ export function AudioSampleList({
                   variant="secondary"
                   className={`inline-flex h-8 w-8 items-center justify-center rounded-full border border-line-strong bg-surface-input p-0 text-base leading-none shadow-sm transition-colors ${
                     audioVote === 1
-                      ? "border-accent bg-accent text-accent-contrast hover:bg-accent-strong"
+                      ? "border-vote-up-border bg-vote-up text-vote-up-text"
                       : "hover:border-brand-500 hover:bg-brand-50"
                   }`}
                   onClick={() => onVote?.(sample.id, 1)}
                   disabled={!canVoteOnSample || isVoting || isDeleting}
                   title={t("audio.upvote")}
                   aria-label={t("audio.upvote")}
+                  aria-pressed={audioVote === 1}
                 >
                   <span aria-hidden>{t("audio.upvoteEmoji")}</span>
                 </Button>
@@ -482,13 +483,14 @@ export function AudioSampleList({
                   variant="secondary"
                   className={`inline-flex h-8 w-8 items-center justify-center rounded-full border border-line-strong bg-surface-input p-0 text-base leading-none shadow-sm transition-colors ${
                     audioVote === -1
-                      ? "border-red-600 bg-red-600 text-white hover:bg-red-700"
+                      ? "border-vote-down-border bg-vote-down text-vote-down-text"
                       : "hover:border-red-500 hover:bg-red-100"
                   }`}
                   onClick={() => onVote?.(sample.id, -1)}
                   disabled={!canVoteOnSample || isVoting || isDeleting}
                   title={t("audio.downvote")}
                   aria-label={t("audio.downvote")}
+                  aria-pressed={audioVote === -1}
                 >
                   <span aria-hidden>{t("audio.downvoteEmoji")}</span>
                 </Button>

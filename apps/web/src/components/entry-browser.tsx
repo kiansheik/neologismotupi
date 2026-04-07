@@ -1,16 +1,23 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useInfiniteQuery } from "@tanstack/react-query";
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 
 import { StatusBadge } from "@/components/status-badge";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
 import { UserBadge } from "@/components/user-badge";
-import { listEntries } from "@/features/entries/api";
+import { useCurrentUser } from "@/features/auth/hooks";
+import { getEntryConstraints, listEntries, voteEntry } from "@/features/entries/api";
+import { createComment } from "@/features/comments/api";
 import { partOfSpeechLabel, statusToKey } from "@/i18n/formatters";
 import { useI18n } from "@/i18n";
 import { trackEvent } from "@/lib/analytics";
+import { ApiError } from "@/lib/api";
+import { getLocalizedApiErrorMessage } from "@/lib/localized-api-error";
 import { entryDefinitionPreview } from "@/lib/entry-definition";
+import { getCachedVote, resolveVote, setCachedVote, useVoteMemoryVersion } from "@/lib/vote-memory";
 
 type EntrySort = "alphabetical" | "recent" | "score" | "most_examples" | "unseen";
 
@@ -65,6 +72,19 @@ export function EntryBrowser({
   const TitleTag = titleAs;
   const hasMounted = useRef(false);
   const loadMoreRef = useRef<HTMLDivElement | null>(null);
+  const queryClient = useQueryClient();
+  const { data: currentUser } = useCurrentUser();
+  useVoteMemoryVersion();
+  const [voteTargetId, setVoteTargetId] = useState<string | null>(null);
+  const [downvoteDrafts, setDownvoteDrafts] = useState<Record<string, string>>({});
+  const [downvoteOpen, setDownvoteOpen] = useState<Record<string, boolean>>({});
+  const [downvoteErrors, setDownvoteErrors] = useState<Record<string, string>>({});
+  const canVote = Boolean(currentUser);
+
+  const constraintsQuery = useQuery({
+    queryKey: ["entry-constraints"],
+    queryFn: getEntryConstraints,
+  });
 
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState("");
@@ -136,6 +156,68 @@ export function EntryBrowser({
     () => data?.pages.flatMap((page) => page.items) ?? [],
     [data],
   );
+
+  const voteMutation = useMutation({
+    mutationFn: (params: { entryId: string; value: -1 | 1 }) =>
+      voteEntry(params.entryId, { value: params.value }),
+    onMutate: (params) => {
+      setVoteTargetId(params.entryId);
+    },
+    onSuccess: (_, params) => {
+      setCachedVote(currentUser?.id, "entry", params.entryId, params.value);
+      trackEvent("entry_voted", {
+        direction: params.value === 1 ? "up" : "down",
+        context: analyticsContext ?? "entry_list",
+      });
+      queryClient.invalidateQueries({ queryKey: ["entry-browser"] });
+    },
+    onError: (error, params) => {
+      trackEvent("entry_vote_failed", {
+        direction: params.value === 1 ? "up" : "down",
+        error_code: error instanceof ApiError ? error.code : "unknown",
+        context: analyticsContext ?? "entry_list",
+      });
+    },
+    onSettled: () => {
+      setVoteTargetId(null);
+    },
+  });
+
+  const downvoteWithCommentMutation = useMutation({
+    mutationFn: async (params: { entryId: string; body: string }) => {
+      await createComment(params.entryId, { body: params.body });
+      return voteEntry(params.entryId, { value: -1 });
+    },
+    onMutate: (params) => {
+      setVoteTargetId(params.entryId);
+    },
+    onSuccess: (_, params) => {
+      setCachedVote(currentUser?.id, "entry", params.entryId, -1);
+      trackEvent("entry_voted", {
+        direction: "down",
+        context: analyticsContext ?? "entry_list",
+      });
+      queryClient.invalidateQueries({ queryKey: ["entry-browser"] });
+      setDownvoteOpen((current) => ({ ...current, [params.entryId]: false }));
+      setDownvoteDrafts((current) => ({ ...current, [params.entryId]: "" }));
+      setDownvoteErrors((current) => ({ ...current, [params.entryId]: "" }));
+    },
+    onError: (error, params) => {
+      trackEvent("entry_vote_failed", {
+        direction: "down",
+        error_code: error instanceof ApiError ? error.code : "unknown",
+        context: analyticsContext ?? "entry_list",
+      });
+      setDownvoteErrors((current) => ({
+        ...current,
+        [params.entryId]:
+          error instanceof ApiError ? getLocalizedApiErrorMessage(error, t) : t("api.request_failed"),
+      }));
+    },
+    onSettled: () => {
+      setVoteTargetId(null);
+    },
+  });
 
   useEffect(() => {
     if (!hasNextPage || isFetchingNextPage) {
@@ -276,6 +358,18 @@ export function EntryBrowser({
             const shouldShowGloss =
               normalizedGloss.length > 0 &&
               normalizedGloss !== normalizedDefinition;
+            const entryVote = resolveVote(
+              entry.current_user_vote,
+              getCachedVote(currentUser?.id, "entry", entry.id),
+            );
+            const isVotingEntry =
+              (voteMutation.isPending || downvoteWithCommentMutation.isPending) &&
+              voteTargetId === entry.id;
+            const requiresComment = constraintsQuery.data?.downvote_requires_comment ?? true;
+            const minDownvoteLength = constraintsQuery.data?.downvote_comment_min_length ?? 1;
+            const isDownvoteOpen = Boolean(downvoteOpen[entry.id]);
+            const downvoteDraft = downvoteDrafts[entry.id] ?? "";
+            const downvoteError = downvoteErrors[entry.id];
 
             return (
               <article
@@ -308,12 +402,115 @@ export function EntryBrowser({
                 <p className="mt-1 text-sm text-slate-700">
                   {entryDefinitionPreview(entry.short_definition)}
                 </p>
-                <p className="mt-2 text-xs text-slate-600">
-                  {t("entries.scoreExamples", {
-                    score: entry.score_cache,
-                    examples: entry.example_count_cache,
-                  })}
-                </p>
+                <div className="mt-2 flex flex-wrap items-center gap-2">
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    className={`inline-flex h-8 w-8 items-center justify-center rounded-full border border-line-strong bg-surface-input p-0 text-sm leading-none shadow-sm transition-colors ${
+                      entryVote === 1
+                        ? "border-vote-up-border bg-vote-up text-vote-up-text"
+                        : "hover:border-brand-500 hover:bg-brand-50"
+                    }`}
+                    onClick={() => voteMutation.mutate({ entryId: entry.id, value: 1 })}
+                    disabled={!canVote || isVotingEntry}
+                    title={canVote ? t("entry.upvote") : t("entry.signInPrompt")}
+                    aria-label={t("entry.upvote")}
+                    aria-pressed={entryVote === 1}
+                  >
+                    <span aria-hidden>{t("entry.upvoteEmoji")}</span>
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    className={`inline-flex h-8 w-8 items-center justify-center rounded-full border border-line-strong bg-surface-input p-0 text-sm leading-none shadow-sm transition-colors ${
+                      entryVote === -1
+                        ? "border-vote-down-border bg-vote-down text-vote-down-text"
+                        : "hover:border-red-500 hover:bg-red-100"
+                    }`}
+                    onClick={() => {
+                      if (!requiresComment) {
+                        voteMutation.mutate({ entryId: entry.id, value: -1 });
+                        return;
+                      }
+                      setDownvoteOpen((current) => ({
+                        ...current,
+                        [entry.id]: true,
+                      }));
+                      setDownvoteErrors((current) => ({ ...current, [entry.id]: "" }));
+                    }}
+                    disabled={!canVote || isVotingEntry}
+                    title={canVote ? t("entry.downvote") : t("entry.signInPrompt")}
+                    aria-label={t("entry.downvote")}
+                    aria-pressed={entryVote === -1}
+                  >
+                    <span aria-hidden>{t("entry.downvoteEmoji")}</span>
+                  </Button>
+                  <span className="text-xs text-slate-600">
+                    {t("entries.scoreExamples", {
+                      score: entry.score_cache,
+                      examples: entry.example_count_cache,
+                    })}
+                  </span>
+                </div>
+                {requiresComment && isDownvoteOpen ? (
+                  <div className="mt-2 rounded-md border border-brand-100 bg-surface/70 p-2">
+                    <p className="text-xs text-slate-700">{t("entries.downvoteRequiresComment")}</p>
+                    <p className="mt-1 text-xs text-slate-600">
+                      {t("api.downvote_comment_required", { min: minDownvoteLength })}
+                    </p>
+                    <p className="mt-1 text-xs text-slate-600">{t("entries.downvoteHelper")}</p>
+                    <div className="mt-2">
+                      <Textarea
+                        rows={3}
+                        value={downvoteDraft}
+                        placeholder={t("entry.commentPlaceholder")}
+                        onChange={(event) => {
+                          const value = event.target.value;
+                          setDownvoteDrafts((current) => ({ ...current, [entry.id]: value }));
+                        }}
+                      />
+                    </div>
+                    {downvoteError ? (
+                      <p className="mt-2 text-xs text-red-700">{downvoteError}</p>
+                    ) : null}
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      <Button
+                        type="button"
+                        className="px-3 py-1 text-xs"
+                        disabled={!canVote || isVotingEntry}
+                        onClick={() => {
+                          const trimmed = downvoteDraft.trim();
+                          if (trimmed.length < minDownvoteLength) {
+                            setDownvoteErrors((current) => ({
+                              ...current,
+                              [entry.id]: t("api.downvote_comment_required", {
+                                min: minDownvoteLength,
+                              }),
+                            }));
+                            return;
+                          }
+                          downvoteWithCommentMutation.mutate({
+                            entryId: entry.id,
+                            body: trimmed,
+                          });
+                        }}
+                      >
+                        {t("entries.downvoteSubmit")}
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        className="px-3 py-1 text-xs"
+                        onClick={() => {
+                          setDownvoteOpen((current) => ({ ...current, [entry.id]: false }));
+                          setDownvoteErrors((current) => ({ ...current, [entry.id]: "" }));
+                        }}
+                      >
+                        {t("entries.downvoteCancel")}
+                      </Button>
+                    </div>
+                  </div>
+                ) : null}
                 <p className="mt-1 text-xs text-slate-600">
                   <span className="inline-flex flex-wrap items-center gap-1">
                     <Link

@@ -12,6 +12,11 @@ def normalize_text(value: str) -> str:
     return "".join(char for char in normalized if unicodedata.category(char) != "Mn")
 
 
+def normalize_search_query(value: str) -> str:
+    normalized = normalize_text(value).replace("-", " ")
+    return collapse_whitespace(normalized)
+
+
 def slugify(value: str) -> str:
     normalized = normalize_text(value)
     slug = re.sub(r"[^a-z0-9]+", "-", normalized).strip("-")

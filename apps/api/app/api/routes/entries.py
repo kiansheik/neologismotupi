@@ -13,7 +13,7 @@ from app.core.deps import SessionDep, get_current_user, get_current_user_optiona
 from app.core.enums import EntryStatus, ExampleStatus, ReportStatus, ReportTargetType
 from app.core.errors import raise_api_error
 from app.core.permissions import can_edit_entry, can_edit_example, is_moderator
-from app.core.utils import collapse_whitespace, normalize_text, slugify
+from app.core.utils import collapse_whitespace, normalize_search_query, normalize_text, slugify
 from app.models.discussion import CommentVote, EntryComment
 from app.models.audio import AudioSample, AudioVote
 from app.models.entry import Entry, EntryTag, EntryVersion, Example, ExampleVersion, ExampleVote, Tag, Vote
@@ -586,11 +586,17 @@ async def list_entries(
 
     if search:
         pattern = f"%{collapse_whitespace(search)}%"
+        normalized_search = normalize_search_query(search)
+        normalized_pattern = f"%{normalized_search}%"
+        normalized_headword = func.replace(Entry.normalized_headword, "-", " ")
         conditions.append(
             or_(
                 Entry.headword.ilike(pattern),
                 Entry.gloss_pt.ilike(pattern),
                 Entry.gloss_en.ilike(pattern),
+                normalized_headword.ilike(normalized_pattern),
+                Entry.normalized_gloss_pt.ilike(normalized_pattern),
+                Entry.normalized_gloss_en.ilike(normalized_pattern),
             )
         )
 
@@ -652,7 +658,7 @@ async def list_entries(
         conditions.append(SourceWork.id == source_work_id)
 
     if source_query:
-        normalized_source = normalize_text(source_query)
+        normalized_source = normalize_search_query(source_query)
         source_pattern = f"%{source_query}%"
         normalized_source_pattern = f"%{normalized_source}%"
 
@@ -661,8 +667,8 @@ async def list_entries(
                 SourceWork.authors.ilike(source_pattern),
                 SourceWork.title.ilike(source_pattern),
                 SourceEdition.edition_label.ilike(source_pattern),
-                SourceWork.normalized_authors.ilike(normalized_source_pattern),
-                SourceWork.normalized_title.ilike(normalized_source_pattern),
+                func.replace(SourceWork.normalized_authors, "-", " ").ilike(normalized_source_pattern),
+                func.replace(SourceWork.normalized_title, "-", " ").ilike(normalized_source_pattern),
                 Entry.source_citation.ilike(source_pattern),
             )
         )
@@ -689,9 +695,24 @@ async def list_entries(
     total = int((await db.execute(count_stmt)).scalar_one())
     entries = (await db.execute(stmt)).scalars().unique().all()
     badge_leaders = await get_user_badge_leaders(db)
+    entry_votes: dict[uuid.UUID, int] = {}
+
+    if user and entries:
+        entry_ids = [entry.id for entry in entries]
+        vote_rows = (
+            await db.execute(
+                select(Vote.entry_id, Vote.value).where(
+                    and_(Vote.user_id == user.id, Vote.entry_id.in_(entry_ids))
+                )
+            )
+        ).all()
+        entry_votes = {row[0]: row[1] for row in vote_rows}
 
     return EntryListOut(
-        items=[serialize_entry_summary(entry, badge_leaders) for entry in entries],
+        items=[
+            serialize_entry_summary(entry, badge_leaders, entry_votes.get(entry.id))
+            for entry in entries
+        ],
         page=page,
         page_size=page_size,
         total=total,
@@ -742,6 +763,53 @@ async def get_entry(
     entry_moderation = await _load_entry_moderation_context(db, entry=entry)
     example_moderation = await _load_example_moderation_context(db, examples=visible_examples)
     history_events = await _load_entry_history_events(db, entry=entry)
+    entry_vote_value: int | None = None
+    example_votes: dict[uuid.UUID, int] = {}
+    comment_votes: dict[uuid.UUID, int] = {}
+    audio_votes: dict[uuid.UUID, int] = {}
+
+    if user:
+        entry_vote_value = (
+            await db.execute(
+                select(Vote.value).where(and_(Vote.entry_id == entry.id, Vote.user_id == user.id))
+            )
+        ).scalar_one_or_none()
+
+        if visible_examples:
+            example_ids = [example.id for example in visible_examples]
+            example_rows = (
+                await db.execute(
+                    select(ExampleVote.example_id, ExampleVote.value).where(
+                        and_(ExampleVote.user_id == user.id, ExampleVote.example_id.in_(example_ids))
+                    )
+                )
+            ).all()
+            example_votes = {row[0]: row[1] for row in example_rows}
+
+        if visible_comments:
+            comment_ids = [comment.id for comment in visible_comments]
+            comment_rows = (
+                await db.execute(
+                    select(CommentVote.comment_id, CommentVote.value).where(
+                        and_(CommentVote.user_id == user.id, CommentVote.comment_id.in_(comment_ids))
+                    )
+                )
+            ).all()
+            comment_votes = {row[0]: row[1] for row in comment_rows}
+
+        audio_ids = [sample.id for sample in entry.audio_samples]
+        if visible_examples:
+            for example in visible_examples:
+                audio_ids.extend(sample.id for sample in example.audio_samples)
+        if audio_ids:
+            audio_rows = (
+                await db.execute(
+                    select(AudioVote.audio_id, AudioVote.value).where(
+                        and_(AudioVote.user_id == user.id, AudioVote.audio_id.in_(audio_ids))
+                    )
+                )
+            ).all()
+            audio_votes = {row[0]: row[1] for row in audio_rows}
 
     return serialize_entry_detail(
         entry,
@@ -751,6 +819,10 @@ async def get_entry(
         entry_moderation=entry_moderation,
         example_moderation=example_moderation,
         history_events=history_events,
+        current_user_vote=entry_vote_value,
+        example_user_votes=example_votes,
+        comment_user_votes=comment_votes,
+        audio_user_votes=audio_votes,
     )
 
 
@@ -833,6 +905,8 @@ async def create_entry(
                 )
 
     normalized_headword = normalize_headword(payload.headword)
+    normalized_gloss_pt = normalize_search_query(payload.gloss_pt) if payload.gloss_pt else None
+    normalized_gloss_en = normalize_search_query(payload.gloss_en) if payload.gloss_en else None
     duplicates = await find_possible_duplicates(
         db,
         headword=payload.headword,
@@ -867,6 +941,8 @@ async def create_entry(
         normalized_headword=normalized_headword,
         gloss_pt=payload.gloss_pt,
         gloss_en=payload.gloss_en,
+        normalized_gloss_pt=normalized_gloss_pt,
+        normalized_gloss_en=normalized_gloss_en,
         part_of_speech=payload.part_of_speech,
         short_definition=short_definition,
         source_citation=None,
@@ -970,10 +1046,12 @@ async def update_entry(
                 message="Gloss cannot be empty",
             )
         entry.gloss_pt = payload.gloss_pt
+        entry.normalized_gloss_pt = normalize_search_query(payload.gloss_pt)
         changed = True
 
     if payload.gloss_en is not None:
         entry.gloss_en = payload.gloss_en
+        entry.normalized_gloss_en = normalize_search_query(payload.gloss_en) if payload.gloss_en else None
         changed = True
 
     if payload.part_of_speech is not None:

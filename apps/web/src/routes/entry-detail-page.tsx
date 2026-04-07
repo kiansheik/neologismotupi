@@ -1432,13 +1432,14 @@ export function EntryDetailPage() {
             variant="secondary"
             className={`inline-flex h-10 w-10 items-center justify-center rounded-full border border-line-strong bg-surface-input p-0 text-lg leading-none shadow-sm transition-colors ${
               entryVote === 1
-                ? "border-accent bg-accent text-accent-contrast hover:bg-accent-strong"
+                ? "border-vote-up-border bg-vote-up text-vote-up-text"
                 : "hover:border-brand-500 hover:bg-brand-50"
             }`}
             onClick={() => voteMutation.mutate(1)}
             disabled={!canWrite || voteMutation.isPending}
             title={t("entry.upvote")}
             aria-label={t("entry.upvote")}
+            aria-pressed={entryVote === 1}
           >
             <span aria-hidden>{t("entry.upvoteEmoji")}</span>
           </Button>
@@ -1447,13 +1448,14 @@ export function EntryDetailPage() {
             variant="secondary"
             className={`inline-flex h-10 w-10 items-center justify-center rounded-full border border-line-strong bg-surface-input p-0 text-lg leading-none shadow-sm transition-colors ${
               entryVote === -1
-                ? "border-red-600 bg-red-600 text-white hover:bg-red-700"
+                ? "border-vote-down-border bg-vote-down text-vote-down-text"
                 : "hover:border-red-500 hover:bg-red-100"
             }`}
             onClick={() => voteMutation.mutate(-1)}
             disabled={!canWrite || voteMutation.isPending}
             title={t("entry.downvote")}
             aria-label={t("entry.downvote")}
+            aria-pressed={entryVote === -1}
           >
             <span aria-hidden>{t("entry.downvoteEmoji")}</span>
           </Button>
@@ -1915,13 +1917,14 @@ export function EntryDetailPage() {
                       variant="secondary"
                       className={`inline-flex h-8 w-8 items-center justify-center rounded-full border border-line-strong bg-surface-input p-0 text-base leading-none shadow-sm transition-colors ${
                         exampleVote === 1
-                          ? "border-accent bg-accent text-accent-contrast hover:bg-accent-strong"
+                          ? "border-vote-up-border bg-vote-up text-vote-up-text"
                           : "hover:border-brand-500 hover:bg-brand-50"
                       }`}
                       onClick={() => voteExampleMutation.mutate({ exampleId: example.id, value: 1 })}
                       disabled={!canWrite || voteExampleMutation.isPending}
                       title={t("entry.upvote")}
                       aria-label={t("entry.upvote")}
+                      aria-pressed={exampleVote === 1}
                     >
                       <span aria-hidden>{t("entry.upvoteEmoji")}</span>
                     </Button>
@@ -1930,13 +1933,14 @@ export function EntryDetailPage() {
                       variant="secondary"
                       className={`inline-flex h-8 w-8 items-center justify-center rounded-full border border-line-strong bg-surface-input p-0 text-base leading-none shadow-sm transition-colors ${
                         exampleVote === -1
-                          ? "border-red-600 bg-red-600 text-white hover:bg-red-700"
+                          ? "border-vote-down-border bg-vote-down text-vote-down-text"
                           : "hover:border-red-500 hover:bg-red-100"
                       }`}
                       onClick={() => voteExampleMutation.mutate({ exampleId: example.id, value: -1 })}
                       disabled={!canWrite || voteExampleMutation.isPending}
                       title={t("entry.downvote")}
                       aria-label={t("entry.downvote")}
+                      aria-pressed={exampleVote === -1}
                     >
                       <span aria-hidden>{t("entry.downvoteEmoji")}</span>
                     </Button>
@@ -2251,13 +2255,14 @@ export function EntryDetailPage() {
                     variant="secondary"
                     className={`inline-flex h-8 w-8 items-center justify-center rounded-full border border-line-strong bg-surface-input p-0 text-base leading-none shadow-sm transition-colors ${
                       commentVote === 1
-                        ? "border-accent bg-accent text-accent-contrast hover:bg-accent-strong"
+                        ? "border-vote-up-border bg-vote-up text-vote-up-text"
                         : "hover:border-brand-500 hover:bg-brand-50"
                     }`}
                     onClick={() => voteCommentMutation.mutate({ commentId: comment.id, value: 1 })}
                     disabled={!canWrite || voteCommentMutation.isPending}
                     title={t("entry.upvote")}
                     aria-label={t("entry.upvote")}
+                    aria-pressed={commentVote === 1}
                   >
                     <span aria-hidden>{t("entry.upvoteEmoji")}</span>
                   </Button>
@@ -2266,13 +2271,14 @@ export function EntryDetailPage() {
                     variant="secondary"
                     className={`inline-flex h-8 w-8 items-center justify-center rounded-full border border-line-strong bg-surface-input p-0 text-base leading-none shadow-sm transition-colors ${
                       commentVote === -1
-                        ? "border-red-600 bg-red-600 text-white hover:bg-red-700"
+                        ? "border-vote-down-border bg-vote-down text-vote-down-text"
                         : "hover:border-red-500 hover:bg-red-100"
                     }`}
                     onClick={() => voteCommentMutation.mutate({ commentId: comment.id, value: -1 })}
                     disabled={!canWrite || voteCommentMutation.isPending}
                     title={t("entry.downvote")}
                     aria-label={t("entry.downvote")}
+                    aria-pressed={commentVote === -1}
                   >
                     <span aria-hidden>{t("entry.downvoteEmoji")}</span>
                   </Button>
