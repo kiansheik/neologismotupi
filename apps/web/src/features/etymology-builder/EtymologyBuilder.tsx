@@ -23,6 +23,7 @@ export function EtymologyBuilder({
   isManualOverride,
   onApplyHeadword,
   onApplyPartOfSpeech,
+  onPydicateChange,
 }: EtymologyBuilderProps) {
   const [isOpen, setIsOpen] = useState(true);
   const [mode, setMode] = useState<BuilderMode>("simple");
