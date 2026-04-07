@@ -217,6 +217,7 @@ class EntryCreate(BaseModel):
     source_citation: str | None = Field(default=None, max_length=500)
     source: SourceInput | None = None
     morphology_notes: str | None = None
+    pydicate: str | None = Field(default=None, max_length=10000)
     tag_ids: list[uuid.UUID] = Field(default_factory=list)
     force_submit: bool = False
     turnstile_token: str | None = None

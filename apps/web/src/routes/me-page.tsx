@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 
 import { EntryBrowser } from "@/components/entry-browser";
+import { OrthographyMappingCard } from "@/components/orthography-mapping-card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -28,6 +29,7 @@ import { useI18n } from "@/i18n";
 import { formatRelativeOrDate } from "@/i18n/formatters";
 import { ApiError } from "@/lib/api";
 import { getLocalizedApiErrorMessage } from "@/lib/localized-api-error";
+import { useOrthography } from "@/lib/orthography";
 import { buildProfileLinks } from "@/lib/profile-links";
 import type { User } from "@/lib/types";
 
@@ -49,6 +51,7 @@ export function MePage() {
   const queryClient = useQueryClient();
   const { locale, t } = useI18n();
   const { data: currentUser } = useCurrentUser();
+  const { apply } = useOrthography();
   const [profileForm, setProfileForm] = useState(profileToForm(null));
   const [isEditingProfile, setIsEditingProfile] = useState(false);
 
@@ -495,6 +498,8 @@ export function MePage() {
         </Card>
       ) : null}
 
+      <OrthographyMappingCard />
+
       <EntryBrowser
         compact
         queryKey={`me-${currentUser.id}`}
@@ -605,7 +610,9 @@ export function MePage() {
                       className="text-sm text-brand-700 hover:underline"
                       to={notification.entry_url}
                     >
-                      {notification.entry_headword ?? notification.entry_url}
+                      {notification.entry_headword
+                        ? apply(notification.entry_headword)
+                        : notification.entry_url}
                     </Link>
                   ) : null}
                   {notification.actor_profile_url &&

@@ -12,6 +12,7 @@ import { applyZodErrors } from "@/lib/zod-form";
 import { type Locale, type TranslateFn, useI18n } from "@/i18n";
 import { trackEvent } from "@/lib/analytics";
 import { splitEntryDefinition } from "@/lib/entry-definition";
+import { useOrthography } from "@/lib/orthography";
 import { formatDate, formatDateTime, formatRelativeOrDate } from "@/i18n/formatters";
 import { getLocalizedApiErrorMessage } from "@/lib/localized-api-error";
 import { getCachedVote, resolveVote, setCachedVote, useVoteMemoryVersion } from "@/lib/vote-memory";
@@ -381,6 +382,7 @@ export function EntryDetailPage() {
   const queryClient = useQueryClient();
   const { data: currentUser } = useCurrentUser();
   const { locale, t } = useI18n();
+  const { apply } = useOrthography();
   useVoteMemoryVersion();
   const [showEntryReportForm, setShowEntryReportForm] = useState(false);
   const [showEditForm, setShowEditForm] = useState(false);
@@ -399,6 +401,7 @@ export function EntryDetailPage() {
     enabled: Boolean(slug),
   });
 
+  const displayHeadword = entry ? apply(entry.headword) : "";
   const entryPageTitle = entry
     ? `${entry.headword} | ${import.meta.env.VITE_APP_NAME ?? "Dicionário de Tupi"}`
     : `${t("entry.loading")} | ${import.meta.env.VITE_APP_NAME ?? "Dicionário de Tupi"}`;
@@ -1336,7 +1339,7 @@ export function EntryDetailPage() {
     <section className="space-y-4">
       <Card>
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <h1 className="text-2xl font-semibold text-brand-900">{entry.headword}</h1>
+          <h1 className="text-2xl font-semibold text-brand-900">{displayHeadword}</h1>
           <StatusBadge status={entry.status} />
         </div>
         {shouldShowGloss ? (
@@ -1855,7 +1858,7 @@ export function EntryDetailPage() {
               return (
                 <article key={example.id} className="rounded-md border border-brand-100 p-3">
                   <div className="flex items-center justify-between gap-2">
-                    <p className="text-sm text-slate-800">{example.sentence_original}</p>
+                    <p className="text-sm text-slate-800">{apply(example.sentence_original)}</p>
                     <StatusBadge status={example.status} />
                   </div>
                   {example.translation_pt ? (

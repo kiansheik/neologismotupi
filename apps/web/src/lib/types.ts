@@ -319,8 +319,14 @@ export interface User {
   profile: Profile | null;
 }
 
+export interface OrthographyMapItem {
+  from: string;
+  to: string;
+}
+
 export interface UserPreferences {
   preferred_locale: string;
+  orthography_map?: OrthographyMapItem[];
 }
 
 export interface NewsletterSubscription {

@@ -2,7 +2,7 @@ import uuid
 from datetime import datetime
 from typing import TYPE_CHECKING
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, String, Uuid
+from sqlalchemy import Boolean, DateTime, ForeignKey, JSON, String, Uuid
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db import Base
@@ -23,6 +23,7 @@ class User(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     is_verified: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     is_superuser: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     preferred_locale: Mapped[str] = mapped_column(String(16), default="pt-BR", nullable=False)
+    orthography_map: Mapped[list[dict[str, str]] | None] = mapped_column(JSON, nullable=True)
 
     profile: Mapped["Profile"] = relationship(back_populates="user", uselist=False)
     sessions: Mapped[list["Session"]] = relationship(

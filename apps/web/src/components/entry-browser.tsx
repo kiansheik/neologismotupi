@@ -17,6 +17,7 @@ import { trackEvent } from "@/lib/analytics";
 import { ApiError } from "@/lib/api";
 import { getLocalizedApiErrorMessage } from "@/lib/localized-api-error";
 import { entryDefinitionPreview } from "@/lib/entry-definition";
+import { applyOrthography, useOrthography } from "@/lib/orthography";
 import { getCachedVote, resolveVote, setCachedVote, useVoteMemoryVersion } from "@/lib/vote-memory";
 
 type EntrySort = "alphabetical" | "recent" | "score" | "most_examples" | "unseen";
@@ -69,6 +70,7 @@ export function EntryBrowser({
   allowUnseenFilter = false,
 }: EntryBrowserProps) {
   const { t } = useI18n();
+  const { apply, mapping, orthoMode, setOrthoMode } = useOrthography();
   const TitleTag = titleAs;
   const hasMounted = useRef(false);
   const loadMoreRef = useRef<HTMLDivElement | null>(null);
@@ -90,6 +92,14 @@ export function EntryBrowser({
   const [status, setStatus] = useState("");
   const [partOfSpeech, setPartOfSpeech] = useState("");
   const [sort, setSort] = useState<EntrySort>(initialSort);
+
+  const effectiveSearch = useMemo(() => {
+    if (orthoMode !== "personal" || !mapping.length || !search.trim()) {
+      return search;
+    }
+    const inverse = mapping.map((item) => ({ from: item.to, to: item.from }));
+    return applyOrthography(search, inverse);
+  }, [search, orthoMode, mapping]);
 
   useEffect(() => {
     if (!analyticsContext) {
@@ -119,7 +129,7 @@ export function EntryBrowser({
 
   const filters = useMemo(
     () => ({
-      search,
+      search: effectiveSearch,
       status,
       part_of_speech: partOfSpeech,
       sort,
@@ -127,7 +137,7 @@ export function EntryBrowser({
       proposer_user_id: scope?.proposer_user_id,
       source_work_id: scope?.source_work_id,
     }),
-    [search, status, partOfSpeech, sort, scope?.proposer_user_id, scope?.source_work_id],
+    [effectiveSearch, status, partOfSpeech, sort, scope?.proposer_user_id, scope?.source_work_id],
   );
 
   const { data, isPending, isFetchingNextPage, hasNextPage, fetchNextPage } =
@@ -252,9 +262,32 @@ export function EntryBrowser({
   return (
     <>
       <Card className={compact ? "p-3" : undefined}>
-        <TitleTag className="text-xl font-semibold text-brand-900">
-          {title}
-        </TitleTag>
+        <div className="flex items-start justify-between gap-2">
+          <TitleTag className="text-xl font-semibold text-brand-900">
+            {title}
+          </TitleTag>
+          {mapping.length > 0 ? (
+            <div
+              className="inline-flex shrink-0 overflow-hidden rounded-full border border-line-strong text-[11px] font-semibold"
+              title={t("orthography.searchModeLabel")}
+            >
+              <button
+                type="button"
+                className={`px-2.5 py-1 transition-colors ${orthoMode === "navarro" ? "bg-brand-700 text-white" : "bg-surface-input text-ink-muted hover:bg-surface-hover"}`}
+                onClick={() => setOrthoMode("navarro")}
+              >
+                {t("orthography.searchModeNavarro")}
+              </button>
+              <button
+                type="button"
+                className={`px-2.5 py-1 transition-colors ${orthoMode === "personal" ? "bg-brand-700 text-white" : "bg-surface-input text-ink-muted hover:bg-surface-hover"}`}
+                onClick={() => setOrthoMode("personal")}
+              >
+                {t("orthography.searchModePersonal")}
+              </button>
+            </div>
+          ) : null}
+        </div>
         {description ? (
           <p className="mt-1 text-sm text-slate-700">{description}</p>
         ) : null}
@@ -390,7 +423,7 @@ export function EntryBrowser({
                       });
                     }}
                   >
-                    {entry.headword}
+                    {apply(entry.headword)}
                   </Link>
                   <StatusBadge status={entry.status} />
                 </div>

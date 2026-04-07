@@ -949,6 +949,7 @@ async def create_entry(
         source_edition_id=None,
         source_pages=None,
         morphology_notes=payload.morphology_notes,
+        pydicate=payload.pydicate.strip() if payload.pydicate and payload.pydicate.strip() else None,
         status=status_value,
         proposer_user_id=user.id,
         approved_at=datetime.now(UTC) if status_value == EntryStatus.approved else None,

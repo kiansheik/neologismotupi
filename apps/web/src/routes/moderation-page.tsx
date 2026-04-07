@@ -20,6 +20,7 @@ import {
 } from "@/features/moderation/api";
 import { useI18n } from "@/i18n";
 import { trackEvent } from "@/lib/analytics";
+import { useOrthography } from "@/lib/orthography";
 import {
   formatBytes,
   formatDateTime,
@@ -32,6 +33,7 @@ export function ModerationPage() {
   const queryClient = useQueryClient();
   const { data: currentUser } = useCurrentUser();
   const { locale, t } = useI18n();
+  const { apply } = useOrthography();
 
   const queueQuery = useQuery({
     queryKey: ["mod-queue"],
@@ -179,7 +181,7 @@ export function ModerationPage() {
                 <article key={entry.id} className="rounded-md border border-brand-100 p-3">
                   <div className="flex items-center justify-between gap-2">
                     <Link className="font-medium text-brand-800 hover:underline" to={`/entries/${entry.slug}`}>
-                      {entry.headword}
+                      {apply(entry.headword)}
                     </Link>
                     <StatusBadge status={entry.status} showPending />
                   </div>
@@ -224,10 +226,10 @@ export function ModerationPage() {
                   <p className="text-xs text-slate-600">
                     <span className="font-medium text-brand-900">{t("moderation.exampleForEntry")}:</span>{" "}
                     <Link className="font-medium text-brand-700 hover:underline" to={`/entries/${example.entry_slug}`}>
-                      {example.entry_headword}
+                      {apply(example.entry_headword)}
                     </Link>
                   </p>
-                  <p className="text-sm text-slate-800">{example.sentence_original}</p>
+                  <p className="text-sm text-slate-800">{apply(example.sentence_original)}</p>
                   <div className="mt-2 flex gap-2">
                     <Button
                       type="button"

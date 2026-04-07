@@ -40,6 +40,7 @@ def snapshot_entry(entry: Entry) -> dict:
         "source_edition_id": str(entry.source_edition_id) if entry.source_edition_id else None,
         "source_pages": entry.source_pages,
         "morphology_notes": entry.morphology_notes,
+        "pydicate": entry.pydicate,
         "status": entry.status.value,
         "updated_at": datetime.now(UTC).isoformat(),
     }

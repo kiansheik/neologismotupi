@@ -1,5 +1,5 @@
 import { apiFetch, withQuery } from "@/lib/api";
-import type { MentionUser, Profile, UserPreferences } from "@/lib/types";
+import type { MentionUser, OrthographyMapItem, Profile, UserPreferences } from "@/lib/types";
 
 export interface UpdateProfilePayload {
   display_name?: string;
@@ -33,6 +33,7 @@ export function updateMyProfile(payload: UpdateProfilePayload): Promise<Profile>
 
 export interface UpdatePreferencesPayload {
   preferred_locale?: string;
+  orthography_map?: OrthographyMapItem[];
 }
 
 export function getMyPreferences(): Promise<UserPreferences> {

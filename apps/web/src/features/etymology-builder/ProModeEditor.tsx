@@ -14,6 +14,7 @@ type ProModeEditorProps = {
   isManualOverride: boolean;
   onApplyHeadword: (headword: string) => void;
   onApplyPartOfSpeech: (value: string) => void;
+  onPydicateChange?: (value: string) => void;
 };
 
 export function ProModeEditor({
@@ -22,6 +23,7 @@ export function ProModeEditor({
   isManualOverride,
   onApplyHeadword,
   onApplyPartOfSpeech,
+  onPydicateChange,
 }: ProModeEditorProps) {
   const [rawText, setRawText] = useState("");
   const [runtimeEnabled, setRuntimeEnabled] = useState(true);
@@ -37,6 +39,10 @@ export function ProModeEditor({
       setAutoSeeded(true);
     }
   }, [store.pydicatePreview, autoSeeded]);
+
+  useEffect(() => {
+    onPydicateChange?.(rawText);
+  }, [onPydicateChange, rawText]);
 
   const { state: runtimeState } = usePyodideRuntime(rawText, runtimeEnabled);
   const runtimeVerbete = extractVerbeteFromOutput(runtimeState.output);

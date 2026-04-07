@@ -49,6 +49,7 @@ class Entry(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     )
     source_pages: Mapped[str | None] = mapped_column(String(120), nullable=True)
     morphology_notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    pydicate: Mapped[str | None] = mapped_column(Text, nullable=True)
     status: Mapped[EntryStatus] = mapped_column(
         Enum(EntryStatus, native_enum=False), default=EntryStatus.pending, index=True, nullable=False
     )

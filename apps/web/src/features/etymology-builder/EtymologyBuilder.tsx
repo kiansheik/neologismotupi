@@ -14,6 +14,7 @@ type EtymologyBuilderProps = {
   isManualOverride: boolean;
   onApplyHeadword: (headword: string) => void;
   onApplyPartOfSpeech: (value: string) => void;
+  onPydicateChange?: (pydicate: string) => void;
 };
 
 export function EtymologyBuilder({
@@ -25,11 +26,42 @@ export function EtymologyBuilder({
 }: EtymologyBuilderProps) {
   const [isOpen, setIsOpen] = useState(true);
   const [mode, setMode] = useState<BuilderMode>("simple");
+  const [proPydicate, setProPydicate] = useState("");
   const store = useEtymologyBuilderStore();
 
   useEffect(() => {
     onNoteChange(store.generatedNote);
   }, [store.generatedNote, onNoteChange]);
+
+  useEffect(() => {
+    if (!onPydicateChange) {
+      return;
+    }
+    if (mode === "simple") {
+      onPydicateChange(store.pydicatePreview);
+    }
+  }, [mode, onPydicateChange, store.pydicatePreview]);
+
+  useEffect(() => {
+    if (!onPydicateChange) {
+      return;
+    }
+    if (mode === "pro") {
+      onPydicateChange(proPydicate);
+    }
+  }, [mode, onPydicateChange, proPydicate]);
+
+  useEffect(() => {
+    if (mode !== "pro") {
+      return;
+    }
+    if (proPydicate) {
+      return;
+    }
+    if (store.pydicatePreview) {
+      setProPydicate(store.pydicatePreview);
+    }
+  }, [mode, proPydicate, store.pydicatePreview]);
 
   return (
     <div className="rounded-md border border-brand-200 bg-surface/70 p-3">
@@ -64,6 +96,7 @@ export function EtymologyBuilder({
               isManualOverride={isManualOverride}
               onApplyHeadword={onApplyHeadword}
               onApplyPartOfSpeech={onApplyPartOfSpeech}
+              onPydicateChange={setProPydicate}
             />
           ) : null}
         </div>

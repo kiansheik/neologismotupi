@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { type Locale, useI18n } from "@/i18n";
 import { initAnalytics, trackEvent, trackPageView } from "@/lib/analytics";
+import { useOrthography } from "@/lib/orthography";
 import { buildAbsoluteUrl, useSeo } from "@/lib/seo";
 import { isTurnstileConfigured, preloadTurnstile } from "@/lib/turnstile";
 
@@ -17,6 +18,7 @@ export function AppShell() {
   const queryClient = useQueryClient();
   const { data: user } = useCurrentUser();
   const { locale, setLocale, t } = useI18n();
+  const { setMapping } = useOrthography();
   const lastLocaleSync = useRef<{ userId: string; locale: string } | null>(null);
 
   const updateLocaleMutation = useMutation({
@@ -92,6 +94,16 @@ export function AppShell() {
     lastLocaleSync.current = { userId: user.id, locale: serverLocale };
     setLocale(serverLocale);
   }, [preferencesQuery.data?.preferred_locale, user?.id]);
+
+  useEffect(() => {
+    if (!user) {
+      return;
+    }
+    if (!preferencesQuery.isFetched) {
+      return;
+    }
+    setMapping(preferencesQuery.data?.orthography_map ?? []);
+  }, [preferencesQuery.data?.orthography_map, preferencesQuery.isFetched, setMapping, user?.id]);
 
   const normalizedPath = location.pathname === "/entries" ? "/" : location.pathname;
   const hasDedicatedPageSeo =

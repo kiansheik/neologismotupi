@@ -25,6 +25,7 @@ from app.schemas.notifications import (
 from app.schemas.users import (
     MentionResolveRequest,
     MentionUserOut,
+    OrthographyMapItem,
     ProfileUpdateRequest,
     PublicProfileOut,
     PublicProfileStatsOut,
@@ -117,6 +118,19 @@ def _normalize_optional_text(value: str | None) -> str | None:
     cleaned = value.strip()
     if not cleaned:
         return None
+    return cleaned
+
+
+def _normalize_orthography_map(items: list[OrthographyMapItem] | None) -> list[dict[str, str]]:
+    if not items:
+        return []
+    cleaned: list[dict[str, str]] = []
+    for item in items:
+        source = item.from_value.strip()
+        if not source:
+            continue
+        target = item.to_value.strip() if item.to_value is not None else ""
+        cleaned.append({"from": source, "to": target})
     return cleaned
 
 
@@ -259,7 +273,10 @@ async def get_my_notification_preferences(
 async def get_my_preferences(
     user: Annotated[User, Depends(get_current_user)],
 ) -> UserPreferencesOut:
-    return UserPreferencesOut(preferred_locale=user.preferred_locale)
+    return UserPreferencesOut(
+        preferred_locale=user.preferred_locale,
+        orthography_map=user.orthography_map or [],
+    )
 
 
 @router.patch("/me/preferences", response_model=UserPreferencesOut)
@@ -277,8 +294,13 @@ async def update_my_preferences(
             .where(NewsletterSubscription.user_id == user.id)
             .values(preferred_locale=next_locale)
         )
+    if "orthography_map" in updates:
+        user.orthography_map = _normalize_orthography_map(payload.orthography_map)
     await db.commit()
-    return UserPreferencesOut(preferred_locale=user.preferred_locale)
+    return UserPreferencesOut(
+        preferred_locale=user.preferred_locale,
+        orthography_map=user.orthography_map or [],
+    )
 
 
 @router.patch("/me/profile", response_model=PublicProfileOut)

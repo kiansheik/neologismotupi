@@ -7,6 +7,7 @@ import { StatusBadge } from "@/components/status-badge";
 import { getSourceDetail } from "@/features/sources/api";
 import { formatDate, formatDateTime } from "@/i18n/formatters";
 import { useI18n } from "@/i18n";
+import { useOrthography } from "@/lib/orthography";
 import { buildAbsoluteUrl, useSeo } from "@/lib/seo";
 
 function buildSourceTitle(
@@ -23,6 +24,7 @@ function buildSourceTitle(
 export function SourceDetailPage() {
   const { workId } = useParams();
   const { t, locale } = useI18n();
+  const { apply } = useOrthography();
 
   const sourceQuery = useQuery({
     queryKey: ["source", workId],
@@ -154,13 +156,13 @@ export function SourceDetailPage() {
                 key={example.id}
                 className="rounded-md border border-brand-100 px-3 py-2"
               >
-                <p className="text-slate-800">{example.sentence_original}</p>
+                <p className="text-slate-800">{apply(example.sentence_original)}</p>
                 <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-slate-600">
                   <Link
                     className="text-brand-700 hover:underline"
                     to={`/entries/${example.entry_slug}`}
                   >
-                    {t("source.inEntry", { headword: example.entry_headword })}
+                    {t("source.inEntry", { headword: apply(example.entry_headword) })}
                   </Link>
                   <StatusBadge status={example.status} />
                   <span>{formatDate(example.created_at, locale)}</span>

@@ -11,6 +11,7 @@ import { listUserAudioSubmissions } from "@/features/audio/api";
 import { CompactAudioPlayer } from "@/features/audio/components";
 import { formatDate, formatRelativeOrDate, formatTimeSince } from "@/i18n/formatters";
 import { useI18n } from "@/i18n";
+import { useOrthography } from "@/lib/orthography";
 import { buildProfileLinks } from "@/lib/profile-links";
 import { buildAbsoluteUrl, useSeo } from "@/lib/seo";
 import {
@@ -21,6 +22,7 @@ import {
 
 export function ProfilePage() {
   const { t, locale } = useI18n();
+  const { apply } = useOrthography();
   const { userId } = useParams();
 
   const userQuery = useQuery({
@@ -238,7 +240,7 @@ export function ProfilePage() {
                 <p className="mt-2 text-sm text-slate-700">
                   {submission.entry_slug ? (
                     <Link className="text-brand-700 hover:underline" to={`/entries/${submission.entry_slug}`}>
-                      {submission.entry_headword ?? t("profile.audioEntryFallback")}
+                      {submission.entry_headword ? apply(submission.entry_headword) : t("profile.audioEntryFallback")}
                     </Link>
                   ) : (
                     <span>{t("profile.audioEntryFallback")}</span>
@@ -246,7 +248,7 @@ export function ProfilePage() {
                 </p>
                 {submission.example_sentence_original ? (
                   <p className="mt-1 text-xs text-slate-600">
-                    {t("profile.audioExampleLabel")}: {submission.example_sentence_original}
+                    {t("profile.audioExampleLabel")}: {apply(submission.example_sentence_original)}
                   </p>
                 ) : null}
                 <p className="mt-1 text-xs text-slate-500">

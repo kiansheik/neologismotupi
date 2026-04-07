@@ -9,6 +9,7 @@ import { useI18n } from "@/i18n";
 import { trackEvent } from "@/lib/analytics";
 import { partOfSpeechLabel } from "@/i18n/formatters";
 import { getLocalizedApiErrorMessage } from "@/lib/localized-api-error";
+import { useOrthography } from "@/lib/orthography";
 import type { DuplicateHint } from "@/lib/types";
 import { applyZodErrors } from "@/lib/zod-form";
 import { Card } from "@/components/ui/card";
@@ -24,6 +25,7 @@ import { EtymologyBuilder } from "@/features/etymology-builder/EtymologyBuilder"
 import type { SourceSuggestion } from "@/lib/types";
 
 const HEADWORD_PATTERN = /^["']?[\p{L}](?:[\p{L}\p{M}'" -]*[\p{L}])?$/u;
+const MAX_PYDICATE_LENGTH = 10000;
 
 function isValidHeadword(value: string): boolean {
   const trimmed = value.trim();
@@ -52,12 +54,14 @@ type SubmitForm = {
 
 export function SubmitPage() {
   const { t, locale } = useI18n();
+  const { apply } = useOrthography();
   const navigate = useNavigate();
   const { data: currentUser } = useCurrentUser();
   const [possibleDuplicates, setPossibleDuplicates] = useState<DuplicateHint[]>([]);
   const [queuedAudio, setQueuedAudio] = useState<File[]>([]);
   const [isUploadingAudio, setIsUploadingAudio] = useState(false);
   const [builderNote, setBuilderNote] = useState("");
+  const [builderPydicate, setBuilderPydicate] = useState("");
   const [isMorphologyOverride, setIsMorphologyOverride] = useState(false);
 
   const form = useForm<SubmitForm>({
@@ -179,6 +183,10 @@ export function SubmitPage() {
     [form],
   );
 
+  const handleBuilderPydicateChange = useCallback((value: string) => {
+    setBuilderPydicate(value);
+  }, []);
+
   useEffect(() => {
     if (!builderNote) return;
     if (morphologyNotesValue === builderNote) {
@@ -283,6 +291,10 @@ export function SubmitPage() {
 
     let createdEntry;
     try {
+      const trimmedPydicate = builderPydicate.trim();
+      const normalizedPydicate = trimmedPydicate
+        ? trimmedPydicate.slice(0, MAX_PYDICATE_LENGTH)
+        : "";
       createdEntry = await createMutation.mutateAsync({
         headword: parsed.data.headword,
         gloss_pt: parsed.data.gloss_pt,
@@ -301,6 +313,7 @@ export function SubmitPage() {
               }
             : undefined,
         morphology_notes: parsed.data.morphology_notes,
+        pydicate: normalizedPydicate.length ? normalizedPydicate : undefined,
         force_submit: parsed.data.force_submit,
       });
     } catch {
@@ -418,6 +431,7 @@ export function SubmitPage() {
           isManualOverride={isMorphologyOverride}
           onApplyHeadword={handleApplyBuilderHeadword}
           onApplyPartOfSpeech={handleApplyBuilderPartOfSpeech}
+          onPydicateChange={handleBuilderPydicateChange}
         />
       <Card>
         <h1 className="text-xl font-semibold text-brand-900">{t("submit.title")}</h1>
@@ -508,7 +522,7 @@ export function SubmitPage() {
                     to={`/entries/${entry.slug}`}
                     onClick={() => trackEvent("duplicate_hint_opened")}
                   >
-                    {entry.headword}
+                    {apply(entry.headword)}
                   </Link>
                   {entry.gloss_pt ? ` - ${entry.gloss_pt}` : ""}
                 </li>

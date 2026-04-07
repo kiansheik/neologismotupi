@@ -42,6 +42,7 @@ export interface CreateEntryPayload {
   source_citation?: string;
   source?: EntrySourceInput;
   morphology_notes?: string;
+  pydicate?: string;
   tag_ids?: string[];
   force_submit?: boolean;
 }

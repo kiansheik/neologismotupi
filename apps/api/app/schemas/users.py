@@ -69,11 +69,20 @@ class ProfileUpdateRequest(BaseModel):
     bluesky_handle: str | None = Field(default=None, max_length=253)
 
 
+class OrthographyMapItem(BaseModel):
+    from_value: str = Field(default="", alias="from", max_length=40)
+    to_value: str = Field(default="", alias="to", max_length=40)
+
+    model_config = {"populate_by_name": True}
+
+
 class UserPreferencesOut(BaseModel):
     preferred_locale: str
+    orthography_map: list["OrthographyMapItem"] = Field(default_factory=list)
 
     model_config = {"from_attributes": True}
 
 
 class UserPreferencesUpdate(BaseModel):
     preferred_locale: str | None = Field(default=None, max_length=16)
+    orthography_map: list["OrthographyMapItem"] | None = None
