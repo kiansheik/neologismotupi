@@ -565,6 +565,7 @@ async def list_entries(
     page: int = Query(default=1, ge=1),
     page_size: int = Query(default=20, ge=1, le=100),
     search: str | None = None,
+    search_terms: list[str] = Query(default=[]),
     status_filter: EntryStatus | None = Query(default=None, alias="status"),
     topic: str | None = None,
     part_of_speech: str | None = None,
@@ -584,21 +585,25 @@ async def list_entries(
 
     conditions = []
 
-    if search:
-        pattern = f"%{collapse_whitespace(search)}%"
-        normalized_search = normalize_search_query(search)
-        normalized_pattern = f"%{normalized_search}%"
+    all_search_terms = [s for s in ([search] if search else []) + list(search_terms) if s]
+    if all_search_terms:
         normalized_headword = func.replace(Entry.normalized_headword, "-", " ")
-        conditions.append(
-            or_(
-                Entry.headword.ilike(pattern),
-                Entry.gloss_pt.ilike(pattern),
-                Entry.gloss_en.ilike(pattern),
-                normalized_headword.ilike(normalized_pattern),
-                Entry.normalized_gloss_pt.ilike(normalized_pattern),
-                Entry.normalized_gloss_en.ilike(normalized_pattern),
+        term_clauses = []
+        for s in all_search_terms:
+            pattern = f"%{collapse_whitespace(s)}%"
+            normalized_s = normalize_search_query(s)
+            normalized_pattern = f"%{normalized_s}%"
+            term_clauses.append(
+                or_(
+                    Entry.headword.ilike(pattern),
+                    Entry.gloss_pt.ilike(pattern),
+                    Entry.gloss_en.ilike(pattern),
+                    normalized_headword.ilike(normalized_pattern),
+                    Entry.normalized_gloss_pt.ilike(normalized_pattern),
+                    Entry.normalized_gloss_en.ilike(normalized_pattern),
+                )
             )
-        )
+        conditions.append(or_(*term_clauses) if len(all_search_terms) > 1 else term_clauses[0])
 
     if sort == "unseen":
         unseen = True

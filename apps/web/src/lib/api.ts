@@ -144,13 +144,19 @@ export async function apiFetch<T>(path: string, options: RequestInitWithBody = {
   return (await response.json()) as T;
 }
 
-export function withQuery(path: string, params: Record<string, string | number | boolean | undefined>) {
+export function withQuery(path: string, params: Record<string, string | number | boolean | string[] | undefined>) {
   const url = new URL(buildUrl(path));
   Object.entries(params).forEach(([key, value]) => {
-    if (value === undefined || value === "") {
+    if (value === undefined) {
       return;
     }
-    url.searchParams.set(key, String(value));
+    if (Array.isArray(value)) {
+      for (const item of value) {
+        if (item !== "") url.searchParams.append(key, item);
+      }
+    } else if (value !== "") {
+      url.searchParams.set(key, String(value));
+    }
   });
   return url.toString();
 }

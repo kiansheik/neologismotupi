@@ -8,10 +8,11 @@ import type {
 } from "@/lib/types";
 
 export interface ListEntriesParams {
-  [key: string]: string | number | boolean | undefined;
+  [key: string]: string | number | boolean | string[] | undefined;
   page?: number;
   page_size?: number;
   search?: string;
+  search_terms?: string[];
   status?: string;
   topic?: string;
   part_of_speech?: string;

@@ -17,7 +17,7 @@ import { trackEvent } from "@/lib/analytics";
 import { ApiError } from "@/lib/api";
 import { getLocalizedApiErrorMessage } from "@/lib/localized-api-error";
 import { entryDefinitionPreview } from "@/lib/entry-definition";
-import { applyOrthography, useOrthography } from "@/lib/orthography";
+import { useOrthography } from "@/lib/orthography";
 import { getCachedVote, resolveVote, setCachedVote, useVoteMemoryVersion } from "@/lib/vote-memory";
 
 type EntrySort = "alphabetical" | "recent" | "score" | "most_examples" | "unseen";
@@ -93,12 +93,26 @@ export function EntryBrowser({
   const [partOfSpeech, setPartOfSpeech] = useState("");
   const [sort, setSort] = useState<EntrySort>(initialSort);
 
-  const effectiveSearch = useMemo(() => {
+  const navarroSearchTerms = useMemo<string[]>(() => {
     if (orthoMode !== "personal" || !mapping.length || !search.trim()) {
-      return search;
+      return [search];
     }
-    const inverse = mapping.map((item) => ({ from: item.to, to: item.from }));
-    return applyOrthography(search, inverse);
+    // Cross-product expansion: for each mapping item, apply its inverse to every
+    // existing variant. This handles multiple sources → same personal char (e.g.
+    // gû→w AND û→w both yielding "w") as well as multi-char words (awjé → aûîé).
+    let variants = new Set<string>([search]);
+    for (const item of mapping) {
+      if (!item.from || !item.to) continue;
+      const next = new Set<string>(variants);
+      for (const v of variants) {
+        if (v.includes(item.to)) {
+          next.add(v.split(item.to).join(item.from));
+        }
+      }
+      variants = next;
+      if (variants.size > 16) break; // guard against combinatorial blowup
+    }
+    return [...variants];
   }, [search, orthoMode, mapping]);
 
   useEffect(() => {
@@ -129,7 +143,8 @@ export function EntryBrowser({
 
   const filters = useMemo(
     () => ({
-      search: effectiveSearch,
+      search: navarroSearchTerms[0] ?? search,
+      search_terms: navarroSearchTerms.length > 1 ? navarroSearchTerms.slice(1) : undefined,
       status,
       part_of_speech: partOfSpeech,
       sort,
@@ -137,7 +152,7 @@ export function EntryBrowser({
       proposer_user_id: scope?.proposer_user_id,
       source_work_id: scope?.source_work_id,
     }),
-    [effectiveSearch, status, partOfSpeech, sort, scope?.proposer_user_id, scope?.source_work_id],
+    [navarroSearchTerms, search, status, partOfSpeech, sort, scope?.proposer_user_id, scope?.source_work_id],
   );
 
   const { data, isPending, isFetchingNextPage, hasNextPage, fetchNextPage } =
