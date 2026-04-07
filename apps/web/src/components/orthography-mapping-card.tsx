@@ -129,9 +129,17 @@ export function OrthographyMappingCard() {
         ))}
       </div>
 
-      <div className="mt-3">
+      <div className="mt-3 flex items-center gap-2">
         <Button type="button" variant="secondary" className="px-3 py-1.5 text-xs" onClick={handleAddRow}>
           {t("orthography.addRow")}
+        </Button>
+        <Button
+          type="button"
+          className="px-3 py-1.5 text-xs"
+          onClick={handleSave}
+          disabled={updateMutation.isPending || (!hasChanges && areMappingsEqual(normalizedDraft, mapping))}
+        >
+          {updateMutation.isPending ? t("orthography.saving") : t("orthography.save")}
         </Button>
       </div>
 

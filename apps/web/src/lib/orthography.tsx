@@ -28,8 +28,8 @@ const OrthographyContext = createContext<OrthographyContextValue | null>(null);
 function normalizeMapping(mapping: OrthographyMapItem[]): OrthographyMapItem[] {
   return mapping
     .map((item) => ({
-      from: item.from.trim(),
-      to: (item.to ?? "").trim(),
+      from: item.from.trim().toLowerCase(),
+      to: (item.to ?? "").trim().toLowerCase(),
     }))
     .filter((item) => item.from.length > 0);
 }
@@ -108,7 +108,7 @@ export function applyOrthography(value: string, mapping: OrthographyMapItem[]): 
   if (!mapping.length) {
     return value;
   }
-  let next = value;
+  let next = value.toLowerCase();
   for (const item of mapping) {
     if (!item.from) {
       continue;

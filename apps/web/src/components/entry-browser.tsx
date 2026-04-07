@@ -70,7 +70,7 @@ export function EntryBrowser({
   allowUnseenFilter = false,
 }: EntryBrowserProps) {
   const { t } = useI18n();
-  const { apply, mapping, orthoMode, setOrthoMode } = useOrthography();
+  const { apply, mapping, orthoMode } = useOrthography();
   const TitleTag = titleAs;
   const hasMounted = useRef(false);
   const loadMoreRef = useRef<HTMLDivElement | null>(null);
@@ -94,13 +94,14 @@ export function EntryBrowser({
   const [sort, setSort] = useState<EntrySort>(initialSort);
 
   const navarroSearchTerms = useMemo<string[]>(() => {
-    if (orthoMode !== "personal" || !mapping.length || !search.trim()) {
-      return [search];
+    const lowered = search.toLowerCase();
+    if (orthoMode !== "personal" || !mapping.length || !lowered.trim()) {
+      return [lowered];
     }
     // Cross-product expansion: for each mapping item, apply its inverse to every
     // existing variant. This handles multiple sources → same personal char (e.g.
     // gû→w AND û→w both yielding "w") as well as multi-char words (awjé → aûîé).
-    let variants = new Set<string>([search]);
+    let variants = new Set<string>([lowered]);
     for (const item of mapping) {
       if (!item.from || !item.to) continue;
       const next = new Set<string>(variants);
@@ -277,32 +278,9 @@ export function EntryBrowser({
   return (
     <>
       <Card className={compact ? "p-3" : undefined}>
-        <div className="flex items-start justify-between gap-2">
-          <TitleTag className="text-xl font-semibold text-brand-900">
-            {title}
-          </TitleTag>
-          {mapping.length > 0 ? (
-            <div
-              className="inline-flex shrink-0 overflow-hidden rounded-full border border-line-strong text-[11px] font-semibold"
-              title={t("orthography.searchModeLabel")}
-            >
-              <button
-                type="button"
-                className={`px-2.5 py-1 transition-colors ${orthoMode === "navarro" ? "bg-brand-700 text-white" : "bg-surface-input text-ink-muted hover:bg-surface-hover"}`}
-                onClick={() => setOrthoMode("navarro")}
-              >
-                {t("orthography.searchModeNavarro")}
-              </button>
-              <button
-                type="button"
-                className={`px-2.5 py-1 transition-colors ${orthoMode === "personal" ? "bg-brand-700 text-white" : "bg-surface-input text-ink-muted hover:bg-surface-hover"}`}
-                onClick={() => setOrthoMode("personal")}
-              >
-                {t("orthography.searchModePersonal")}
-              </button>
-            </div>
-          ) : null}
-        </div>
+        <TitleTag className="text-xl font-semibold text-brand-900">
+          {title}
+        </TitleTag>
         {description ? (
           <p className="mt-1 text-sm text-slate-700">{description}</p>
         ) : null}

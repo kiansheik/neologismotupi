@@ -18,7 +18,7 @@ export function AppShell() {
   const queryClient = useQueryClient();
   const { data: user } = useCurrentUser();
   const { locale, setLocale, t } = useI18n();
-  const { setMapping } = useOrthography();
+  const { setMapping, orthoMode, setOrthoMode, mapping } = useOrthography();
   const lastLocaleSync = useRef<{ userId: string; locale: string } | null>(null);
 
   const updateLocaleMutation = useMutation({
@@ -232,6 +232,27 @@ export function AppShell() {
                 </Link>
               </>
             )}
+            {mapping.length > 0 ? (
+              <div
+                className="inline-flex shrink-0 overflow-hidden rounded-full border border-line-strong text-[11px] font-semibold"
+                title={t("orthography.searchModeLabel")}
+              >
+                <button
+                  type="button"
+                  className={`px-2.5 py-1 transition-colors ${orthoMode === "navarro" ? "bg-brand-700 text-white" : "bg-surface-input text-ink-muted hover:bg-surface-hover"}`}
+                  onClick={() => setOrthoMode("navarro")}
+                >
+                  {t("orthography.searchModeNavarro")}
+                </button>
+                <button
+                  type="button"
+                  className={`px-2.5 py-1 transition-colors ${orthoMode === "personal" ? "bg-brand-700 text-white" : "bg-surface-input text-ink-muted hover:bg-surface-hover"}`}
+                  onClick={() => setOrthoMode("personal")}
+                >
+                  {t("orthography.searchModePersonal")}
+                </button>
+              </div>
+            ) : null}
             <ThemeToggle />
             <select
               aria-label={t("language.label")}
