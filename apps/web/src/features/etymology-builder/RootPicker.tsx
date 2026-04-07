@@ -77,7 +77,7 @@ export function RootPicker({
   }, [value]);
 
   return (
-    <div className="min-w-0 rounded-md border border-slate-200 bg-white/70 p-3">
+    <div className="min-w-0 rounded-md border border-slate-200 bg-surface/70 p-3">
       <div className="flex items-center justify-between gap-2">
         <p className="text-xs font-semibold text-slate-700">{label}</p>
         {value ? (
@@ -126,7 +126,7 @@ export function RootPicker({
             ))}
           </div>
           {allowManual ? (
-            <div className="mt-3 rounded-md border border-slate-200 bg-white/80 p-2">
+            <div className="mt-3 rounded-md border border-slate-200 bg-surface/80 p-2">
               <p className="text-[11px] font-semibold text-slate-600">Adicionar manualmente</p>
               <div className="mt-2 grid min-w-0 gap-2">
                 <Input
@@ -137,7 +137,7 @@ export function RootPicker({
                 />
                 <div className="grid min-w-0 gap-2 sm:grid-cols-[minmax(0,140px)_minmax(0,1fr)]">
                   <select
-                    className="w-full min-w-0 rounded-md border border-slate-200 bg-white px-2 py-1 text-xs"
+                    className="w-full min-w-0 rounded-md border border-slate-200 bg-surface-soft px-2 py-1 text-xs"
                     value={manualPosKind}
                     onChange={(event) => setManualPosKind(event.target.value as RootPosKind)}
                   >

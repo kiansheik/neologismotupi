@@ -51,7 +51,7 @@ export function ProModeEditor({
         </p>
       </section>
 
-      <section className="rounded-md border border-brand-100 bg-white/70 p-3">
+      <section className="rounded-md border border-brand-100 bg-surface/70 p-3">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <p className="text-sm font-semibold text-brand-900">Editor pydicate</p>
           <Button
@@ -80,7 +80,7 @@ export function ProModeEditor({
         />
       </section>
 
-      <section className="rounded-md border border-brand-100 bg-white/70 p-3">
+      <section className="rounded-md border border-brand-100 bg-surface/70 p-3">
         <p className="text-sm font-semibold text-brand-900">Execução</p>
         <div className="mt-2 flex flex-wrap items-center gap-2">
           <label className="flex items-center gap-2 text-[11px] text-slate-600">
@@ -102,18 +102,18 @@ export function ProModeEditor({
             <span className="text-[11px] text-amber-700">{runtimeState.message}</span>
           ) : null}
         </div>
-        <div className="mt-2 rounded-md border border-slate-200 bg-white px-2 py-2 text-xs text-slate-800">
+        <div className="mt-2 rounded-md border border-slate-200 bg-surface-soft px-2 py-2 text-xs text-slate-800">
           {runtimeEnabled ? runtimeDisplay || runtimeState.message || "—" : "Runtime desativado."}
         </div>
         {/* iframe is managed globally by usePyodideRuntime */}
       </section>
 
-      <section className="rounded-md border border-brand-100 bg-white/70 p-3">
+      <section className="rounded-md border border-brand-100 bg-surface/70 p-3">
         <p className="text-sm font-semibold text-brand-900">Nota gerada da estrutura atual</p>
         <p className="mt-1 text-xs text-slate-600">
           Use esta nota se preferir sincronizar a partir da estrutura atual.
         </p>
-        <div className="mt-2 rounded-md border border-brand-100 bg-white px-2 py-2 text-sm text-slate-800">
+        <div className="mt-2 rounded-md border border-brand-100 bg-surface-soft px-2 py-2 text-sm text-slate-800">
           {store.generatedNote || "—"}
         </div>
         <div className="mt-2 flex flex-wrap items-center gap-2">

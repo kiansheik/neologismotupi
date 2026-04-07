@@ -29,7 +29,7 @@ export function StatusBadge({ status, showPending = false }: Props) {
         <span
           id={tooltipId}
           role="tooltip"
-          className="pointer-events-none absolute left-1/2 top-full z-20 mt-2 hidden w-64 -translate-x-1/2 rounded-md bg-slate-900 px-2 py-1 text-xs text-white shadow-lg group-hover:block group-focus-within:block"
+          className="pointer-events-none absolute left-1/2 top-full z-20 mt-2 hidden w-64 -translate-x-1/2 rounded-md bg-tooltip px-2 py-1 text-xs text-white shadow-lg group-hover:block group-focus-within:block"
         >
           {tooltip}
         </span>

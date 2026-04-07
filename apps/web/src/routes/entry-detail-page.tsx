@@ -1391,7 +1391,7 @@ export function EntryDetailPage() {
           </p>
         ) : null}
         {((entry.audio_samples?.length ?? 0) > 0 || canWrite) ? (
-          <div className="mt-3 rounded-md border border-brand-100 bg-white/70 p-3">
+          <div className="mt-3 rounded-md border border-brand-100 bg-surface/70 p-3">
             <h2 className="text-sm font-semibold text-brand-900">{t("audio.entryTitle")}</h2>
             <p className="mt-1 text-xs text-slate-600">{t("audio.entryHelp")}</p>
             <div className="mt-2">
@@ -1430,9 +1430,9 @@ export function EntryDetailPage() {
           <Button
             type="button"
             variant="secondary"
-            className={`inline-flex h-10 w-10 items-center justify-center rounded-full border border-[#d3c6b0] bg-[#fffaf2] p-0 text-lg leading-none shadow-sm transition-colors ${
+            className={`inline-flex h-10 w-10 items-center justify-center rounded-full border border-line-strong bg-surface-input p-0 text-lg leading-none shadow-sm transition-colors ${
               entryVote === 1
-                ? "border-brand-600 bg-brand-600 text-white hover:bg-brand-700"
+                ? "border-accent bg-accent text-accent-contrast hover:bg-accent-strong"
                 : "hover:border-brand-500 hover:bg-brand-50"
             }`}
             onClick={() => voteMutation.mutate(1)}
@@ -1445,7 +1445,7 @@ export function EntryDetailPage() {
           <Button
             type="button"
             variant="secondary"
-            className={`inline-flex h-10 w-10 items-center justify-center rounded-full border border-[#d3c6b0] bg-[#fffaf2] p-0 text-lg leading-none shadow-sm transition-colors ${
+            className={`inline-flex h-10 w-10 items-center justify-center rounded-full border border-line-strong bg-surface-input p-0 text-lg leading-none shadow-sm transition-colors ${
               entryVote === -1
                 ? "border-red-600 bg-red-600 text-white hover:bg-red-700"
                 : "hover:border-red-500 hover:bg-red-100"
@@ -1618,7 +1618,7 @@ export function EntryDetailPage() {
               </label>
               <select
                 id="edit_part_of_speech"
-                className="w-full rounded-md border border-brand-300 bg-white px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-200"
+                className="w-full rounded-md border border-brand-300 bg-surface-soft px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-200"
                 {...entryEditForm.register("part_of_speech")}
               >
                 <option value="">{t("partOfSpeech.any")}</option>
@@ -1723,7 +1723,7 @@ export function EntryDetailPage() {
                     <Input id="edit_source_citation" {...entryEditForm.register("source_citation")} />
                   </div>
                   {entrySourceSuggestionsQuery.data && entrySourceSuggestionsQuery.data.length > 0 ? (
-                    <div className="rounded-md border border-brand-200 bg-white p-2">
+                    <div className="rounded-md border border-brand-200 bg-surface-soft p-2">
                       <p className="text-xs font-semibold text-brand-900">{t("submit.sourceSuggestionsTitle")}</p>
                       <div className="mt-2 flex flex-wrap gap-2">
                         {entrySourceSuggestionsQuery.data.map((source) => (
@@ -1879,7 +1879,7 @@ export function EntryDetailPage() {
                     </p>
                   ) : null}
                   {((example.audio_samples?.length ?? 0) > 0 || canWrite) ? (
-                    <div className="mt-2 rounded-md border border-brand-100 bg-white/70 p-2">
+                    <div className="mt-2 rounded-md border border-brand-100 bg-surface/70 p-2">
                       <p className="text-xs font-semibold text-brand-900">{t("audio.exampleTitle")}</p>
                       <div className="mt-2">
                         <AudioSampleList
@@ -1913,9 +1913,9 @@ export function EntryDetailPage() {
                     <Button
                       type="button"
                       variant="secondary"
-                      className={`inline-flex h-8 w-8 items-center justify-center rounded-full border border-[#d3c6b0] bg-[#fffaf2] p-0 text-base leading-none shadow-sm transition-colors ${
+                      className={`inline-flex h-8 w-8 items-center justify-center rounded-full border border-line-strong bg-surface-input p-0 text-base leading-none shadow-sm transition-colors ${
                         exampleVote === 1
-                          ? "border-brand-600 bg-brand-600 text-white hover:bg-brand-700"
+                          ? "border-accent bg-accent text-accent-contrast hover:bg-accent-strong"
                           : "hover:border-brand-500 hover:bg-brand-50"
                       }`}
                       onClick={() => voteExampleMutation.mutate({ exampleId: example.id, value: 1 })}
@@ -1928,7 +1928,7 @@ export function EntryDetailPage() {
                     <Button
                       type="button"
                       variant="secondary"
-                      className={`inline-flex h-8 w-8 items-center justify-center rounded-full border border-[#d3c6b0] bg-[#fffaf2] p-0 text-base leading-none shadow-sm transition-colors ${
+                      className={`inline-flex h-8 w-8 items-center justify-center rounded-full border border-line-strong bg-surface-input p-0 text-base leading-none shadow-sm transition-colors ${
                         exampleVote === -1
                           ? "border-red-600 bg-red-600 text-white hover:bg-red-700"
                           : "hover:border-red-500 hover:bg-red-100"
@@ -2164,7 +2164,7 @@ export function EntryDetailPage() {
                             </div>
                             {exampleEditSourceSuggestionsQuery.data &&
                             exampleEditSourceSuggestionsQuery.data.length > 0 ? (
-                              <div className="rounded-md border border-brand-200 bg-white p-2">
+                              <div className="rounded-md border border-brand-200 bg-surface-soft p-2">
                                 <p className="text-xs font-semibold text-brand-900">
                                   {t("submit.sourceSuggestionsTitle")}
                                 </p>
@@ -2249,9 +2249,9 @@ export function EntryDetailPage() {
                   <Button
                     type="button"
                     variant="secondary"
-                    className={`inline-flex h-8 w-8 items-center justify-center rounded-full border border-[#d3c6b0] bg-[#fffaf2] p-0 text-base leading-none shadow-sm transition-colors ${
+                    className={`inline-flex h-8 w-8 items-center justify-center rounded-full border border-line-strong bg-surface-input p-0 text-base leading-none shadow-sm transition-colors ${
                       commentVote === 1
-                        ? "border-brand-600 bg-brand-600 text-white hover:bg-brand-700"
+                        ? "border-accent bg-accent text-accent-contrast hover:bg-accent-strong"
                         : "hover:border-brand-500 hover:bg-brand-50"
                     }`}
                     onClick={() => voteCommentMutation.mutate({ commentId: comment.id, value: 1 })}
@@ -2264,7 +2264,7 @@ export function EntryDetailPage() {
                   <Button
                     type="button"
                     variant="secondary"
-                    className={`inline-flex h-8 w-8 items-center justify-center rounded-full border border-[#d3c6b0] bg-[#fffaf2] p-0 text-base leading-none shadow-sm transition-colors ${
+                    className={`inline-flex h-8 w-8 items-center justify-center rounded-full border border-line-strong bg-surface-input p-0 text-base leading-none shadow-sm transition-colors ${
                       commentVote === -1
                         ? "border-red-600 bg-red-600 text-white hover:bg-red-700"
                         : "hover:border-red-500 hover:bg-red-100"
@@ -2325,7 +2325,7 @@ export function EntryDetailPage() {
                 }}
               />
               {showMentionSuggestions ? (
-                <div className="absolute left-0 right-0 z-20 mt-1 rounded-md border border-[#d3c6b0] bg-[#fffaf2] shadow-lg">
+                <div className="absolute left-0 right-0 z-20 mt-1 rounded-md border border-line-strong bg-surface-input shadow-lg">
                   {mentionSuggestionsQuery.isLoading ? (
                     <p className="px-3 py-2 text-xs text-slate-600">{t("entry.mentionLoading")}</p>
                   ) : mentionSuggestions.length ? (
@@ -2336,8 +2336,8 @@ export function EntryDetailPage() {
                             type="button"
                             className={`flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-sm ${
                               index === mentionSelectionIndex
-                                ? "bg-[#efe2c6] text-brand-900"
-                                : "text-slate-700 hover:bg-[#f7ecd5]"
+                              ? "bg-surface-chip text-brand-900"
+                              : "text-slate-700 hover:bg-surface-hover"
                             }`}
                             onMouseDown={(event) => {
                               event.preventDefault();
@@ -2507,7 +2507,7 @@ export function EntryDetailPage() {
                     <Input id="source_citation" {...exampleForm.register("source_citation")} />
                   </div>
                   {exampleSourceSuggestionsQuery.data && exampleSourceSuggestionsQuery.data.length > 0 ? (
-                    <div className="rounded-md border border-brand-200 bg-white p-2">
+                    <div className="rounded-md border border-brand-200 bg-surface-soft p-2">
                       <p className="text-xs font-semibold text-brand-900">{t("submit.sourceSuggestionsTitle")}</p>
                       <div className="mt-2 flex flex-wrap gap-2">
                         {exampleSourceSuggestionsQuery.data.map((source) => (
@@ -2526,7 +2526,7 @@ export function EntryDetailPage() {
                 </div>
               ) : null}
             </div>
-            <div className="rounded-md border border-brand-100 bg-white/70 p-3">
+            <div className="rounded-md border border-brand-100 bg-surface/70 p-3">
               <p className="text-sm font-semibold text-brand-900">{t("submit.audioTitle")}</p>
               <p className="mt-1 text-xs text-slate-600">{t("submit.audioHelp")}</p>
               <div className="mt-2">

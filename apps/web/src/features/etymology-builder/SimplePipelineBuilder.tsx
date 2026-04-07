@@ -179,8 +179,8 @@ export function SimplePipelineBuilder({
   }, []);
 
   const previewPanelClass = mobilePreviewPinned
-    ? "rounded-md border border-brand-200 bg-white p-3 shadow-md"
-    : "rounded-md border border-brand-100 bg-white/70 p-3";
+    ? "rounded-md border border-brand-200 bg-surface-soft p-3 shadow-md"
+    : "rounded-md border border-brand-100 bg-surface/70 p-3";
 
   const previewPanel = (
     <section className={previewPanelClass}>
@@ -194,7 +194,7 @@ export function SimplePipelineBuilder({
             ? "border-red-200 bg-red-50 text-red-800"
             : runtimeDisplay
               ? "border-emerald-200 bg-emerald-50 text-emerald-900"
-              : "border-slate-200 bg-white text-slate-800")
+              : "border-slate-200 bg-surface-soft text-slate-800")
         }
       >
         {runtimeDisplay || runtimeState.message || "—"}
@@ -212,9 +212,9 @@ export function SimplePipelineBuilder({
   );
 
   const notePanel = (
-    <section className="rounded-md border border-brand-100 bg-white/70 p-3">
+    <section className="rounded-md border border-brand-100 bg-surface/70 p-3">
       <p className="text-sm font-semibold text-brand-900">Nota gerada</p>
-      <div className="mt-2 rounded-md border border-slate-200 bg-white px-2 py-2 text-xs text-slate-700">
+      <div className="mt-2 rounded-md border border-slate-200 bg-surface-soft px-2 py-2 text-xs text-slate-700">
         <p className="text-[11px] text-slate-500">Classe atual: {typeLabel}</p>
         <p className="text-[11px] text-slate-500">{objectLabel}</p>
       </div>
@@ -254,7 +254,7 @@ export function SimplePipelineBuilder({
             <div className="max-h-[30vh] overflow-auto">{previewPanel}</div>
           </div>
         </div>
-        <section className="rounded-md border border-brand-100 bg-white/70 p-3">
+        <section className="rounded-md border border-brand-100 bg-surface/70 p-3">
             <p className="text-sm font-semibold text-brand-900">Raiz base</p>
             <p className="mt-1 text-xs text-slate-600">Selecione a raiz principal para iniciar a composição.</p>
             <div className="mt-2">
@@ -266,13 +266,13 @@ export function SimplePipelineBuilder({
           />
         </div>
         {state.base ? (
-          <div className="mt-2 rounded-md border border-slate-200 bg-white px-3 py-2 text-xs text-slate-700">
+          <div className="mt-2 rounded-md border border-slate-200 bg-surface-soft px-3 py-2 text-xs text-slate-700">
             <p className="text-[11px] text-slate-500">Classe: {posLabelForEntry(state.base)}</p>
             {meta.currentStage === "verb" && meta.transitivity === "unknown" ? (
               <div className="mt-2 flex flex-wrap items-center gap-2">
                 <span className="text-[11px] text-amber-700">Transitividade não definida.</span>
                 <select
-                  className="rounded-md border border-slate-200 bg-white px-2 py-1 text-[11px]"
+                  className="rounded-md border border-slate-200 bg-surface-soft px-2 py-1 text-[11px]"
                   value={state.transitivityOverride || ""}
                   onChange={(event) =>
                     store.setTransitivityOverride(
@@ -295,7 +295,7 @@ export function SimplePipelineBuilder({
         ) : null}
         </section>
 
-        <section className="rounded-md border border-brand-100 bg-white/70 p-3">
+        <section className="rounded-md border border-brand-100 bg-surface/70 p-3">
           <p className="text-sm font-semibold text-brand-900">Operações (composição e derivações)</p>
           <p className="mt-1 text-xs text-slate-600">
             Adicione composições com “/” e derivações. A ordem pode ser ajustada.
@@ -308,7 +308,7 @@ export function SimplePipelineBuilder({
               {state.steps.map((step, index) => {
                 if (step.kind === "compose") {
                   return (
-                    <div key={step.id} className="rounded-md border border-slate-200 bg-white px-2 py-2 text-xs">
+                    <div key={step.id} className="rounded-md border border-slate-200 bg-surface-soft px-2 py-2 text-xs">
                       <div className="flex flex-wrap items-center justify-between gap-2">
                         <span className="font-semibold text-slate-800">Composição (/)</span>
                         <div className="flex items-center gap-2">
@@ -351,7 +351,7 @@ export function SimplePipelineBuilder({
                 if (step.kind === "object") {
                   const mode = step.resolution.mode;
                   return (
-                    <div key={step.id} className="rounded-md border border-slate-200 bg-white px-2 py-2 text-xs">
+                    <div key={step.id} className="rounded-md border border-slate-200 bg-surface-soft px-2 py-2 text-xs">
                       <div className="flex flex-wrap items-center justify-between gap-2">
                         <span className="font-semibold text-slate-800">Objeto do predicado</span>
                         <div className="flex items-center gap-2">
@@ -446,7 +446,7 @@ export function SimplePipelineBuilder({
                         </div>
                       ) : null}
                       {mode === "manual" ? (
-                        <div className="mt-3 rounded-md border border-slate-200 bg-white/80 p-2">
+                        <div className="mt-3 rounded-md border border-slate-200 bg-surface/80 p-2">
                           <p className="text-[11px] font-semibold text-slate-600">Objeto manual</p>
                           <ManualRootForm
                             onSubmit={(entry) => {
@@ -466,7 +466,7 @@ export function SimplePipelineBuilder({
                 if (step.kind === "postposition") {
                   const option = POSTPOSITION_OPTIONS.find((item) => item.value === step.value);
                   return (
-                    <div key={step.id} className="rounded-md border border-slate-200 bg-white px-2 py-2 text-xs">
+                    <div key={step.id} className="rounded-md border border-slate-200 bg-surface-soft px-2 py-2 text-xs">
                       <div className="flex flex-wrap items-center justify-between gap-2">
                         <div>
                           <span className="font-semibold text-slate-800">Postposição</span>
@@ -517,7 +517,7 @@ export function SimplePipelineBuilder({
                 }
                 const op = DERIVE_OPERATIONS[step.op];
                 return (
-                  <div key={step.id} className="rounded-md border border-slate-200 bg-white px-2 py-2 text-xs">
+                  <div key={step.id} className="rounded-md border border-slate-200 bg-surface-soft px-2 py-2 text-xs">
                     <div className="flex flex-wrap items-center justify-between gap-2">
                       <div>
                         <span className="font-semibold text-slate-800">{op.token}</span>
@@ -565,7 +565,7 @@ export function SimplePipelineBuilder({
             </div>
           )}
 
-          <div className="mt-3 rounded-md border border-slate-200 bg-white/80">
+          <div className="mt-3 rounded-md border border-slate-200 bg-surface/80">
             <button
               type="button"
               className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left"
@@ -597,7 +597,7 @@ export function SimplePipelineBuilder({
           </div>
 
           {meta.requiresObject && !meta.objectResolved ? (
-          <div className="mt-3 rounded-md border border-slate-200 bg-white/80">
+          <div className="mt-3 rounded-md border border-slate-200 bg-surface/80">
             <div className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left">
               <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-600">Objeto</span>
               <span className="text-[11px] text-slate-500">Predicados transitivos</span>
@@ -619,7 +619,7 @@ export function SimplePipelineBuilder({
             </div>
           ) : null}
 
-          <div className="mt-3 rounded-md border border-slate-200 bg-white/80">
+          <div className="mt-3 rounded-md border border-slate-200 bg-surface/80">
             <div className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left">
               <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-600">Postposição</span>
               <span className="text-[11px] text-slate-500">Aplicar ao predicado atual</span>
@@ -653,7 +653,7 @@ export function SimplePipelineBuilder({
                   {postpositionMode === "preset" ? (
                     <div className="flex flex-wrap items-center gap-2">
                       <select
-                        className="rounded-md border border-slate-200 bg-white px-2 py-1 text-xs"
+                        className="rounded-md border border-slate-200 bg-surface-soft px-2 py-1 text-xs"
                         defaultValue=""
                         onChange={(event) => {
                           const value = event.target.value;
@@ -686,7 +686,7 @@ export function SimplePipelineBuilder({
                     />
                   ) : null}
                   {postpositionMode === "manual" ? (
-                    <div className="rounded-md border border-slate-200 bg-white/80 p-2">
+                    <div className="rounded-md border border-slate-200 bg-surface/80 p-2">
                       <p className="text-[11px] font-semibold text-slate-600">Adicionar manualmente</p>
                       <div className="mt-2 flex flex-wrap items-center gap-2">
                         <Input
@@ -773,13 +773,13 @@ export function SimplePipelineBuilder({
 
 function optionClass(active: boolean) {
   return `rounded-full border px-3 py-1 text-[11px] font-semibold disabled:cursor-not-allowed disabled:opacity-50 ${
-    active ? "border-brand-500 bg-brand-600 text-white" : "border-brand-200 bg-white text-brand-800 hover:border-brand-400"
+    active ? "border-accent bg-accent text-accent-contrast" : "border-brand-200 bg-surface-soft text-brand-800 hover:border-brand-400"
   }`;
 }
 
 function optionIconClass(active: boolean) {
   return `rounded-full border p-2 text-[11px] font-semibold disabled:cursor-not-allowed disabled:opacity-50 ${
-    active ? "border-brand-500 bg-brand-600 text-white" : "border-brand-200 bg-white text-brand-800 hover:border-brand-400"
+    active ? "border-accent bg-accent text-accent-contrast" : "border-brand-200 bg-surface-soft text-brand-800 hover:border-brand-400"
   }`;
 }
 

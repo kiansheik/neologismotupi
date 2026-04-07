@@ -22,8 +22,8 @@ export function ModeSwitcher({ mode, onChange }: ModeSwitcherProps) {
             onClick={() => onChange(item.id)}
             className={`rounded-full border px-3 py-1 text-xs font-semibold ${
               isActive
-                ? "border-brand-500 bg-brand-600 text-white"
-                : "border-brand-200 bg-white text-brand-800 hover:border-brand-400"
+                ? "border-accent bg-accent text-accent-contrast"
+                : "border-brand-200 bg-surface-soft text-brand-800 hover:border-brand-400"
             }`}
             aria-pressed={isActive}
           >

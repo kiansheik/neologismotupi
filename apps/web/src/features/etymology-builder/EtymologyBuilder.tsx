@@ -32,7 +32,7 @@ export function EtymologyBuilder({
   }, [store.generatedNote, onNoteChange]);
 
   return (
-    <div className="rounded-md border border-brand-200 bg-white/70 p-3">
+    <div className="rounded-md border border-brand-200 bg-surface/70 p-3">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <p className="text-sm font-semibold text-brand-900">Construtor de etimologia (beta)</p>

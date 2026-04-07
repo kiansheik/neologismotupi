@@ -20,13 +20,13 @@ export function HomePage() {
         </p>
         <div className="mt-4 flex gap-3">
           <Link
-            className="rounded-md bg-brand-700 px-4 py-2 text-sm text-white"
+            className="rounded-md bg-accent px-4 py-2 text-sm text-accent-contrast hover:bg-accent-strong"
             to="/entries"
           >
             {t("home.browse")}
           </Link>
           <Link
-            className="rounded-md bg-white px-4 py-2 text-sm text-brand-800 ring-1 ring-brand-300"
+            className="rounded-md bg-surface-soft px-4 py-2 text-sm text-brand-800 ring-1 ring-brand-300"
             to="/submit"
           >
             {t("home.submit")}

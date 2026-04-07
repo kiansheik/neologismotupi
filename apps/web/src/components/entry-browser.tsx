@@ -184,7 +184,7 @@ export function EntryBrowser({
             onChange={(event) => setSearch(event.target.value)}
           />
           <select
-            className="rounded-md border border-brand-300 bg-white px-3 py-2 text-sm"
+            className="rounded-md border border-brand-300 bg-surface-soft px-3 py-2 text-sm"
             value={status}
             onChange={(event) => setStatus(event.target.value)}
           >
@@ -196,7 +196,7 @@ export function EntryBrowser({
             <option value="archived">{t(statusToKey("archived"))}</option>
           </select>
           <select
-            className="rounded-md border border-brand-300 bg-white px-3 py-2 text-sm"
+            className="rounded-md border border-brand-300 bg-surface-soft px-3 py-2 text-sm"
             value={partOfSpeech}
             onChange={(event) => setPartOfSpeech(event.target.value)}
           >
@@ -226,7 +226,7 @@ export function EntryBrowser({
             <option value="other">{partOfSpeechLabel("other", t)}</option>
           </select>
           <select
-            className="rounded-md border border-brand-300 bg-white px-3 py-2 text-sm"
+            className="rounded-md border border-brand-300 bg-surface-soft px-3 py-2 text-sm"
             value={sort}
             onChange={(event) =>
               setSort(

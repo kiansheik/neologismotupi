@@ -279,7 +279,7 @@ export function MePage() {
               {profileLinks.map((link) => (
                 <li key={link.key}>
                   <a
-                    className="inline-flex items-center gap-1 rounded-full border border-brand-200 bg-white px-2 py-1 text-xs text-brand-800 hover:bg-brand-50 hover:underline"
+                    className="inline-flex items-center gap-1 rounded-full border border-brand-200 bg-surface-soft px-2 py-1 text-xs text-brand-800 hover:bg-brand-50 hover:underline"
                     href={link.url}
                     target="_blank"
                     rel="noreferrer"
@@ -519,7 +519,7 @@ export function MePage() {
           </p>
         ) : (
           <div className="mt-3 grid gap-2 sm:grid-cols-2">
-            <label className="flex items-start justify-between gap-4 rounded-md border border-brand-100 bg-[#fffaf2] px-3 py-2 text-sm">
+            <label className="flex items-start justify-between gap-4 rounded-md border border-brand-100 bg-surface-input px-3 py-2 text-sm">
               <span>
                 <span className="block font-medium text-slate-900">
                   {t("me.newsletterWordOfDay")}
@@ -671,7 +671,7 @@ export function MePage() {
             return (
               <label
                 key={item.key}
-                className="flex items-center justify-between rounded-md border border-brand-100 bg-[#fffaf2] px-3 py-2 text-sm"
+                className="flex items-center justify-between rounded-md border border-brand-100 bg-surface-input px-3 py-2 text-sm"
               >
                 <span>{item.label}</span>
                 <input

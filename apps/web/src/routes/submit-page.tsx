@@ -400,7 +400,7 @@ export function SubmitPage() {
         <p className="mt-3 text-sm text-slate-700">{t("submit.voteGateHint")}</p>
         <div className="mt-3">
           <Link
-            className="inline-flex items-center rounded-md bg-brand-700 px-4 py-2 text-sm text-white"
+            className="inline-flex items-center rounded-md bg-accent px-4 py-2 text-sm text-accent-contrast hover:bg-accent-strong"
             to="/entries?unseen=1"
           >
             {t("submit.voteGateCta")}
@@ -549,7 +549,7 @@ export function SubmitPage() {
           <p className="mb-1 text-xs text-slate-600">{t("submit.help.partOfSpeech")}</p>
           <select
             id="part_of_speech"
-            className="w-full rounded-md border border-brand-300 bg-white px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-200"
+            className="w-full rounded-md border border-brand-300 bg-surface-soft px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-200"
             {...form.register("part_of_speech")}
           >
             <option value="">{t("partOfSpeech.any")}</option>
@@ -658,7 +658,7 @@ export function SubmitPage() {
               </div>
 
               {sourceSuggestionsQuery.data && sourceSuggestionsQuery.data.length > 0 ? (
-                <div className="rounded-md border border-brand-200 bg-white p-2">
+                <div className="rounded-md border border-brand-200 bg-surface-soft p-2">
                   <p className="text-xs font-semibold text-brand-900">{t("submit.sourceSuggestionsTitle")}</p>
                   <div className="mt-2 flex flex-wrap gap-2">
                     {sourceSuggestionsQuery.data.map((source) => (
@@ -689,7 +689,7 @@ export function SubmitPage() {
             {...morphologyNotesField}
           />
         </div>
-        <div className="rounded-md border border-brand-100 bg-white/70 p-3">
+        <div className="rounded-md border border-brand-100 bg-surface/70 p-3">
           <p className="text-sm font-semibold text-brand-900">{t("submit.audioTitle")}</p>
           <p className="mt-1 text-xs text-slate-600">{t("submit.audioHelp")}</p>
           <div className="mt-2">

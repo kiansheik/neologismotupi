@@ -29,7 +29,7 @@ export function DictionaryResultCard({ result, onPick, compact }: DictionaryResu
   const orthVariants = normalized && normalized !== rawLower ? [normalized] : [];
 
   return (
-    <div className="rounded-md border border-slate-200 bg-white px-3 py-2 text-sm">
+    <div className="rounded-md border border-slate-200 bg-surface-soft px-3 py-2 text-sm">
       <div className="flex items-start justify-between gap-2">
         <div>
           <div className="flex flex-wrap items-center gap-2">

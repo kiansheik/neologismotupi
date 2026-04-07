@@ -6,6 +6,7 @@ import { useCurrentUser } from "@/features/auth/hooks";
 import { logout } from "@/features/auth/api";
 import { getMyPreferences, updateMyPreferences } from "@/features/users/api";
 import { Button } from "@/components/ui/button";
+import { ThemeToggle } from "@/components/theme-toggle";
 import { type Locale, useI18n } from "@/i18n";
 import { initAnalytics, trackEvent, trackPageView } from "@/lib/analytics";
 import { buildAbsoluteUrl, useSeo } from "@/lib/seo";
@@ -168,7 +169,7 @@ export function AppShell() {
 
   return (
     <div className="min-h-screen">
-      <header className="border-b border-[#d8cbb4] bg-[#f8efde]/95 backdrop-blur">
+      <header className="border-b border-line bg-surface-header/95 backdrop-blur">
         <nav className="mx-auto flex max-w-6xl flex-col gap-3 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
           <Link to="/" className="min-w-0 text-base font-semibold text-brand-800 sm:text-lg">
             {import.meta.env.VITE_APP_NAME ?? "Dicionário de Tupi"}
@@ -176,24 +177,24 @@ export function AppShell() {
           <div className="flex w-full flex-wrap items-center gap-2 text-sm sm:w-auto sm:justify-end">
             <Link
               to="/entries"
-              className="rounded-md px-2 py-1 text-brand-700 hover:bg-brand-700 hover:text-white"
+              className="rounded-md px-2 py-1 text-brand-700 hover:bg-accent hover:text-accent-contrast"
             >
               {t("nav.entries")}
             </Link>
-            <Link to="/submit" className="rounded-md px-2 py-1 text-brand-700 hover:bg-brand-700 hover:text-white">
+            <Link to="/submit" className="rounded-md px-2 py-1 text-brand-700 hover:bg-accent hover:text-accent-contrast">
               {t("nav.submit")}
             </Link>
             {user?.is_superuser ? (
               <Link
                 to="/moderation"
-                className="rounded-md px-2 py-1 text-brand-700 hover:bg-brand-700 hover:text-white"
+                className="rounded-md px-2 py-1 text-brand-700 hover:bg-accent hover:text-accent-contrast"
               >
                 {t("nav.moderation")}
               </Link>
             ) : null}
             {user ? (
               <>
-                <Link to="/me" className="rounded-md px-2 py-1 text-brand-700 hover:bg-brand-700 hover:text-white">
+                <Link to="/me" className="rounded-md px-2 py-1 text-brand-700 hover:bg-accent hover:text-accent-contrast">
                   {t("nav.me")}
                 </Link>
                 <Button
@@ -208,20 +209,21 @@ export function AppShell() {
               </>
             ) : (
               <>
-                <Link to="/login" className="rounded-md px-2 py-1 text-brand-700 hover:bg-brand-700 hover:text-white">
+                <Link to="/login" className="rounded-md px-2 py-1 text-brand-700 hover:bg-accent hover:text-accent-contrast">
                   {t("nav.login")}
                 </Link>
                 <Link
                   to="/signup"
-                  className="rounded-md px-2 py-1 text-brand-700 hover:bg-brand-700 hover:text-white"
+                  className="rounded-md px-2 py-1 text-brand-700 hover:bg-accent hover:text-accent-contrast"
                 >
                   {t("nav.signup")}
                 </Link>
               </>
             )}
+            <ThemeToggle />
             <select
               aria-label={t("language.label")}
-              className="rounded-md border border-[#d3c6b0] bg-[#fffaf2] px-2 py-1 text-xs"
+              className="rounded-md border border-line-strong bg-surface-input px-2 py-1 text-xs text-ink"
               value={locale}
               onChange={(event) => {
                 const nextLocale = event.target.value as Locale;
@@ -239,7 +241,7 @@ export function AppShell() {
       <main className="mx-auto max-w-6xl px-4 py-6">
         <Outlet />
       </main>
-      <footer className="border-t border-[#d8cbb4] bg-[#f8efde]/70">
+      <footer className="border-t border-line bg-surface-header/70">
         <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-2 px-4 py-3 text-xs text-slate-700">
           <p>{t("footer.tagline")}</p>
           <div className="inline-flex items-center gap-3">

@@ -138,7 +138,7 @@ export function ProfilePage() {
               {profileLinks.map((link) => (
                 <li key={link.key}>
                   <a
-                    className="inline-flex items-center gap-1 rounded-full border border-brand-200 bg-white px-2 py-1 text-xs text-brand-800 hover:bg-brand-50 hover:underline"
+                    className="inline-flex items-center gap-1 rounded-full border border-brand-200 bg-surface-soft px-2 py-1 text-xs text-brand-800 hover:bg-brand-50 hover:underline"
                     href={link.url}
                     target="_blank"
                     rel="noreferrer"

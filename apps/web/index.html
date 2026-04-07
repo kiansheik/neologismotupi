@@ -21,6 +21,22 @@
       name="twitter:description"
       content="Dicionário vivo e comunitário de Tupi com verbetes históricos e contemporâneos."
     />
+    <script>
+      (function () {
+        try {
+          var storageKey = "nheenga.theme";
+          var stored = localStorage.getItem(storageKey);
+          var prefersDark =
+            window.matchMedia &&
+            window.matchMedia("(prefers-color-scheme: dark)").matches;
+          var theme = stored === "light" || stored === "dark" ? stored : prefersDark ? "dark" : "light";
+          document.documentElement.dataset.theme = theme;
+          document.documentElement.style.colorScheme = theme;
+        } catch (err) {
+          // Ignore theme hydration errors.
+        }
+      })();
+    </script>
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <title>Dicionário vivo de Tupi | Dicionário de Tupi</title>
   </head>

@@ -5,14 +5,97 @@
 @tailwind utilities;
 
 :root {
-  --surface: #f6ead7;
-  --surface-alt: #efe2c6;
-  --surface-soft: #f9f2e6;
-  --text: #2a231b;
-  --muted: #6b5e4c;
-  --line: #d8cbb4;
-  --accent: #14532d;
-  --accent-soft: #dff0e6;
+  color-scheme: light;
+  --surface: 246 234 215;
+  --surface-alt: 239 226 198;
+  --surface-soft: 249 242 230;
+  --surface-header: 248 239 222;
+  --surface-input: 255 250 242;
+  --surface-hover: 240 228 207;
+  --surface-chip: 239 226 198;
+  --surface-card-from: 253 248 239;
+  --surface-card-to: 248 239 222;
+  --text: 42 35 27;
+  --muted: 107 94 76;
+  --line: 216 203 180;
+  --line-strong: 211 198 176;
+  --line-soft: 217 204 181;
+  --accent: 20 83 45;
+  --accent-strong: 15 63 34;
+  --accent-soft: 223 240 230;
+  --accent-contrast: 255 255 255;
+  --focus: 138 114 70;
+  --tooltip: 15 23 42;
+  --glow-1: 223 240 230;
+  --glow-2: 242 227 201;
+  --card-shadow: 0 6px 20px rgba(57, 49, 37, 0.08);
+  --brand-50: 243 247 239;
+  --brand-100: 224 235 215;
+  --brand-200: 191 214 173;
+  --brand-300: 150 186 120;
+  --brand-400: 112 157 79;
+  --brand-500: 90 130 64;
+  --brand-600: 71 104 52;
+  --brand-700: 58 82 43;
+  --brand-800: 49 65 37;
+  --brand-900: 42 55 31;
+  --slate-50: 248 250 252;
+  --slate-100: 241 245 249;
+  --slate-200: 226 232 240;
+  --slate-300: 203 213 225;
+  --slate-400: 148 163 184;
+  --slate-500: 100 116 139;
+  --slate-600: 71 85 105;
+  --slate-700: 51 65 85;
+  --slate-800: 30 41 59;
+  --slate-900: 15 23 42;
+}
+
+[data-theme="dark"] {
+  color-scheme: dark;
+  --surface: 26 23 18;
+  --surface-alt: 33 29 22;
+  --surface-soft: 38 31 24;
+  --surface-header: 34 29 23;
+  --surface-input: 42 36 27;
+  --surface-hover: 51 44 34;
+  --surface-chip: 58 50 39;
+  --surface-card-from: 34 29 23;
+  --surface-card-to: 27 23 18;
+  --text: 241 233 221;
+  --muted: 199 184 166;
+  --line: 63 53 41;
+  --line-strong: 74 62 49;
+  --line-soft: 47 39 31;
+  --accent: 47 143 95;
+  --accent-strong: 38 122 80;
+  --accent-soft: 37 72 54;
+  --accent-contrast: 255 255 255;
+  --focus: 183 152 94;
+  --tooltip: 12 14 18;
+  --glow-1: 31 58 46;
+  --glow-2: 43 36 25;
+  --card-shadow: 0 10px 28px rgba(0, 0, 0, 0.45);
+  --brand-50: 26 33 26;
+  --brand-100: 33 43 33;
+  --brand-200: 45 59 45;
+  --brand-300: 62 81 62;
+  --brand-400: 84 108 84;
+  --brand-500: 112 140 112;
+  --brand-600: 144 172 144;
+  --brand-700: 176 202 176;
+  --brand-800: 206 226 206;
+  --brand-900: 226 240 226;
+  --slate-50: 18 20 24;
+  --slate-100: 24 28 33;
+  --slate-200: 34 40 47;
+  --slate-300: 47 55 64;
+  --slate-400: 71 82 96;
+  --slate-500: 105 119 134;
+  --slate-600: 147 162 178;
+  --slate-700: 186 198 211;
+  --slate-800: 212 221 231;
+  --slate-900: 232 237 243;
 }
 
 body {
@@ -20,11 +103,11 @@ body {
   min-height: 100vh;
   overflow-x: hidden;
   font-family: "Poppins", "Source Sans 3", "IBM Plex Sans", sans-serif;
-  color: var(--text);
+  color: rgb(var(--text));
   background:
-    radial-gradient(circle at top right, #dff0e6 0%, transparent 43%),
-    radial-gradient(circle at 18% 72%, #f2e3c9 0%, transparent 38%),
-    var(--surface);
+    radial-gradient(circle at top right, rgb(var(--glow-1)) 0%, transparent 43%),
+    radial-gradient(circle at 18% 72%, rgb(var(--glow-2)) 0%, transparent 38%),
+    rgb(var(--surface));
 }
 
 h1,

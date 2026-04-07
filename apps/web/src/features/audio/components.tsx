@@ -23,8 +23,9 @@ export function CompactAudioPlayer({ src, t, size = "md", className }: CompactAu
   const sizeClass = size === "sm" ? "h-8 w-8" : "h-9 w-9";
   const iconSize = size === "sm" ? "text-sm" : "text-base";
   const baseClass =
-    "inline-flex items-center justify-center rounded-full border border-[#d3c6b0] bg-[#fffaf2] p-0 text-brand-800 shadow-sm transition-colors hover:border-brand-500 hover:bg-brand-50";
-  const activeClass = "bg-brand-800 text-white hover:bg-brand-900 hover:border-brand-900";
+    "inline-flex items-center justify-center rounded-full border border-line-strong bg-surface-input p-0 text-brand-800 shadow-sm transition-colors hover:border-brand-500 hover:bg-brand-50";
+  const activeClass =
+    "border-accent bg-accent text-accent-contrast hover:bg-accent-strong hover:border-accent-strong";
 
   const stopPlayback = (resetState = true) => {
     const audio = audioRef.current;
@@ -113,10 +114,10 @@ export function AudioCapture({
   const countdownTimerRef = useRef<number | null>(null);
   const maxSize = maxBytes ?? 5 * 1024 * 1024;
   const actionGroupClass =
-    "inline-flex items-center gap-1 rounded-full border border-[#d3c6b0] bg-[#fffaf2] px-2 py-1 shadow-sm";
+    "inline-flex items-center gap-1 rounded-full border border-line-strong bg-surface-input px-2 py-1 shadow-sm";
   const iconButtonBase =
-    "inline-flex h-7 w-7 items-center justify-center rounded-full bg-transparent p-0 text-brand-800 transition-colors hover:bg-white/80 leading-none";
-  const iconButtonActive = "bg-brand-800 text-white hover:bg-brand-900";
+    "inline-flex h-7 w-7 items-center justify-center rounded-full bg-transparent p-0 text-brand-800 transition-colors hover:bg-surface/80 leading-none";
+  const iconButtonActive = "bg-accent text-accent-contrast hover:bg-accent-strong";
   const iconButtonDanger = "bg-red-600 text-white hover:bg-red-700";
 
   useEffect(() => {
@@ -336,12 +337,12 @@ export function AudioCapture({
           </Button>
         </div>
         {countdown !== null ? (
-          <div className="flex items-center gap-1 rounded-full bg-brand-900 px-2 py-1 text-[11px] font-semibold text-white">
+          <div className="flex items-center gap-1 rounded-full bg-accent-strong px-2 py-1 text-[11px] font-semibold text-accent-contrast">
             {[3, 2, 1].map((step) => (
               <span
                 key={step}
                 className={`flex h-5 w-5 items-center justify-center rounded-full tabular-nums transition-all ${
-                  countdown === step ? "bg-white/30 text-white" : "opacity-50"
+                  countdown === step ? "bg-surface/30 text-white" : "opacity-50"
                 }`}
               >
                 {step}
@@ -457,16 +458,16 @@ export function AudioSampleList({
         const uploaderUrl = sample.uploader_profile_url ?? null;
         const isConfirmingDelete = confirmDeleteId === sample.id;
         return (
-          <div key={sample.id} className="rounded-md border border-brand-100 bg-white/70 p-2">
+          <div key={sample.id} className="rounded-md border border-brand-100 bg-surface/70 p-2">
             <div className="flex flex-wrap items-center gap-3">
               <CompactAudioPlayer src={sample.url} t={t} size="sm" />
               <div className="flex flex-wrap items-center gap-2">
                 <Button
                   type="button"
                   variant="secondary"
-                  className={`inline-flex h-8 w-8 items-center justify-center rounded-full border border-[#d3c6b0] bg-[#fffaf2] p-0 text-base leading-none shadow-sm transition-colors ${
+                  className={`inline-flex h-8 w-8 items-center justify-center rounded-full border border-line-strong bg-surface-input p-0 text-base leading-none shadow-sm transition-colors ${
                     audioVote === 1
-                      ? "border-brand-600 bg-brand-600 text-white hover:bg-brand-700"
+                      ? "border-accent bg-accent text-accent-contrast hover:bg-accent-strong"
                       : "hover:border-brand-500 hover:bg-brand-50"
                   }`}
                   onClick={() => onVote?.(sample.id, 1)}
@@ -479,7 +480,7 @@ export function AudioSampleList({
                 <Button
                   type="button"
                   variant="secondary"
-                  className={`inline-flex h-8 w-8 items-center justify-center rounded-full border border-[#d3c6b0] bg-[#fffaf2] p-0 text-base leading-none shadow-sm transition-colors ${
+                  className={`inline-flex h-8 w-8 items-center justify-center rounded-full border border-line-strong bg-surface-input p-0 text-base leading-none shadow-sm transition-colors ${
                     audioVote === -1
                       ? "border-red-600 bg-red-600 text-white hover:bg-red-700"
                       : "hover:border-red-500 hover:bg-red-100"
