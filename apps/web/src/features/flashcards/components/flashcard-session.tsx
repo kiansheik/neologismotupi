@@ -1,9 +1,11 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { CompactAudioPlayer } from "@/features/audio/components";
 import { useI18n } from "@/i18n";
+import { useOrthography } from "@/lib/orthography";
 import { trackEvent } from "@/lib/analytics";
 import type { FlashcardCard, FlashcardGrade } from "@/lib/types";
 
@@ -25,11 +27,10 @@ export function FlashcardSession({
   dueLaterToday = 0,
 }: FlashcardSessionProps) {
   const { t } = useI18n();
+  const { apply } = useOrthography();
   const [revealed, setRevealed] = useState(false);
   const [shownAt, setShownAt] = useState<number | null>(null);
   const [responseMs, setResponseMs] = useState<number | null>(null);
-  const promptAudioRef = useRef<HTMLAudioElement | null>(null);
-  const revealAudioRef = useRef<HTMLAudioElement | null>(null);
 
   useEffect(() => {
     if (!card) {
@@ -43,36 +44,19 @@ export function FlashcardSession({
     setShownAt(Date.now());
   }, [card?.entry_id, card?.direction]);
 
-  useEffect(() => {
-    if (!card || card.direction !== "headword_to_gloss" || !card.audio_url) {
-      return;
-    }
-    const audio = promptAudioRef.current;
-    if (!audio) {
-      return;
-    }
-    audio.currentTime = 0;
-    void audio.play().catch(() => undefined);
-  }, [card?.entry_id, card?.direction, card?.audio_url]);
-
-  useEffect(() => {
-    if (!revealed || !card || card.direction !== "gloss_to_headword" || !card.audio_url) {
-      return;
-    }
-    const audio = revealAudioRef.current;
-    if (!audio) {
-      return;
-    }
-    audio.currentTime = 0;
-    void audio.play().catch(() => undefined);
-  }, [revealed, card?.entry_id, card?.direction, card?.audio_url]);
-
   const prompt = useMemo(() => {
     if (!card) {
       return "";
     }
-    return card.direction === "headword_to_gloss" ? card.headword : card.gloss_pt;
-  }, [card]);
+    return card.direction === "headword_to_gloss" ? apply(card.headword) : card.gloss_pt;
+  }, [apply, card]);
+
+  const headwordLabel = useMemo(() => {
+    if (!card) {
+      return "";
+    }
+    return apply(card.headword);
+  }, [apply, card]);
 
   const promptLabel = useMemo(() => {
     if (!card) {
@@ -156,15 +140,15 @@ export function FlashcardSession({
       <div className="mt-4">
         <p className="text-2xl font-semibold text-brand-900">{prompt}</p>
         {card.audio_url && card.direction === "headword_to_gloss" ? (
-          <div className="mt-3">
-            <p className="text-xs text-ink-muted">{t("flashcards.audioLabel")}</p>
-            <audio
-              ref={promptAudioRef}
+          <div className="mt-3 flex items-center gap-3">
+            <CompactAudioPlayer
               src={card.audio_url}
-              className="mt-2 w-full"
-              controls
-              preload="none"
+              t={t}
+              size="sm"
+              autoPlay
+              autoPlayKey={`${card.entry_id}-${card.direction}`}
             />
+            <p className="text-xs text-ink-muted">{t("flashcards.audioLabel")}</p>
           </div>
         ) : null}
       </div>
@@ -183,7 +167,7 @@ export function FlashcardSession({
             <div className="mt-2 space-y-2 text-sm">
               <div>
                 <p className="text-xs text-ink-muted">{t("flashcards.headwordLabel")}</p>
-                <p className="text-base font-semibold text-brand-900">{card.headword}</p>
+                <p className="text-base font-semibold text-brand-900">{headwordLabel}</p>
               </div>
               <div>
                 <p className="text-xs text-ink-muted">{t("flashcards.glossLabel")}</p>
@@ -194,15 +178,15 @@ export function FlashcardSession({
                 <p className="text-sm text-ink">{card.short_definition}</p>
               </div>
               {card.audio_url && card.direction === "gloss_to_headword" ? (
-                <div>
-                  <p className="text-xs text-ink-muted">{t("flashcards.audioLabel")}</p>
-                  <audio
-                    ref={revealAudioRef}
+                <div className="flex items-center gap-3">
+                  <CompactAudioPlayer
                     src={card.audio_url}
-                    className="mt-2 w-full"
-                    controls
-                    preload="none"
+                    t={t}
+                    size="sm"
+                    autoPlay={revealed}
+                    autoPlayKey={`${card.entry_id}-${card.direction}-reveal`}
                   />
+                  <p className="text-xs text-ink-muted">{t("flashcards.audioLabel")}</p>
                 </div>
               ) : null}
               {card.part_of_speech ? (
