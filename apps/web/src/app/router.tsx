@@ -4,6 +4,8 @@ import { AppShell } from "@/components/app-shell";
 import { AboutPage } from "@/routes/about-page";
 import { EntriesPage } from "@/routes/entries-page";
 import { EntryDetailPage } from "@/routes/entry-detail-page";
+import { FlashcardsPage } from "@/routes/flashcards-page";
+import { GamesPage } from "@/routes/games-page";
 import { LoginPage } from "@/routes/login-page";
 import { MePage } from "@/routes/me-page";
 import { ModerationPage } from "@/routes/moderation-page";
@@ -24,6 +26,8 @@ export const router = createBrowserRouter([
       { index: true, element: <EntriesPage /> },
       { path: "entries", element: <EntriesPage /> },
       { path: "about", element: <AboutPage /> },
+      { path: "games", element: <GamesPage /> },
+      { path: "games/flashcards", element: <FlashcardsPage /> },
       { path: "entries/:slug", element: <EntryDetailPage /> },
       { path: "sources/:workId", element: <SourceDetailPage /> },
       { path: "profiles/:userId", element: <ProfilePage /> },

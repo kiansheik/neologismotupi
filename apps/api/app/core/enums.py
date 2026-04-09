@@ -56,3 +56,25 @@ PARTS_OF_SPEECH = [
     "expression",
     "other",
 ]
+
+
+class FlashcardDirection(str, Enum):
+    headword_to_gloss = "headword_to_gloss"
+    gloss_to_headword = "gloss_to_headword"
+
+
+class FlashcardState(str, Enum):
+    new = "new"
+    learning = "learning"
+    review = "review"
+    relearning = "relearning"
+
+
+class FlashcardQueueType(str, Enum):
+    new = "new"
+    review = "review"
+
+
+class FlashcardReviewResult(str, Enum):
+    correct = "correct"
+    study_more = "study_more"

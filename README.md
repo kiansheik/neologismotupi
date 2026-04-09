@@ -20,6 +20,7 @@ People already use, study, and document Tupi in classrooms, communities, archive
 - Report entries/examples.
 - Moderator queue and report resolution.
 - Search/filter entry lists.
+- Games: flashcards with spaced repetition based on approved entries (progress saved to account).
 
 ## Tech stack
 - Frontend: Vite + React + TypeScript + React Router + TanStack Query + React Hook Form + Zod + Tailwind.

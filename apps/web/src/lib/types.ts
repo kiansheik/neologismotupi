@@ -463,6 +463,45 @@ export interface NotificationListResponse {
   unread_count: number;
 }
 
+export type FlashcardDirection = "headword_to_gloss" | "gloss_to_headword";
+export type FlashcardQueueType = "new" | "review";
+export type FlashcardReviewResult = "correct" | "study_more";
+
+export interface FlashcardSettings {
+  new_cards_per_day: number;
+}
+
+export interface FlashcardSessionSummary {
+  new_remaining: number;
+  review_remaining: number;
+  completed_today: number;
+  due_now: number;
+}
+
+export interface FlashcardCard {
+  entry_id: string;
+  direction: FlashcardDirection;
+  queue_type: FlashcardQueueType;
+  slug: string;
+  headword: string;
+  gloss_pt: string;
+  short_definition: string;
+  part_of_speech: string | null;
+  audio_url?: string | null;
+  audio_duration_seconds?: number | null;
+}
+
+export interface FlashcardSession {
+  settings: FlashcardSettings;
+  summary: FlashcardSessionSummary;
+  current_card: FlashcardCard | null;
+}
+
+export interface FlashcardReviewResponse {
+  summary: FlashcardSessionSummary;
+  next_card: FlashcardCard | null;
+}
+
 export interface ApiErrorShape {
   error: {
     code: string;

@@ -130,6 +130,10 @@ export function AppShell() {
   let pageTitle = import.meta.env.VITE_APP_NAME ?? "Dicionário de Tupi";
   if (normalizedPath === "/submit") {
     pageTitle = `${t("submit.title")} | ${pageTitle}`;
+  } else if (normalizedPath === "/games") {
+    pageTitle = `${t("games.title")} | ${pageTitle}`;
+  } else if (normalizedPath === "/games/flashcards") {
+    pageTitle = `${t("flashcards.title")} | ${pageTitle}`;
   } else if (normalizedPath === "/login") {
     pageTitle = `${t("auth.loginTitle")} | ${pageTitle}`;
   } else if (normalizedPath === "/signup") {
@@ -192,6 +196,12 @@ export function AppShell() {
               className="rounded-md px-2 py-1 text-brand-700 hover:bg-accent hover:text-accent-contrast"
             >
               {t("nav.entries")}
+            </Link>
+            <Link
+              to="/games"
+              className="rounded-md px-2 py-1 text-brand-700 hover:bg-accent hover:text-accent-contrast"
+            >
+              {t("nav.games")}
             </Link>
             <Link to="/submit" className="rounded-md px-2 py-1 text-brand-700 hover:bg-accent hover:text-accent-contrast">
               {t("nav.submit")}
