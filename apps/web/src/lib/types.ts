@@ -463,6 +463,69 @@ export interface NotificationListResponse {
   unread_count: number;
 }
 
+export type FlashcardDirection = "headword_to_gloss" | "gloss_to_headword";
+export type FlashcardQueue = "new" | "learn" | "review" | "day_learn" | "buried" | "suspended";
+export type FlashcardGrade = "again" | "hard" | "good" | "easy";
+
+export interface FlashcardSettings {
+  new_cards_per_day: number;
+  advanced_grading_enabled: boolean;
+}
+
+export interface FlashcardSessionSummary {
+  new_remaining: number;
+  review_remaining: number;
+  completed_today: number;
+  due_now: number;
+  due_later_today: number;
+}
+
+export interface FlashcardActiveSession {
+  id: string;
+  started_at: string;
+  elapsed_seconds: number;
+  review_count: number;
+}
+
+export interface FlashcardDailyStats {
+  date: string;
+  reviews: number;
+  new_seen: number;
+  study_minutes: number;
+  sessions: number;
+}
+
+export interface FlashcardStats {
+  today: FlashcardDailyStats;
+  last_7_days: FlashcardDailyStats[];
+}
+
+export interface FlashcardCard {
+  entry_id: string;
+  direction: FlashcardDirection;
+  queue: FlashcardQueue;
+  slug: string;
+  headword: string;
+  gloss_pt: string;
+  short_definition: string;
+  part_of_speech: string | null;
+  audio_url?: string | null;
+  audio_duration_seconds?: number | null;
+}
+
+export interface FlashcardSession {
+  settings: FlashcardSettings;
+  summary: FlashcardSessionSummary;
+  current_card: FlashcardCard | null;
+  active_session: FlashcardActiveSession | null;
+}
+
+export interface FlashcardReviewResponse {
+  summary: FlashcardSessionSummary;
+  next_card: FlashcardCard | null;
+  active_session: FlashcardActiveSession | null;
+}
+
 export interface ApiErrorShape {
   error: {
     code: string;
