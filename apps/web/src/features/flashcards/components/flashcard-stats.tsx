@@ -9,6 +9,8 @@ interface FlashcardStatsProps {
   activeSession: FlashcardActiveSession | null | undefined;
   onFinishSession?: () => void;
   isFinishing?: boolean;
+  remindTomorrow?: boolean;
+  onToggleRemind?: (value: boolean) => void;
 }
 
 function formatMinutes(value: number) {
@@ -26,6 +28,8 @@ export function FlashcardStatsPanel({
   activeSession,
   onFinishSession,
   isFinishing = false,
+  remindTomorrow,
+  onToggleRemind,
 }: FlashcardStatsProps) {
   const { t, locale } = useI18n();
   const safeLocale = locale === "tupi-BR" ? "pt-BR" : locale;
@@ -44,6 +48,7 @@ export function FlashcardStatsPanel({
 
   const days = stats.last_7_days;
   const maxMinutes = Math.max(1, ...days.map((day) => day.study_minutes));
+  const isPaused = Boolean(activeSession?.is_paused);
 
   return (
     <div className="space-y-4">
@@ -75,15 +80,30 @@ export function FlashcardStatsPanel({
           {activeSession ? (
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
-                <p className="text-xs text-ink-muted">{t("flashcards.stats.activeSession")}</p>
+                <p className="text-xs text-ink-muted">
+                  {isPaused
+                    ? t("flashcards.stats.pausedSession")
+                    : t("flashcards.stats.activeSession")}
+                </p>
                 <p className="text-sm font-semibold text-brand-900">
                   {formatMinutes(Math.floor(activeSession.elapsed_seconds / 60))}
                 </p>
               </div>
-              {onFinishSession ? (
-                <Button type="button" onClick={onFinishSession} disabled={isFinishing}>
-                  {t("flashcards.stats.finishSession")}
-                </Button>
+              {onFinishSession && !isPaused ? (
+                <div className="flex flex-col items-end gap-2">
+                  <label className="flex items-center gap-2 text-xs text-ink-muted">
+                    <input
+                      type="checkbox"
+                      className="h-4 w-4 rounded border-line-strong text-brand-600"
+                      checked={Boolean(remindTomorrow)}
+                      onChange={(event) => onToggleRemind?.(event.target.checked)}
+                    />
+                    {t("flashcards.reminder.label")}
+                  </label>
+                  <Button type="button" onClick={onFinishSession} disabled={isFinishing}>
+                    {t("flashcards.stats.finishSession")}
+                  </Button>
+                </div>
               ) : null}
             </div>
           ) : (

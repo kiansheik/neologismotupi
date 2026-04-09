@@ -31,6 +31,7 @@ class FlashcardActiveSessionOut(BaseModel):
     started_at: datetime
     elapsed_seconds: int
     review_count: int
+    is_paused: bool
 
 
 class FlashcardCardOut(BaseModel):
@@ -58,12 +59,23 @@ class FlashcardReviewRequest(BaseModel):
     direction: FlashcardDirection
     grade: FlashcardGrade
     response_ms: int | None = Field(default=None, ge=0, le=600_000)
+    user_response: str | None = Field(default=None, max_length=1000)
 
 
 class FlashcardReviewResponse(BaseModel):
     summary: FlashcardSessionSummary
     next_card: FlashcardCardOut | None
     active_session: FlashcardActiveSessionOut | None
+
+
+class FlashcardFinishSessionRequest(BaseModel):
+    remind_tomorrow: bool = False
+    time_zone: str | None = Field(default=None, max_length=64)
+    offset_minutes: int | None = Field(default=None, ge=-840, le=840)
+
+
+class FlashcardSessionPresenceRequest(BaseModel):
+    status: str = Field(pattern="^(active|away)$")
 
 
 class FlashcardDailyStatsOut(BaseModel):
@@ -77,3 +89,14 @@ class FlashcardDailyStatsOut(BaseModel):
 class FlashcardStatsOut(BaseModel):
     today: FlashcardDailyStatsOut
     last_7_days: list[FlashcardDailyStatsOut]
+
+
+class FlashcardLeaderboardEntry(BaseModel):
+    rank: int
+    display_name: str
+    reviews_this_week: int
+    total_reviews: int
+
+
+class FlashcardLeaderboardOut(BaseModel):
+    entries: list[FlashcardLeaderboardEntry]

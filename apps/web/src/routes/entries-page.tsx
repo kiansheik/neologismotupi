@@ -1,5 +1,6 @@
 import { useLocation } from "react-router-dom";
 
+import { BrowseTabs } from "@/components/browse-tabs";
 import { EntryBrowser } from "@/components/entry-browser";
 import { useCurrentUser } from "@/features/auth/hooks";
 import { useI18n } from "@/i18n";
@@ -36,6 +37,7 @@ export function EntriesPage() {
 
   return (
     <section className="space-y-4">
+      <BrowseTabs />
       <EntryBrowser
         analyticsContext="entries_page"
         queryKey="entries-global"

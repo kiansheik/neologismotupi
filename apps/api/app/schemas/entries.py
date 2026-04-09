@@ -127,6 +127,34 @@ class ExampleOut(BaseModel):
     model_config = {"from_attributes": True}
 
 
+class ExampleListItemOut(BaseModel):
+    id: uuid.UUID
+    entry_id: uuid.UUID
+    entry_slug: str
+    entry_headword: str
+    entry_gloss_pt: str | None
+    entry_gloss_en: str | None
+    entry_status: EntryStatus
+    sentence_original: str
+    translation_pt: str | None
+    translation_en: str | None
+    source_citation: str | None
+    source: EntrySourceOut | None = None
+    usage_note: str | None
+    context_tag: str | None
+    status: ExampleStatus
+    score_cache: int
+    upvote_count_cache: int
+    downvote_count_cache: int
+    current_user_vote: int | None = None
+    audio_samples: list[AudioSampleOut] = Field(default_factory=list)
+    shared_entry_count: int | None = None
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
 class ExampleVersionOut(BaseModel):
     id: uuid.UUID
     example_id: uuid.UUID
@@ -180,6 +208,13 @@ class DuplicateHintOut(BaseModel):
 
 class EntryListOut(BaseModel):
     items: list[EntrySummaryOut]
+    page: int
+    page_size: int
+    total: int
+
+
+class ExampleListOut(BaseModel):
+    items: list[ExampleListItemOut]
     page: int
     page_size: int
     total: int

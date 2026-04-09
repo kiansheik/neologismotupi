@@ -115,8 +115,11 @@ class Example(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     entry_id: Mapped[uuid.UUID] = mapped_column(Uuid, ForeignKey("entries.id", ondelete="CASCADE"), index=True)
     user_id: Mapped[uuid.UUID] = mapped_column(Uuid, ForeignKey("users.id"), nullable=False)
     sentence_original: Mapped[str] = mapped_column(Text, nullable=False)
+    normalized_sentence_original: Mapped[str] = mapped_column(Text, nullable=False, index=True)
     translation_pt: Mapped[str | None] = mapped_column(Text, nullable=True)
+    normalized_translation_pt: Mapped[str | None] = mapped_column(Text, nullable=True, index=True)
     translation_en: Mapped[str | None] = mapped_column(Text, nullable=True)
+    normalized_translation_en: Mapped[str | None] = mapped_column(Text, nullable=True, index=True)
     source_citation: Mapped[str | None] = mapped_column(String(500), nullable=True)
     source_edition_id: Mapped[uuid.UUID | None] = mapped_column(
         Uuid,

@@ -1,11 +1,11 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { useCurrentUser } from "@/features/auth/hooks";
+import { FlashcardLeaderboard } from "@/features/flashcards/components/flashcard-leaderboard";
 import { FlashcardSession } from "@/features/flashcards/components/flashcard-session";
-import { FlashcardSettings } from "@/features/flashcards/components/flashcard-settings";
 import { FlashcardStatsPanel } from "@/features/flashcards/components/flashcard-stats";
 import { FlashcardSummary } from "@/features/flashcards/components/flashcard-summary";
 import {
@@ -13,7 +13,7 @@ import {
   useFlashcardReview,
   useFlashcardSession,
   useFlashcardStats,
-  useUpdateFlashcardSettings,
+  useFlashcardPresence,
 } from "@/features/flashcards/hooks";
 import { useI18n } from "@/i18n";
 import { trackEvent } from "@/lib/analytics";
@@ -23,18 +23,25 @@ export function FlashcardsPage() {
   const { data: user, isLoading: userLoading } = useCurrentUser();
   const sessionQuery = useFlashcardSession(Boolean(user));
   const statsQuery = useFlashcardStats(Boolean(user));
-  const updateSettingsMutation = useUpdateFlashcardSettings();
   const reviewMutation = useFlashcardReview();
   const finishSessionMutation = useFinishFlashcardSession();
+  const presenceMutation = useFlashcardPresence();
   const completionTracked = useRef(false);
   const sessionEnded = useRef(false);
+  const [remindTomorrow, setRemindTomorrow] = useState(false);
+
+  const session = sessionQuery.data;
+  const isSessionLoading = sessionQuery.isLoading || sessionQuery.isFetching;
+  const currentCard = session?.current_card ?? null;
+  const activeSession = session?.active_session ?? null;
+  const isPaused = Boolean(activeSession?.is_paused);
+  const stats = statsQuery.data;
 
   useEffect(() => {
     trackEvent("flashcards_page_view");
   }, []);
 
   useEffect(() => {
-    const session = sessionQuery.data;
     if (!session) {
       return;
     }
@@ -46,7 +53,35 @@ export function FlashcardsPage() {
       trackEvent("flashcard_session_completed");
       completionTracked.current = true;
     }
-  }, [sessionQuery.data]);
+  }, [session]);
+
+  useEffect(() => {
+    if (!user || !activeSession || activeSession.is_paused) {
+      return;
+    }
+
+    const markAway = () => {
+      if (!activeSession || activeSession.is_paused) {
+        return;
+      }
+      presenceMutation.mutate({ status: "away" });
+    };
+
+    const handleVisibility = () => {
+      if (document.visibilityState === "hidden") {
+        markAway();
+      }
+    };
+
+    document.addEventListener("visibilitychange", handleVisibility);
+    window.addEventListener("pagehide", markAway);
+
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibility);
+      window.removeEventListener("pagehide", markAway);
+      markAway();
+    };
+  }, [user, activeSession?.id, activeSession?.is_paused, presenceMutation.mutate]);
 
   if (userLoading) {
     return (
@@ -85,13 +120,6 @@ export function FlashcardsPage() {
     );
   }
 
-  const session = sessionQuery.data;
-  const isSessionLoading = sessionQuery.isLoading || sessionQuery.isFetching;
-  const currentCard = session?.current_card ?? null;
-  const advancedGrading = session?.settings.advanced_grading_enabled ?? false;
-  const activeSession = session?.active_session ?? null;
-  const stats = statsQuery.data;
-
   return (
     <div className="space-y-4">
       <Card>
@@ -120,14 +148,53 @@ export function FlashcardsPage() {
                 </Button>
               </div>
             </Card>
+          ) : isPaused ? (
+            <Card>
+              <p className="text-lg font-semibold text-brand-900">
+                {t("flashcards.sessionPaused.title")}
+              </p>
+              <p className="mt-2 text-sm text-ink-muted">{t("flashcards.sessionPaused.body")}</p>
+              <div className="mt-4 flex flex-wrap gap-2">
+                <Button
+                  type="button"
+                  onClick={() => {
+                    presenceMutation.mutate(
+                      { status: "active" },
+                      {
+                        onSuccess: () => {
+                          sessionQuery.refetch();
+                          statsQuery.refetch();
+                        },
+                      },
+                    );
+                  }}
+                >
+                  {t("flashcards.sessionPaused.continue")}
+                </Button>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  onClick={() => {
+                    finishSessionMutation.mutate(undefined, {
+                      onSuccess: () => {
+                        sessionEnded.current = false;
+                        sessionQuery.refetch();
+                        statsQuery.refetch();
+                      },
+                    });
+                  }}
+                >
+                  {t("flashcards.sessionPaused.startNew")}
+                </Button>
+              </div>
+            </Card>
           ) : (
             <FlashcardSession
               card={currentCard}
               isLoading={isSessionLoading}
               isSubmitting={reviewMutation.isPending}
-              advancedGrading={advancedGrading}
               dueLaterToday={session?.summary.due_later_today ?? 0}
-              onReview={(result, responseMs) => {
+              onReview={(result, responseMs, userResponse) => {
                 if (!currentCard) {
                   return;
                 }
@@ -136,6 +203,7 @@ export function FlashcardsPage() {
                   direction: currentCard.direction,
                   grade: result,
                   response_ms: responseMs,
+                  user_response: userResponse,
                 });
               }}
             />
@@ -149,37 +217,36 @@ export function FlashcardsPage() {
               <p className="text-sm text-ink-muted">{t("flashcards.loading")}</p>
             </Card>
           )}
-          {session ? (
-            <FlashcardSettings
-              isSaving={updateSettingsMutation.isPending}
-              advancedEnabled={advancedGrading}
-              onToggleAdvanced={(value) => {
-                updateSettingsMutation.mutate(
-                  { advanced_grading_enabled: value },
-                  {
-                    onSuccess: () => {
-                      trackEvent("flashcard_settings_updated", {
-                        advanced_grading_enabled: value,
-                      });
-                    },
-                  },
-                );
-              }}
-            />
-          ) : null}
+          <FlashcardLeaderboard enabled={Boolean(user)} />
           <FlashcardStatsPanel
             stats={stats}
             isLoading={statsQuery.isLoading || statsQuery.isFetching}
             activeSession={activeSession}
             isFinishing={finishSessionMutation.isPending}
+            remindTomorrow={remindTomorrow}
+            onToggleRemind={setRemindTomorrow}
             onFinishSession={() => {
-              finishSessionMutation.mutate(undefined, {
-                onSuccess: () => {
-                  sessionEnded.current = true;
-                  trackEvent("flashcard_session_completed");
-                  statsQuery.refetch();
+              const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+              const offsetMinutes = new Date().getTimezoneOffset();
+              const shouldRemind = remindTomorrow;
+              finishSessionMutation.mutate(
+                {
+                  remind_tomorrow: shouldRemind,
+                  time_zone: timeZone,
+                  offset_minutes: offsetMinutes,
                 },
-              });
+                {
+                  onSuccess: () => {
+                    sessionEnded.current = true;
+                    setRemindTomorrow(false);
+                    trackEvent("flashcard_session_completed");
+                    if (shouldRemind) {
+                      trackEvent("flashcard_reminder_requested");
+                    }
+                    statsQuery.refetch();
+                  },
+                },
+              );
             }}
           />
         </div>

@@ -98,6 +98,11 @@ def _entry_url(slug: str) -> str:
     return f"{base}/entries/{quote(slug)}"
 
 
+def _flashcards_url() -> str:
+    base = get_settings().app_public_url.rstrip("/")
+    return f"{base}/games/flashcards"
+
+
 async def send_entry_moderation_email(
     *,
     to_email: str,
@@ -150,4 +155,25 @@ async def send_comment_notification_email(
         f"Comentário:\n{comment_body}\n\n"
         "Acesse o verbete para continuar a conversa."
     )
+    await send_email(to_email=to_email, subject=subject, body=body)
+
+
+async def send_flashcard_reminder_email(*, to_email: str, locale: str | None = None) -> None:
+    link = _flashcards_url()
+    is_en = (locale or "").lower().startswith("en")
+    if is_en:
+        subject = "Reminder: time for your flashcards"
+        body = (
+            "You asked to be reminded to study flashcards today.\n\n"
+            f"Open your deck here:\n{link}\n\n"
+            "Keep going — a little every day adds up."
+        )
+    else:
+        subject = "Lembrete: hora de revisar seus flashcards"
+        body = (
+            "Você pediu para ser lembrado de estudar flashcards hoje.\n\n"
+            f"Acesse aqui:\n{link}\n\n"
+            "Um pouco por dia faz diferença."
+        )
+
     await send_email(to_email=to_email, subject=subject, body=body)

@@ -10,14 +10,18 @@ const {
   submitFlashcardReviewMock,
   updateFlashcardSettingsMock,
   finishFlashcardSessionMock,
+  updateFlashcardPresenceMock,
   getFlashcardStatsMock,
+  getFlashcardLeaderboardMock,
 } = vi.hoisted(() => ({
   authState: { currentUser: undefined as unknown },
   getFlashcardSessionMock: vi.fn(),
   submitFlashcardReviewMock: vi.fn(),
   updateFlashcardSettingsMock: vi.fn(),
   finishFlashcardSessionMock: vi.fn(),
+  updateFlashcardPresenceMock: vi.fn(),
   getFlashcardStatsMock: vi.fn(),
+  getFlashcardLeaderboardMock: vi.fn(),
 }));
 
 vi.mock("@/features/auth/hooks", () => ({
@@ -29,7 +33,9 @@ vi.mock("@/features/flashcards/api", () => ({
   submitFlashcardReview: submitFlashcardReviewMock,
   updateFlashcardSettings: updateFlashcardSettingsMock,
   finishFlashcardSession: finishFlashcardSessionMock,
+  updateFlashcardPresence: updateFlashcardPresenceMock,
   getFlashcardStats: getFlashcardStatsMock,
+  getFlashcardLeaderboard: getFlashcardLeaderboardMock,
 }));
 
 describe("FlashcardsPage", () => {
@@ -68,6 +74,7 @@ describe("FlashcardsPage", () => {
     });
     updateFlashcardSettingsMock.mockResolvedValue({ new_cards_per_day: 5, advanced_grading_enabled: false });
     finishFlashcardSessionMock.mockResolvedValue(null);
+    updateFlashcardPresenceMock.mockResolvedValue(null);
     getFlashcardStatsMock.mockResolvedValue({
       today: {
         date: "2026-04-01",
@@ -86,6 +93,7 @@ describe("FlashcardsPage", () => {
         { date: "2026-04-01", reviews: 4, new_seen: 2, study_minutes: 20, sessions: 1 },
       ],
     });
+    getFlashcardLeaderboardMock.mockResolvedValue({ entries: [] });
   });
 
   it("shows auth CTA when logged out", () => {
@@ -97,7 +105,7 @@ describe("FlashcardsPage", () => {
     expect(screen.getByRole("link", { name: "Criar conta" })).toBeInTheDocument();
   });
 
-  it("reveals and submits review", async () => {
+  it("types a correct answer and submits review", async () => {
     authState.currentUser = {
       id: "u1",
       email: "u@example.com",
@@ -114,11 +122,15 @@ describe("FlashcardsPage", () => {
 
     expect(await screen.findByText("abare")).toBeInTheDocument();
 
-    const revealButton = screen.getByRole("button", { name: "Revelar" });
-    await user.click(revealButton);
+    const input = screen.getByPlaceholderText("Sua resposta...");
+    await user.type(input, "padre");
 
-    const correctButton = await screen.findByRole("button", { name: "Correto!" });
-    await user.click(correctButton);
+    const submitButton = screen.getByRole("button", { name: "Enviar" });
+    await user.click(submitButton);
+
+    // Should show Congrats since "padre" matches exactly
+    const continueButton = await screen.findByRole("button", { name: "Parabéns!" });
+    await user.click(continueButton);
 
     await waitFor(() => {
       expect(submitFlashcardReviewMock).toHaveBeenCalled();
@@ -126,9 +138,10 @@ describe("FlashcardsPage", () => {
     const payload = submitFlashcardReviewMock.mock.calls[0][0];
     expect(payload.entry_id).toBe("entry-1");
     expect(payload.grade).toBe("good");
+    expect(payload.user_response).toBe("padre");
   });
 
-  it("submits advanced grading", async () => {
+  it("types an incorrect answer and gets study-more grade", async () => {
     authState.currentUser = {
       id: "u4",
       email: "u4@example.com",
@@ -141,7 +154,7 @@ describe("FlashcardsPage", () => {
     };
 
     getFlashcardSessionMock.mockResolvedValueOnce({
-      settings: { new_cards_per_day: 3, advanced_grading_enabled: true },
+      settings: { new_cards_per_day: 3, advanced_grading_enabled: false },
       summary: {
         new_remaining: 1,
         review_remaining: 0,
@@ -165,18 +178,22 @@ describe("FlashcardsPage", () => {
     const user = userEvent.setup();
     renderWithProviders(<FlashcardsPage />);
 
-    const revealButton = await screen.findByRole("button", { name: "Revelar" });
-    await user.click(revealButton);
+    const input = await screen.findByPlaceholderText("Sua resposta...");
+    await user.type(input, "completamente errado xyz");
 
-    const easyButton = await screen.findByRole("button", { name: "Fácil" });
-    await user.click(easyButton);
+    const submitButton = screen.getByRole("button", { name: "Enviar" });
+    await user.click(submitButton);
+
+    // Should show Study More since the answer is wrong
+    const continueButton = await screen.findByRole("button", { name: "Estudar mais" });
+    await user.click(continueButton);
 
     await waitFor(() => {
       expect(submitFlashcardReviewMock).toHaveBeenCalled();
     });
 
     const payload = submitFlashcardReviewMock.mock.calls[0][0];
-    expect(payload.grade).toBe("easy");
+    expect(payload.grade).toBe("again");
   });
 
   it("finishes a session when requested", async () => {
@@ -206,6 +223,7 @@ describe("FlashcardsPage", () => {
         started_at: "2026-04-01T12:00:00Z",
         elapsed_seconds: 300,
         review_count: 2,
+        is_paused: false,
       },
     });
 

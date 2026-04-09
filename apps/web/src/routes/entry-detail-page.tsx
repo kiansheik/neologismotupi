@@ -17,6 +17,7 @@ import { formatDate, formatDateTime, formatRelativeOrDate } from "@/i18n/formatt
 import { getLocalizedApiErrorMessage } from "@/lib/localized-api-error";
 import { getCachedVote, resolveVote, setCachedVote, useVoteMemoryVersion } from "@/lib/vote-memory";
 import { StatusBadge } from "@/components/status-badge";
+import { SourceCitation } from "@/components/source-citation";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -264,40 +265,6 @@ function historyActionLabel(actionType: string | null, t: TranslateFn): string {
     default:
       return actionType || t("entry.history.moderationAction");
   }
-}
-
-function SourceCitation({
-  citation,
-  workId,
-  firstUrl,
-  t,
-}: {
-  citation: string;
-  workId?: string | null;
-  firstUrl?: string | null;
-  t: TranslateFn;
-}) {
-  return (
-    <span className="inline-flex flex-wrap items-center gap-2">
-      {workId ? (
-        <Link className="text-brand-700 hover:underline" to={`/sources/${workId}`}>
-          {citation}
-        </Link>
-      ) : (
-        <span>{citation}</span>
-      )}
-      {firstUrl ? (
-        <a
-          href={firstUrl}
-          target="_blank"
-          rel="noreferrer"
-          className="text-xs text-brand-700 hover:underline"
-        >
-          {t("entry.openMirror")}
-        </a>
-      ) : null}
-    </span>
-  );
 }
 
 function ExampleVersionHistory({

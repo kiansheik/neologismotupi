@@ -1,6 +1,7 @@
 import { apiFetch } from "@/lib/api";
 import type {
   FlashcardActiveSession,
+  FlashcardLeaderboard,
   FlashcardStats,
   FlashcardReviewResponse,
   FlashcardSession,
@@ -19,6 +20,17 @@ export interface FlashcardReviewPayload {
   direction: FlashcardDirection;
   grade: FlashcardGrade;
   response_ms: number | null;
+  user_response?: string;
+}
+
+export interface FinishFlashcardSessionPayload {
+  remind_tomorrow?: boolean;
+  time_zone?: string;
+  offset_minutes?: number;
+}
+
+export interface FlashcardPresencePayload {
+  status: "active" | "away";
 }
 
 export function getFlashcardSettings(): Promise<FlashcardSettings> {
@@ -47,12 +59,29 @@ export function submitFlashcardReview(
   });
 }
 
-export function finishFlashcardSession(): Promise<FlashcardActiveSession | null> {
+export function finishFlashcardSession(
+  payload?: FinishFlashcardSessionPayload,
+): Promise<FlashcardActiveSession | null> {
   return apiFetch<FlashcardActiveSession | null>("/flashcards/finish-session", {
     method: "POST",
+    body: payload ?? {},
+  });
+}
+
+export function updateFlashcardPresence(
+  payload: FlashcardPresencePayload,
+): Promise<FlashcardActiveSession | null> {
+  return apiFetch<FlashcardActiveSession | null>("/flashcards/session/presence", {
+    method: "POST",
+    body: payload,
+    keepalive: true,
   });
 }
 
 export function getFlashcardStats(): Promise<FlashcardStats> {
   return apiFetch<FlashcardStats>("/flashcards/stats");
+}
+
+export function getFlashcardLeaderboard(): Promise<FlashcardLeaderboard> {
+  return apiFetch<FlashcardLeaderboard>("/flashcards/leaderboard");
 }

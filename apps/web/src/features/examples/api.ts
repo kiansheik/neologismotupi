@@ -1,5 +1,5 @@
-import { apiFetch } from "@/lib/api";
-import type { ExampleVersion } from "@/lib/types";
+import { apiFetch, withQuery } from "@/lib/api";
+import type { ExampleListResponse, ExampleVersion } from "@/lib/types";
 import type { EntrySourceInput } from "@/features/entries/api";
 
 export interface ReportExamplePayload {
@@ -9,6 +9,16 @@ export interface ReportExamplePayload {
 
 export interface ExampleVotePayload {
   value: -1 | 1;
+}
+
+export interface ListExamplesParams {
+  [key: string]: string | number | boolean | string[] | undefined;
+  page?: number;
+  page_size?: number;
+  search?: string;
+  search_terms?: string[];
+  status?: string;
+  sort?: "recent" | "score";
 }
 
 export interface UpdateExamplePayload {
@@ -32,6 +42,10 @@ export function updateExample(exampleId: string, payload: UpdateExamplePayload) 
 
 export function listExampleVersions(exampleId: string) {
   return apiFetch<ExampleVersion[]>(`/examples/${exampleId}/versions`);
+}
+
+export function listExamples(params: ListExamplesParams): Promise<ExampleListResponse> {
+  return apiFetch<ExampleListResponse>(withQuery("/examples", params));
 }
 
 export function voteExample(exampleId: string, payload: ExampleVotePayload) {

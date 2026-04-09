@@ -1,8 +1,18 @@
 import uuid
 from dataclasses import dataclass
-from datetime import UTC, date, datetime, time, timedelta
+from datetime import UTC, date, datetime, time, timedelta, timezone
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
-from sqlalchemy import and_, func, or_, select
+from sqlalchemy import and_, case, func, or_, select
+
+
+def _to_date(val) -> "date":
+    """Normalize DB date result to a Python date (works for SQLite strings and PG date/datetime)."""
+    if isinstance(val, datetime):
+        return val.date()
+    if isinstance(val, date):
+        return val
+    return date.fromisoformat(str(val))
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import aliased
 
@@ -15,13 +25,17 @@ from app.core.enums import (
 )
 from app.models.audio import AudioSample
 from app.models.entry import Entry
+from app.models.user import Profile, User
 from app.models.flashcards import (
     FlashcardProgress,
+    FlashcardReminder,
     FlashcardReviewLog,
+    FlashcardSessionSegment,
     FlashcardSettings,
     FlashcardStudySession,
 )
 from app.services.audio import build_audio_url
+from app.services.email_delivery import send_flashcard_reminder_email
 from app.services.flashcards_scheduler import (
     DEFAULT_FSRS_PARAMS,
     DEFAULT_FSRS_VERSION,
@@ -61,6 +75,7 @@ class FlashcardActiveSession:
     started_at: datetime
     elapsed_seconds: int
     review_count: int
+    is_paused: bool
 
 
 @dataclass(frozen=True)
@@ -94,6 +109,30 @@ class FlashcardCardPayload:
 
 def utc_now() -> datetime:
     return datetime.now(UTC)
+
+
+def _resolve_reminder_timezone(time_zone: str | None, offset_minutes: int | None) -> timezone | ZoneInfo:
+    if time_zone:
+        try:
+            return ZoneInfo(time_zone)
+        except ZoneInfoNotFoundError:
+            pass
+    if offset_minutes is not None:
+        return timezone(timedelta(minutes=-offset_minutes))
+    return UTC
+
+
+def _format_reminder_timezone(tz: timezone | ZoneInfo) -> str | None:
+    if isinstance(tz, ZoneInfo):
+        return tz.key
+    offset = tz.utcoffset(None) if tz else None
+    if offset is None:
+        return None
+    total_minutes = int(offset.total_seconds() // 60)
+    sign = "+" if total_minutes >= 0 else "-"
+    hours = abs(total_minutes) // 60
+    minutes = abs(total_minutes) % 60
+    return f"UTC{sign}{hours:02d}:{minutes:02d}"
 
 
 def _entry_card_filters():
@@ -256,6 +295,83 @@ async def _get_active_session(
     return (await db.execute(stmt)).scalars().first()
 
 
+async def _get_open_segment(
+    db: AsyncSession, session_id: uuid.UUID
+) -> FlashcardSessionSegment | None:
+    stmt = (
+        select(FlashcardSessionSegment)
+        .where(
+            FlashcardSessionSegment.session_id == session_id,
+            FlashcardSessionSegment.ended_at.is_(None),
+        )
+        .order_by(FlashcardSessionSegment.started_at.desc())
+    )
+    return (await db.execute(stmt)).scalars().first()
+
+
+async def _load_session_segments(
+    db: AsyncSession, session_id: uuid.UUID
+) -> list[FlashcardSessionSegment]:
+    stmt = (
+        select(FlashcardSessionSegment)
+        .where(FlashcardSessionSegment.session_id == session_id)
+        .order_by(FlashcardSessionSegment.started_at.asc())
+    )
+    return list((await db.execute(stmt)).scalars().all())
+
+
+def _as_utc(dt: datetime) -> datetime:
+    """Return dt as UTC-aware, adding UTC tzinfo if it's naive (e.g. from SQLite)."""
+    if dt.tzinfo is None:
+        return dt.replace(tzinfo=UTC)
+    return dt
+
+
+def _sum_segment_seconds(segments: list[FlashcardSessionSegment], end_time: datetime) -> int:
+    end = _as_utc(end_time)
+    total = 0
+    for segment in segments:
+        seg_end = _as_utc(segment.ended_at) if segment.ended_at is not None else end
+        seg_start = _as_utc(segment.started_at)
+        seg_end = min(seg_end, end)
+        if seg_end <= seg_start:
+            continue
+        total += int((seg_end - seg_start).total_seconds())
+    return total
+
+
+async def _ensure_active_segment(
+    db: AsyncSession,
+    *,
+    session: FlashcardStudySession,
+    user_id: uuid.UUID,
+    now: datetime,
+) -> FlashcardSessionSegment | None:
+    segment = await _get_open_segment(db, session.id)
+    if segment:
+        return segment
+    segment = FlashcardSessionSegment(
+        session_id=session.id,
+        user_id=user_id,
+        started_at=now,
+    )
+    db.add(segment)
+    return segment
+
+
+async def _end_open_segment(
+    db: AsyncSession,
+    *,
+    session_id: uuid.UUID,
+    now: datetime,
+) -> FlashcardSessionSegment | None:
+    segment = await _get_open_segment(db, session_id)
+    if not segment:
+        return None
+    segment.ended_at = now
+    return segment
+
+
 async def _count_reviews_for_session(
     db: AsyncSession, session_id: uuid.UUID
 ) -> int:
@@ -273,13 +389,16 @@ async def build_session_payload(
     if not session:
         return None
     end_time = session.ended_at or now
-    elapsed = max(0, int((end_time - session.started_at).total_seconds()))
+    segments = await _load_session_segments(db, session.id)
+    elapsed = _sum_segment_seconds(segments, end_time)
+    is_paused = not any(segment.ended_at is None for segment in segments)
     review_count = await _count_reviews_for_session(db, session.id)
     return FlashcardActiveSession(
         id=session.id,
         started_at=session.started_at,
         elapsed_seconds=elapsed,
         review_count=review_count,
+        is_paused=is_paused,
     )
 
 
@@ -781,20 +900,20 @@ async def build_flashcard_session(
     due_now = review_remaining + new_remaining + (1 if pending_sibling else 0)
 
     current_card: FlashcardCardPayload | None = None
-    if pending_sibling:
-        current_card = await build_flashcard_card_payload(
-            db,
-            entry_id=pending_sibling.entry_id,
-            direction=pending_sibling.direction,
-            queue=_flashcard_queue_for_progress(pending_sibling),
-        )
-    elif due_learning:
+    if due_learning:
         progress = due_learning[0]
         current_card = await build_flashcard_card_payload(
             db,
             entry_id=progress.entry_id,
             direction=progress.direction,
             queue=_flashcard_queue_for_progress(progress),
+        )
+    elif pending_sibling:
+        current_card = await build_flashcard_card_payload(
+            db,
+            entry_id=pending_sibling.entry_id,
+            direction=pending_sibling.direction,
+            queue=_flashcard_queue_for_progress(pending_sibling),
         )
     elif due_review:
         progress = due_review[0]
@@ -832,6 +951,7 @@ async def apply_flashcard_review(
     direction: FlashcardDirection,
     grade: FlashcardGrade,
     response_ms: int | None,
+    user_response: str | None = None,
 ) -> FlashcardProgress:
     now = utc_now()
     settings = await get_or_create_flashcard_settings(db, user_id)
@@ -839,6 +959,7 @@ async def apply_flashcard_review(
     if not active_session:
         active_session = FlashcardStudySession(user_id=user_id, started_at=now)
         db.add(active_session)
+    await _ensure_active_segment(db, session=active_session, user_id=user_id, now=now)
     params = list(settings.fsrs_params or DEFAULT_FSRS_PARAMS)
     desired_retention = _normalize_retention(settings.desired_retention)
     learning_steps = _normalize_steps(settings.learning_steps_minutes, DEFAULT_LEARNING_STEPS)
@@ -950,6 +1071,7 @@ async def apply_flashcard_review(
             direction=direction,
             grade=grade,
             response_ms=response_ms,
+            user_response=user_response,
             reviewed_at=now,
             card_type_before=state_before,
             card_type_after=progress.card_type,
@@ -974,10 +1096,135 @@ async def finish_flashcard_session(
     session = await _get_active_session(db, user_id)
     if not session:
         return None
-    session.ended_at = now
+    open_segment = await _get_open_segment(db, session.id)
+    if open_segment:
+        open_segment.ended_at = now
+        session.ended_at = now
+    else:
+        last_end = (
+            await db.execute(
+                select(func.max(FlashcardSessionSegment.ended_at)).where(
+                    FlashcardSessionSegment.session_id == session.id,
+                    FlashcardSessionSegment.ended_at.isnot(None),
+                )
+            )
+        ).scalar_one_or_none()
+        session.ended_at = last_end or now
     await db.commit()
     await db.refresh(session)
     return session
+
+
+async def update_flashcard_presence(
+    db: AsyncSession,
+    *,
+    user_id: uuid.UUID,
+    status: str,
+) -> FlashcardActiveSession | None:
+    session = await _get_active_session(db, user_id)
+    if not session:
+        return None
+    now = utc_now()
+    if status == "away":
+        await _end_open_segment(db, session_id=session.id, now=now)
+    elif status == "active":
+        await _ensure_active_segment(db, session=session, user_id=user_id, now=now)
+    else:
+        return await build_session_payload(db, session, now)
+    await db.commit()
+    return await build_session_payload(db, session, now)
+
+
+async def schedule_flashcard_reminder(
+    db: AsyncSession,
+    *,
+    user_id: uuid.UUID,
+    session: FlashcardStudySession | None,
+    time_zone: str | None,
+    offset_minutes: int | None,
+) -> FlashcardReminder | None:
+    if not session:
+        return None
+
+    now = utc_now()
+    tz = _resolve_reminder_timezone(time_zone, offset_minutes)
+    start_local = session.started_at.astimezone(tz)
+    target_local = start_local + timedelta(days=1)
+    remind_at = target_local.astimezone(UTC)
+    tz_label = _format_reminder_timezone(tz)
+
+    pending = list(
+        (
+            await db.execute(
+                select(FlashcardReminder)
+                .where(
+                    FlashcardReminder.user_id == user_id,
+                    FlashcardReminder.sent_at.is_(None),
+                )
+                .order_by(FlashcardReminder.remind_at.desc())
+            )
+        ).scalars().all()
+    )
+
+    reminder: FlashcardReminder | None = None
+    if pending:
+        reminder = pending[0]
+        reminder.remind_at = remind_at
+        reminder.time_zone = tz_label
+        reminder.session_id = session.id
+        for extra in pending[1:]:
+            extra.sent_at = now
+    if reminder is None:
+        reminder = FlashcardReminder(
+            user_id=user_id,
+            session_id=session.id,
+            time_zone=tz_label,
+            remind_at=remind_at,
+        )
+        db.add(reminder)
+
+    await db.commit()
+    await db.refresh(reminder)
+    return reminder
+
+
+async def send_due_flashcard_reminders(
+    db: AsyncSession,
+    *,
+    now: datetime | None = None,
+    limit: int = 200,
+) -> int:
+    now = now or utc_now()
+    rows = (
+        await db.execute(
+            select(FlashcardReminder, User)
+            .join(User, User.id == FlashcardReminder.user_id)
+            .where(
+                FlashcardReminder.sent_at.is_(None),
+                FlashcardReminder.remind_at <= now,
+                User.is_active.is_(True),
+            )
+            .order_by(FlashcardReminder.remind_at.asc())
+            .limit(limit)
+        )
+    ).all()
+
+    sent = 0
+    for reminder, user in rows:
+        try:
+            await send_flashcard_reminder_email(
+                to_email=user.email,
+                locale=user.preferred_locale,
+            )
+        except Exception:  # noqa: BLE001
+            # Skip marking sent so it can be retried on next run.
+            continue
+        reminder.sent_at = now
+        sent += 1
+
+    if sent:
+        await db.commit()
+    return sent
 
 
 async def get_flashcard_stats(
@@ -992,9 +1239,10 @@ async def get_flashcard_stats(
     start_dt = datetime.combine(start_day, time.min, tzinfo=UTC)
     end_dt = datetime.combine(today + timedelta(days=1), time.min, tzinfo=UTC)
 
+    review_day_expr = func.date(FlashcardReviewLog.reviewed_at)
     review_stmt = (
         select(
-            func.date_trunc("day", FlashcardReviewLog.reviewed_at).label("day"),
+            review_day_expr.label("day"),
             func.count().label("count"),
         )
         .where(
@@ -1002,14 +1250,15 @@ async def get_flashcard_stats(
             FlashcardReviewLog.reviewed_at >= start_dt,
             FlashcardReviewLog.reviewed_at < end_dt,
         )
-        .group_by("day")
+        .group_by(review_day_expr)
     )
     review_rows = (await db.execute(review_stmt)).all()
-    reviews_by_day = {row.day.date(): int(row.count) for row in review_rows}
+    reviews_by_day = {_to_date(row.day): int(row.count) for row in review_rows}
 
+    new_day_expr = func.date(FlashcardProgress.created_at)
     new_stmt = (
         select(
-            func.date_trunc("day", FlashcardProgress.created_at).label("day"),
+            new_day_expr.label("day"),
             func.count(func.distinct(FlashcardProgress.entry_id)).label("count"),
         )
         .where(
@@ -1017,10 +1266,10 @@ async def get_flashcard_stats(
             FlashcardProgress.created_at >= start_dt,
             FlashcardProgress.created_at < end_dt,
         )
-        .group_by("day")
+        .group_by(new_day_expr)
     )
     new_rows = (await db.execute(new_stmt)).all()
-    new_by_day = {row.day.date(): int(row.count) for row in new_rows}
+    new_by_day = {_to_date(row.day): int(row.count) for row in new_rows}
 
     session_stmt = (
         select(FlashcardStudySession)
@@ -1036,22 +1285,39 @@ async def get_flashcard_stats(
     )
     sessions = list((await db.execute(session_stmt)).scalars().all())
 
+    segment_stmt = (
+        select(FlashcardSessionSegment)
+        .where(
+            FlashcardSessionSegment.user_id == user_id,
+            FlashcardSessionSegment.started_at < end_dt,
+            or_(
+                FlashcardSessionSegment.ended_at.is_(None),
+                FlashcardSessionSegment.ended_at >= start_dt,
+            ),
+        )
+        .order_by(FlashcardSessionSegment.started_at.asc())
+    )
+    segments = list((await db.execute(segment_stmt)).scalars().all())
+
     minutes_by_day: dict[date, int] = {}
     sessions_by_day: dict[date, int] = {}
     for session in sessions:
         session_start = max(session.started_at, start_dt)
-        session_end = min(session.ended_at or now, end_dt)
-        if session_end <= session_start:
-            continue
         sessions_by_day[session_start.date()] = sessions_by_day.get(session_start.date(), 0) + 1
-        cursor = session_start
-        while cursor < session_end:
+
+    for segment in segments:
+        segment_start = max(segment.started_at, start_dt)
+        segment_end = min(segment.ended_at or now, end_dt)
+        if segment_end <= segment_start:
+            continue
+        cursor = segment_start
+        while cursor < segment_end:
             day_end = datetime.combine(cursor.date() + timedelta(days=1), time.min, tzinfo=UTC)
-            segment_end = min(session_end, day_end)
-            minutes = int((segment_end - cursor).total_seconds() // 60)
+            slice_end = min(segment_end, day_end)
+            minutes = int((slice_end - cursor).total_seconds() // 60)
             if minutes > 0:
                 minutes_by_day[cursor.date()] = minutes_by_day.get(cursor.date(), 0) + minutes
-            cursor = segment_end
+            cursor = slice_end
 
     days_out: list[FlashcardDailyStats] = []
     for offset in range(days):
@@ -1068,3 +1334,45 @@ async def get_flashcard_stats(
 
     today_stats = days_out[-1]
     return FlashcardStats(today=today_stats, last_7_days=days_out)
+
+
+@dataclass
+class FlashcardLeaderboardData:
+    rank: int
+    display_name: str
+    reviews_this_week: int
+    total_reviews: int
+
+
+async def get_flashcard_leaderboard(db: AsyncSession, limit: int = 20) -> list[FlashcardLeaderboardData]:
+    now = utc_now()
+    week_ago = now - timedelta(days=7)
+
+    reviews_this_week_expr = func.count(
+        case((FlashcardReviewLog.reviewed_at >= week_ago, FlashcardReviewLog.id))
+    )
+    total_reviews_expr = func.count(FlashcardReviewLog.id)
+
+    rows = (
+        await db.execute(
+            select(
+                Profile.display_name,
+                total_reviews_expr.label("total_reviews"),
+                reviews_this_week_expr.label("reviews_this_week"),
+            )
+            .join(Profile, Profile.user_id == FlashcardReviewLog.user_id)
+            .group_by(Profile.user_id, Profile.display_name)
+            .order_by(reviews_this_week_expr.desc(), total_reviews_expr.desc())
+            .limit(limit)
+        )
+    ).all()
+
+    return [
+        FlashcardLeaderboardData(
+            rank=i + 1,
+            display_name=row.display_name,
+            total_reviews=row.total_reviews,
+            reviews_this_week=row.reviews_this_week,
+        )
+        for i, row in enumerate(rows)
+    ]

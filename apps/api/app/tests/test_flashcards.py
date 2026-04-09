@@ -335,7 +335,7 @@ async def test_new_pair_shows_back_to_back(client):
     await seed_entry(user_id=user_id, headword="beta", score_cache=9)
 
     async with db_module.AsyncSessionLocal() as session:
-        session.add(FlashcardSettings(user_id=user_id, new_cards_per_day=2))
+        session.add(FlashcardSettings(user_id=user_id, new_cards_per_day=3))
         await session.commit()
 
     response = await client.get("/api/flashcards/session")
@@ -398,7 +398,7 @@ async def test_new_popular_entries_show_in_future_sessions(client):
     await register_user(client, "future@example.com", "Future User")
     user_id = await get_user_id("future@example.com")
 
-    await seed_entry(user_id=user_id, headword="old", score_cache=1)
+    await seed_entry(user_id=user_id, headword="old", score_cache=10)
     mid = await seed_entry(user_id=user_id, headword="mid", score_cache=2)
 
     response = await client.get("/api/flashcards/session")

@@ -125,6 +125,33 @@ export interface Example {
   updated_at: string;
 }
 
+export interface ExampleSummary {
+  id: string;
+  entry_id: string;
+  entry_slug: string;
+  entry_headword: string;
+  entry_gloss_pt: string | null;
+  entry_gloss_en: string | null;
+  entry_status: EntryStatus;
+  user_id: string;
+  sentence_original: string;
+  translation_pt: string | null;
+  translation_en: string | null;
+  source_citation: string | null;
+  source?: SourceRecord | null;
+  usage_note: string | null;
+  context_tag: string | null;
+  status: ExampleStatus;
+  score_cache: number;
+  upvote_count_cache: number;
+  downvote_count_cache: number;
+  current_user_vote?: number | null;
+  audio_samples: AudioSample[];
+  shared_entry_count?: number | null;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface ExampleVersion {
   id: string;
   example_id: string;
@@ -229,6 +256,13 @@ export interface SourceDetail {
 
 export interface EntryListResponse {
   items: EntrySummary[];
+  page: number;
+  page_size: number;
+  total: number;
+}
+
+export interface ExampleListResponse {
+  items: ExampleSummary[];
   page: number;
   page_size: number;
   total: number;
@@ -485,6 +519,7 @@ export interface FlashcardActiveSession {
   started_at: string;
   elapsed_seconds: number;
   review_count: number;
+  is_paused: boolean;
 }
 
 export interface FlashcardDailyStats {
@@ -524,6 +559,17 @@ export interface FlashcardReviewResponse {
   summary: FlashcardSessionSummary;
   next_card: FlashcardCard | null;
   active_session: FlashcardActiveSession | null;
+}
+
+export interface FlashcardLeaderboardEntry {
+  rank: number;
+  display_name: string;
+  reviews_this_week: number;
+  total_reviews: number;
+}
+
+export interface FlashcardLeaderboard {
+  entries: FlashcardLeaderboardEntry[];
 }
 
 export interface ApiErrorShape {

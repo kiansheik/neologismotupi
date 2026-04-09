@@ -109,6 +109,7 @@ export function AppShell() {
   const hasDedicatedPageSeo =
     normalizedPath === "/" ||
     normalizedPath === "/entries" ||
+    normalizedPath === "/examples" ||
     normalizedPath === "/about" ||
     normalizedPath.startsWith("/entries/") ||
     normalizedPath.startsWith("/sources/") ||
@@ -130,6 +131,8 @@ export function AppShell() {
   let pageTitle = import.meta.env.VITE_APP_NAME ?? "Dicionário de Tupi";
   if (normalizedPath === "/submit") {
     pageTitle = `${t("submit.title")} | ${pageTitle}`;
+  } else if (normalizedPath === "/examples") {
+    pageTitle = `${t("examples.title")} | ${pageTitle}`;
   } else if (normalizedPath === "/games") {
     pageTitle = `${t("games.title")} | ${pageTitle}`;
   } else if (normalizedPath === "/games/flashcards") {

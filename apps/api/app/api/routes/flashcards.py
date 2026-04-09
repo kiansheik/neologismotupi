@@ -12,9 +12,13 @@ from app.schemas.flashcards import (
     FlashcardActiveSessionOut,
     FlashcardCardOut,
     FlashcardDailyStatsOut,
+    FlashcardLeaderboardEntry,
+    FlashcardLeaderboardOut,
     FlashcardReviewRequest,
     FlashcardReviewResponse,
+    FlashcardFinishSessionRequest,
     FlashcardSessionOut,
+    FlashcardSessionPresenceRequest,
     FlashcardSessionSummary,
     FlashcardSettingsOut,
     FlashcardSettingsUpdate,
@@ -24,8 +28,11 @@ from app.services.flashcards import (
     apply_flashcard_review,
     build_flashcard_session,
     finish_flashcard_session,
+    get_flashcard_leaderboard,
     get_or_create_flashcard_settings,
     get_flashcard_stats,
+    schedule_flashcard_reminder,
+    update_flashcard_presence,
 )
 
 router = APIRouter(prefix="/flashcards", tags=["flashcards"])
@@ -107,6 +114,7 @@ async def review_flashcard(
         direction=payload.direction,
         grade=payload.grade,
         response_ms=payload.response_ms,
+        user_response=payload.user_response,
     )
     await db.commit()
     await db.refresh(progress)
@@ -129,9 +137,34 @@ async def review_flashcard(
 async def finish_flashcard_today(
     db: SessionDep,
     user: Annotated[User, Depends(get_current_user)],
+    payload: FlashcardFinishSessionRequest | None = None,
 ) -> FlashcardActiveSessionOut | None:
-    await finish_flashcard_session(db, user_id=user.id)
+    session = await finish_flashcard_session(db, user_id=user.id)
+    if payload and payload.remind_tomorrow:
+        await schedule_flashcard_reminder(
+            db,
+            user_id=user.id,
+            session=session,
+            time_zone=payload.time_zone,
+            offset_minutes=payload.offset_minutes,
+        )
     return None
+
+
+@router.post("/session/presence", response_model=FlashcardActiveSessionOut | None)
+async def update_flashcard_session_presence(
+    db: SessionDep,
+    payload: FlashcardSessionPresenceRequest,
+    user: Annotated[User, Depends(get_current_user)],
+) -> FlashcardActiveSessionOut | None:
+    active_session = await update_flashcard_presence(
+        db,
+        user_id=user.id,
+        status=payload.status,
+    )
+    if not active_session:
+        return None
+    return FlashcardActiveSessionOut(**active_session.__dict__)
 
 
 @router.get("/stats", response_model=FlashcardStatsOut)
@@ -143,4 +176,15 @@ async def get_flashcard_stats_endpoint(
     return FlashcardStatsOut(
         today=FlashcardDailyStatsOut(**stats.today.__dict__),
         last_7_days=[FlashcardDailyStatsOut(**day.__dict__) for day in stats.last_7_days],
+    )
+
+
+@router.get("/leaderboard", response_model=FlashcardLeaderboardOut)
+async def get_flashcard_leaderboard_endpoint(
+    db: SessionDep,
+    user: Annotated[User, Depends(get_current_user)],
+) -> FlashcardLeaderboardOut:
+    entries = await get_flashcard_leaderboard(db)
+    return FlashcardLeaderboardOut(
+        entries=[FlashcardLeaderboardEntry(**e.__dict__) for e in entries]
     )

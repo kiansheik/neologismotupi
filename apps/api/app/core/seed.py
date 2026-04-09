@@ -8,7 +8,7 @@ from sqlalchemy import and_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.enums import EntryStatus, ExampleStatus, TagType
-from app.core.utils import collapse_whitespace, normalize_text, slugify
+from app.core.utils import collapse_whitespace, normalize_search_query, normalize_text, slugify
 from app.db import AsyncSessionLocal
 from app.models.entry import Entry, EntryTag, Example, Tag
 from app.models.user import Profile, User
@@ -375,8 +375,11 @@ async def _seed_from_csv(
                         entry_id=entry.id,
                         user_id=proposer.id,
                         sentence_original=attestation,
+                        normalized_sentence_original=normalize_search_query(attestation) or "",
                         translation_pt=_clean(row.get("Tradução Portuguesa")),
+                        normalized_translation_pt=normalize_search_query(_clean(row.get("Tradução Portuguesa"))),
                         translation_en=_clean(row.get("Tradução Inglesa")),
+                        normalized_translation_en=normalize_search_query(_clean(row.get("Tradução Inglesa"))),
                         source_citation=source_citation,
                         usage_note=" | ".join(usage_note_parts) if usage_note_parts else None,
                         context_tag=_clean(source, limit=120),

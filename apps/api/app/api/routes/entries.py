@@ -34,6 +34,8 @@ from app.schemas.entries import (
     EntryUpdate,
     EntryVersionOut,
     ExampleCreate,
+    ExampleListItemOut,
+    ExampleListOut,
     ExampleOut,
     ExampleVoteOut,
     ExampleUpdate,
@@ -1429,13 +1431,23 @@ async def create_example(
 
     user_example_count = await count_user_examples(db, user.id)
     status_value = build_example_status_for_submission(user, user_example_count)
+    normalized_sentence_original = normalize_search_query(payload.sentence_original)
+    normalized_translation_pt = (
+        normalize_search_query(payload.translation_pt) if payload.translation_pt else None
+    )
+    normalized_translation_en = (
+        normalize_search_query(payload.translation_en) if payload.translation_en else None
+    )
 
     example = Example(
         entry_id=entry_id,
         user_id=user.id,
         sentence_original=collapse_whitespace(payload.sentence_original),
+        normalized_sentence_original=normalized_sentence_original,
         translation_pt=payload.translation_pt,
+        normalized_translation_pt=normalized_translation_pt,
         translation_en=payload.translation_en,
+        normalized_translation_en=normalized_translation_en,
         source_citation=None,
         source_edition_id=None,
         source_pages=None,
@@ -1578,6 +1590,167 @@ example_router = APIRouter(prefix="/examples", tags=["examples"])
 comment_router = APIRouter(prefix="/comments", tags=["comments"])
 
 
+@example_router.get("", response_model=ExampleListOut)
+async def list_examples(
+    db: SessionDep,
+    user: Annotated[User | None, Depends(get_current_user_optional)],
+    page: int = Query(default=1, ge=1),
+    page_size: int = Query(default=20, ge=1, le=100),
+    search: str | None = None,
+    search_terms: list[str] = Query(default=[]),
+    status_filter: ExampleStatus | None = Query(default=None, alias="status"),
+    sort: Literal["recent", "score"] = "recent",
+) -> ExampleListOut:
+    is_mod = bool(user and is_moderator(user))
+    stmt = (
+        select(Example)
+        .join(Entry, Entry.id == Example.entry_id)
+        .options(
+            selectinload(Example.entry),
+            selectinload(Example.source_edition).selectinload(SourceEdition.work),
+            selectinload(Example.source_edition).selectinload(SourceEdition.links),
+            selectinload(Example.audio_samples)
+            .selectinload(AudioSample.uploader)
+            .selectinload(User.profile),
+        )
+    )
+    count_stmt = select(func.count(func.distinct(Example.id))).select_from(Example).join(
+        Entry, Entry.id == Example.entry_id
+    )
+
+    conditions = []
+
+    all_search_terms = [s for s in ([search] if search else []) + list(search_terms) if s]
+    if all_search_terms:
+        normalized_headword = func.replace(Entry.normalized_headword, "-", " ")
+        term_clauses = []
+        for s in all_search_terms:
+            pattern = f"%{collapse_whitespace(s)}%"
+            normalized_s = normalize_search_query(s)
+            normalized_pattern = f"%{normalized_s}%"
+            term_clauses.append(
+                or_(
+                    Example.sentence_original.ilike(pattern),
+                    Example.translation_pt.ilike(pattern),
+                    Example.translation_en.ilike(pattern),
+                    Entry.headword.ilike(pattern),
+                    Entry.gloss_pt.ilike(pattern),
+                    Entry.gloss_en.ilike(pattern),
+                    Example.normalized_sentence_original.ilike(normalized_pattern),
+                    Example.normalized_translation_pt.ilike(normalized_pattern),
+                    Example.normalized_translation_en.ilike(normalized_pattern),
+                    normalized_headword.ilike(normalized_pattern),
+                    Entry.normalized_gloss_pt.ilike(normalized_pattern),
+                    Entry.normalized_gloss_en.ilike(normalized_pattern),
+                )
+            )
+        conditions.append(or_(*term_clauses) if len(all_search_terms) > 1 else term_clauses[0])
+
+    if status_filter:
+        if is_mod or status_filter == ExampleStatus.approved:
+            conditions.append(Example.status == status_filter)
+        else:
+            conditions.append(Example.status == ExampleStatus.approved)
+    else:
+        if is_mod:
+            conditions.append(Example.status != ExampleStatus.rejected)
+        else:
+            conditions.append(Example.status == ExampleStatus.approved)
+
+    if not is_mod:
+        conditions.append(Entry.status != EntryStatus.rejected)
+
+    if conditions:
+        stmt = stmt.where(and_(*conditions))
+        count_stmt = count_stmt.where(and_(*conditions))
+
+    if sort == "score":
+        stmt = stmt.order_by(Example.score_cache.desc(), Example.created_at.desc())
+    else:
+        stmt = stmt.order_by(Example.created_at.desc())
+
+    stmt = stmt.offset((page - 1) * page_size).limit(page_size)
+
+    total = int((await db.execute(count_stmt)).scalar_one())
+    examples = (await db.execute(stmt)).scalars().unique().all()
+    example_votes: dict[uuid.UUID, int] = {}
+    audio_votes: dict[uuid.UUID, int] = {}
+
+    if user and examples:
+        example_ids = [example.id for example in examples]
+        vote_rows = (
+            await db.execute(
+                select(ExampleVote.example_id, ExampleVote.value).where(
+                    and_(ExampleVote.user_id == user.id, ExampleVote.example_id.in_(example_ids))
+                )
+            )
+        ).all()
+        example_votes = {row[0]: row[1] for row in vote_rows}
+
+        audio_ids: list[uuid.UUID] = []
+        for example in examples:
+            audio_ids.extend(sample.id for sample in example.audio_samples)
+        if audio_ids:
+            audio_rows = (
+                await db.execute(
+                    select(AudioVote.audio_id, AudioVote.value).where(
+                        and_(AudioVote.user_id == user.id, AudioVote.audio_id.in_(audio_ids))
+                    )
+                )
+            ).all()
+            audio_votes = {row[0]: row[1] for row in audio_rows}
+
+    example_moderation = await _load_example_moderation_context(db, examples=examples)
+
+    shared_entry_counts: dict[str, int] = {}
+    if examples:
+        sentence_values = [example.sentence_original for example in examples]
+        shared_rows = (
+            await db.execute(
+                select(
+                    Example.sentence_original,
+                    func.count(func.distinct(Example.entry_id)),
+                )
+                .where(
+                    and_(
+                        Example.sentence_original.in_(sentence_values),
+                        Example.status == ExampleStatus.approved,
+                    )
+                )
+                .group_by(Example.sentence_original)
+            )
+        ).all()
+        shared_entry_counts = {row[0]: int(row[1]) for row in shared_rows}
+
+    items: list[ExampleListItemOut] = []
+    for example in examples:
+        entry = example.entry
+        if not entry:
+            continue
+        serialized = serialize_example(
+            example,
+            moderation_map=example_moderation,
+            current_user_vote=example_votes.get(example.id),
+            audio_user_votes=audio_votes,
+        )
+        shared_count = shared_entry_counts.get(example.sentence_original, 1)
+        items.append(
+            ExampleListItemOut.model_validate(
+                {
+                    **serialized.model_dump(),
+                    "entry_slug": entry.slug,
+                    "entry_headword": entry.headword,
+                    "entry_gloss_pt": entry.gloss_pt,
+                    "entry_gloss_en": entry.gloss_en,
+                    "entry_status": entry.status,
+                    "shared_entry_count": shared_count if shared_count > 1 else None,
+                }
+            )
+        )
+
+    return ExampleListOut(items=items, page=page, page_size=page_size, total=total)
+
+
 @example_router.patch("/{example_id}", response_model=ExampleOut)
 async def update_example(
     example_id: uuid.UUID,
@@ -1598,14 +1771,21 @@ async def update_example(
         if is_effectively_empty(payload.sentence_original):
             raise_api_error(status_code=400, code="empty_submission", message="Sentence cannot be empty")
         example.sentence_original = collapse_whitespace(payload.sentence_original)
+        example.normalized_sentence_original = normalize_search_query(payload.sentence_original)
         changed = True
 
     if payload.translation_pt is not None:
         example.translation_pt = payload.translation_pt
+        example.normalized_translation_pt = (
+            normalize_search_query(payload.translation_pt) if payload.translation_pt else None
+        )
         changed = True
 
     if payload.translation_en is not None:
         example.translation_en = payload.translation_en
+        example.normalized_translation_en = (
+            normalize_search_query(payload.translation_en) if payload.translation_en else None
+        )
         changed = True
 
     if "source" in payload.model_fields_set:

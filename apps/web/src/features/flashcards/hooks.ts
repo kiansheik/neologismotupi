@@ -3,11 +3,14 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { FlashcardActiveSession, FlashcardReviewResponse, FlashcardSession } from "@/lib/types";
 import {
   finishFlashcardSession,
+  getFlashcardLeaderboard,
   getFlashcardStats,
   getFlashcardSession,
   submitFlashcardReview,
+  updateFlashcardPresence,
   updateFlashcardSettings,
 } from "@/features/flashcards/api";
+import type { FinishFlashcardSessionPayload, FlashcardPresencePayload } from "@/features/flashcards/api";
 
 export function useFlashcardSession(enabled: boolean) {
   return useQuery({
@@ -61,7 +64,26 @@ export function useFlashcardReview() {
 export function useFinishFlashcardSession() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: finishFlashcardSession,
+    mutationFn: (payload?: FinishFlashcardSessionPayload) => finishFlashcardSession(payload),
+    onSuccess: (data: FlashcardActiveSession | null) => {
+      queryClient.setQueryData(["flashcards-session"], (prev) => {
+        if (!prev) {
+          return prev;
+        }
+        const session = prev as FlashcardSession;
+        return {
+          ...session,
+          active_session: data,
+        };
+      });
+    },
+  });
+}
+
+export function useFlashcardPresence() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (payload: FlashcardPresencePayload) => updateFlashcardPresence(payload),
     onSuccess: (data: FlashcardActiveSession | null) => {
       queryClient.setQueryData(["flashcards-session"], (prev) => {
         if (!prev) {
@@ -82,5 +104,14 @@ export function useFlashcardStats(enabled: boolean) {
     queryKey: ["flashcards-stats"],
     queryFn: getFlashcardStats,
     enabled,
+  });
+}
+
+export function useFlashcardLeaderboard(enabled: boolean) {
+  return useQuery({
+    queryKey: ["flashcards-leaderboard"],
+    queryFn: getFlashcardLeaderboard,
+    enabled,
+    staleTime: 60_000,
   });
 }

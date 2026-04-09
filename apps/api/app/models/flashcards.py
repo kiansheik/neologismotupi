@@ -12,6 +12,7 @@ from sqlalchemy import (
     ForeignKey,
     Integer,
     String,
+    Text,
     UniqueConstraint,
     Uuid,
     func,
@@ -143,6 +144,7 @@ class FlashcardReviewLog(Base, UUIDPrimaryKeyMixin):
     memory_stability_after: Mapped[float | None] = mapped_column(Float, nullable=True)
     memory_difficulty_before: Mapped[float | None] = mapped_column(Float, nullable=True)
     memory_difficulty_after: Mapped[float | None] = mapped_column(Float, nullable=True)
+    user_response: Mapped[str | None] = mapped_column(Text, nullable=True)
 
 
 class FlashcardStudySession(Base, UUIDPrimaryKeyMixin, TimestampMixin):
@@ -203,3 +205,38 @@ class FlashcardDailyPlan(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     )
     position: Mapped[int] = mapped_column(Integer, nullable=False)
     completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class FlashcardReminder(Base, UUIDPrimaryKeyMixin, TimestampMixin):
+    __tablename__ = "flashcard_reminders"
+    __table_args__ = (
+        UniqueConstraint("user_id", "remind_at", name="uq_flashcard_reminder_user_time"),
+    )
+
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    session_id: Mapped[uuid.UUID | None] = mapped_column(
+        Uuid, ForeignKey("flashcard_study_session.id", ondelete="SET NULL"), nullable=True
+    )
+    time_zone: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    remind_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, index=True)
+    sent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True, index=True)
+
+
+class FlashcardSessionSegment(Base, UUIDPrimaryKeyMixin, TimestampMixin):
+    __tablename__ = "flashcard_session_segments"
+    __table_args__ = (
+        UniqueConstraint("session_id", "started_at", name="uq_flashcard_segment_session_start"),
+    )
+
+    session_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid, ForeignKey("flashcard_study_session.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    started_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False, index=True
+    )
+    ended_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True, index=True)

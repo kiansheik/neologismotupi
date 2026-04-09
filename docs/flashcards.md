@@ -20,6 +20,7 @@ All tables live in `apps/api/app/models/flashcards.py`.
 - `flashcard_progress`
 - `flashcard_review_log`
 - `flashcard_study_session`
+- `flashcard_session_segments`
 - `flashcard_daily_intake`
 - `flashcard_daily_plan` (legacy/unused for scheduling)
 
@@ -117,6 +118,9 @@ Important details:
 Study sessions are explicit, and new cards are introduced continuously during a session.
 
 - A session begins on the first review and ends when the user clicks “Finish session”.
+- Active time is tracked in `flashcard_session_segments`. Each segment is a continuous active interval.
+- When the user leaves the session (tab hidden or page exit), the open segment is closed and the session becomes paused.
+- Returning shows a “Continue session” / “Start new session” choice. Starting new finalizes the old session at the last active segment end time.
 - There is no daily cap in the session queue. New cards are always available as long as eligible entries exist.
 - `flashcard_daily_intake` remains in the database but is not used by the scheduler.
 - Each review log row stores the `session_id` so session analytics can be derived later.
@@ -153,27 +157,42 @@ Key files:
 - `apps/web/src/features/flashcards/hooks.ts`
 - `apps/web/src/features/flashcards/api.ts`
 
-Prompt and reveal behavior:
+Production scoring (typed-answer mode):
+- Users type their answer rather than self-grading.
+- Grade is auto-computed via Levenshtein distance after normalizing both strings to lowercase with collapsed whitespace.
+  - ratio >= 0.85 → `good`
+  - ratio >= 0.50 → `hard`
+  - ratio < 0.50 → `again`
+- The typed response is stored in `flashcard_review_log.user_response` for analysis.
+- The result banner shows “Congrats!” or “Study more” with the percentage match.
+- For cards without audio, an inline `AudioCapture` is shown so users can contribute recordings without leaving the quiz.
+- A pro-tip to repeat audio is shown on cards that have audio.
+
+Prompt behavior:
 - Prompt side shows `headword` for `headword_to_gloss` and `gloss_pt` for `gloss_to_headword`.
-- Reveal side always shows headword, gloss, and short definition.
+- The expected answer is `gloss_pt` for `headword_to_gloss` and the orthography-applied `headword` for `gloss_to_headword`.
 - Audio autoplay is direction-specific: Tupi -> PT plays on prompt; PT -> Tupi plays on reveal.
 
-Grading modes:
-- Simple mode shows two buttons. Mapping is `Study more` -> `again` and `Correct!` -> `good`.
-- Advanced mode shows four buttons: `Again`, `Hard`, `Good`, `Easy`.
-- The red “Study more” button is on the left in simple mode.
-
 Response time:
-- `response_ms` is measured from the moment the prompt is shown to the moment the user clicks “Reveal”.
+- `response_ms` is measured from the moment the prompt is shown to the moment the user clicks “Submit”.
 - That value is sent to the backend with the review, and stored in `flashcard_review_log`.
 
 Empty states:
 - If nothing is due now but there are cards due later today, the UI shows a “due later today” message.
 
 Session controls and stats:
-- The “Finish session” button ends the active session and freezes its duration.
+- The “Finish session” button ends the active session and closes any open segment.
+- If a session is paused (no open segment), the UI prompts the user to continue or start a new session.
+- If the user checks “Remind me tomorrow at this time”, the UI sends the request with the browser time zone.
+- The backend computes the next-day reminder time using the session `started_at` in that time zone and stores it in `flashcard_reminders`.
 - A “Resumo de hoje” card shows today’s reviews, new entries, study minutes, and session count.
 - A minimalist 7‑day bar chart shows study minutes per day.
+
+**Reminders (email job)**
+- Reminders are stored in `flashcard_reminders` with `remind_at`, `time_zone`, and `sent_at`.
+- `POST /api/flashcards/finish-session` schedules a reminder if `remind_tomorrow` is set.
+- The scheduler in `apps/api/app/core/schedule_flashcard_reminders.py` polls due reminders and sends emails via `send_flashcard_reminder_email` in `apps/api/app/services/email_delivery.py`.
+- After a successful send, `sent_at` is set so the reminder is not resent.
 
 **API endpoints**
 Defined in `apps/api/app/api/routes/flashcards.py`:
@@ -182,6 +201,7 @@ Defined in `apps/api/app/api/routes/flashcards.py`:
 - `GET /api/flashcards/session`
 - `POST /api/flashcards/review`
 - `POST /api/flashcards/finish-session`
+- `POST /api/flashcards/session/presence`
 - `GET /api/flashcards/stats`
 
 **Analytics**
