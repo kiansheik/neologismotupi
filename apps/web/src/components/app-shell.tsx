@@ -4,6 +4,7 @@ import { useEffect, useRef } from "react";
 
 import { useCurrentUser } from "@/features/auth/hooks";
 import { logout } from "@/features/auth/api";
+import { listNotifications } from "@/features/notifications/api";
 import { getMyPreferences, updateMyPreferences } from "@/features/users/api";
 import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/theme-toggle";
@@ -31,6 +32,18 @@ export function AppShell() {
   const preferencesQuery = useQuery({
     queryKey: ["user-preferences"],
     queryFn: getMyPreferences,
+    enabled: Boolean(user),
+  });
+
+  const mentionNotificationsQuery = useQuery({
+    queryKey: ["notifications", "mentions-unread"],
+    queryFn: () =>
+      listNotifications({
+        page: 1,
+        page_size: 1,
+        unread_only: true,
+        kind: "comment_mention",
+      }),
     enabled: Boolean(user),
   });
 
@@ -186,6 +199,8 @@ export function AppShell() {
     },
   });
 
+  const unreadMentions = mentionNotificationsQuery.data?.unread_count ?? 0;
+
   return (
     <div className="min-h-screen">
       <header className="border-b border-line bg-surface-header/95 backdrop-blur">
@@ -220,7 +235,19 @@ export function AppShell() {
             {user ? (
               <>
                 <Link to="/me" className="rounded-md px-2 py-1 text-brand-700 hover:bg-accent hover:text-accent-contrast">
-                  {t("nav.me")}
+                  <span className="inline-flex items-center gap-1">
+                    {t("nav.me")}
+                    {unreadMentions > 0 ? (
+                      <span
+                        role="img"
+                        aria-label={t("nav.mentionsIndicator", { count: unreadMentions })}
+                        title={t("nav.mentionsIndicator", { count: unreadMentions })}
+                        className="text-sm"
+                      >
+                        📬
+                      </span>
+                    ) : null}
+                  </span>
                 </Link>
                 <Button
                   type="button"

@@ -54,6 +54,10 @@ export function MePage() {
   const { apply } = useOrthography();
   const [profileForm, setProfileForm] = useState(profileToForm(null));
   const [isEditingProfile, setIsEditingProfile] = useState(false);
+  const whatsappGroupUrl = (import.meta.env.VITE_WHATSAPP_GROUP_URL as string | undefined)?.trim();
+  const githubUrl =
+    (import.meta.env.VITE_GITHUB_URL as string | undefined)?.trim() ||
+    "https://github.com/kiansheik/neologismotupi";
 
   const notificationPreferencesQuery = useQuery({
     queryKey: ["notification-preferences"],
@@ -708,6 +712,34 @@ export function MePage() {
         {notificationPreferencesQuery.error ? (
           <p className="mt-2 text-sm text-red-700">{t("api.request_failed")}</p>
         ) : null}
+      </Card>
+
+      <Card>
+        <h2 className="text-lg font-semibold text-brand-900">
+          {t("me.communityTitle")}
+        </h2>
+        <p className="mt-1 text-sm text-slate-600">{t("me.communityHint")}</p>
+        <div className="mt-3 flex flex-col gap-2 text-sm">
+          {whatsappGroupUrl ? (
+            <a
+              className="inline-flex items-center gap-2 text-brand-700 hover:underline"
+              href={whatsappGroupUrl}
+              target="_blank"
+              rel="noreferrer"
+            >
+              <span aria-hidden="true">💬</span>
+              <span>{t("me.communityWhatsApp")}</span>
+            </a>
+          ) : null}
+          <a
+            className="inline-flex items-center gap-2 text-brand-700 hover:underline"
+            href={githubUrl}
+            target="_blank"
+            rel="noreferrer"
+          >
+            <span>{t("me.communityGithub")}</span>
+          </a>
+        </div>
       </Card>
     </section>
   );

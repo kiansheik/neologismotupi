@@ -140,6 +140,7 @@ def serialize_entry_comment(
         user_id=comment.user_id,
         parent_comment_id=comment.parent_comment_id,
         body=comment.body,
+        edited_at=comment.edited_at,
         score_cache=comment.score_cache,
         upvote_count_cache=comment.upvote_count_cache,
         downvote_count_cache=comment.downvote_count_cache,

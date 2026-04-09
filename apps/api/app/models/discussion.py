@@ -37,6 +37,7 @@ class EntryComment(Base, UUIDPrimaryKeyMixin, TimestampMixin):
         nullable=True,
     )
     body: Mapped[str] = mapped_column(Text, nullable=False)
+    edited_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     score_cache: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     upvote_count_cache: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     downvote_count_cache: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
@@ -46,6 +47,11 @@ class EntryComment(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     parent_comment = relationship("EntryComment", remote_side="EntryComment.id")
     votes: Mapped[list["CommentVote"]] = relationship(
         back_populates="comment", cascade="all, delete-orphan"
+    )
+    versions: Mapped[list["EntryCommentVersion"]] = relationship(
+        back_populates="comment",
+        cascade="all, delete-orphan",
+        order_by="EntryCommentVersion.version_number",
     )
 
 
@@ -63,6 +69,29 @@ class CommentVote(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     value: Mapped[int] = mapped_column(Integer, nullable=False)
 
     comment: Mapped[EntryComment] = relationship(back_populates="votes")
+
+
+class EntryCommentVersion(Base, UUIDPrimaryKeyMixin):
+    __tablename__ = "entry_comment_versions"
+    __table_args__ = (
+        UniqueConstraint(
+            "comment_id",
+            "version_number",
+            name="uq_entry_comment_versions_comment_id_version_number",
+        ),
+    )
+
+    comment_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid, ForeignKey("entry_comments.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    edited_by_user_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid, ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+    )
+    version_number: Mapped[int] = mapped_column(Integer, nullable=False)
+    snapshot_json: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    comment: Mapped[EntryComment] = relationship(back_populates="versions")
 
 
 class NotificationPreference(Base, TimestampMixin):

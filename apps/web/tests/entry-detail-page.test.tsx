@@ -10,6 +10,8 @@ const {
   getEntryMock,
   createCommentMock,
   voteCommentMock,
+  updateCommentMock,
+  listCommentVersionsMock,
   listMentionUsersMock,
   resolveMentionUsersMock,
   authState,
@@ -18,6 +20,8 @@ const {
   updateEntryMock: vi.fn().mockResolvedValue({}),
   createCommentMock: vi.fn().mockResolvedValue({}),
   voteCommentMock: vi.fn().mockResolvedValue({ score_cache: 1 }),
+  updateCommentMock: vi.fn().mockResolvedValue({}),
+  listCommentVersionsMock: vi.fn().mockResolvedValue([]),
   listMentionUsersMock: vi.fn().mockResolvedValue([]),
   resolveMentionUsersMock: vi.fn().mockResolvedValue([]),
   getEntryMock: vi.fn().mockResolvedValue({
@@ -47,6 +51,8 @@ const {
     comments: [],
   }),
   authState: { currentUser: undefined as unknown },
+  updateCommentMock: vi.fn(),
+  listCommentVersionsMock: vi.fn(),
 }));
 
 vi.mock("@/features/entries/api", () => ({
@@ -63,6 +69,8 @@ vi.mock("@/features/examples/api", () => ({
 vi.mock("@/features/comments/api", () => ({
   createComment: createCommentMock,
   voteComment: voteCommentMock,
+  updateComment: updateCommentMock,
+  listCommentVersions: listCommentVersionsMock,
 }));
 vi.mock("@/features/auth/hooks", () => ({
   useCurrentUser: () => ({ data: authState.currentUser }),
@@ -76,6 +84,8 @@ describe("EntryDetailPage", () => {
   beforeEach(() => {
     listMentionUsersMock.mockResolvedValue([]);
     resolveMentionUsersMock.mockResolvedValue([]);
+    updateCommentMock.mockResolvedValue({});
+    listCommentVersionsMock.mockResolvedValue([]);
   });
 
   it("shows sign-in prompt for logged-out users", async () => {

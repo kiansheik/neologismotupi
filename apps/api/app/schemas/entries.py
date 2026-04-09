@@ -167,12 +167,24 @@ class ExampleVersionOut(BaseModel):
     model_config = {"from_attributes": True}
 
 
+class CommentVersionOut(BaseModel):
+    id: uuid.UUID
+    comment_id: uuid.UUID
+    edited_by_user_id: uuid.UUID
+    version_number: int
+    snapshot_json: dict
+    created_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
 class EntryCommentOut(BaseModel):
     id: uuid.UUID
     entry_id: uuid.UUID
     user_id: uuid.UUID
     parent_comment_id: uuid.UUID | None
     body: str
+    edited_at: datetime | None = None
     score_cache: int
     upvote_count_cache: int
     downvote_count_cache: int
@@ -297,6 +309,10 @@ class CommentCreate(BaseModel):
     body: str = Field(min_length=1, max_length=2000)
     parent_comment_id: uuid.UUID | None = None
     turnstile_token: str | None = None
+
+
+class CommentUpdate(BaseModel):
+    body: str = Field(min_length=1, max_length=2000)
 
 
 class VoteRequest(BaseModel):

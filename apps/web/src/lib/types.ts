@@ -162,12 +162,22 @@ export interface ExampleVersion {
   created_at: string;
 }
 
+export interface CommentVersion {
+  id: string;
+  comment_id: string;
+  edited_by_user_id: string;
+  version_number: number;
+  snapshot_json: Record<string, unknown>;
+  created_at: string;
+}
+
 export interface EntryComment {
   id: string;
   entry_id: string;
   user_id: string;
   parent_comment_id: string | null;
   body: string;
+  edited_at?: string | null;
   score_cache: number;
   upvote_count_cache: number;
   downvote_count_cache: number;

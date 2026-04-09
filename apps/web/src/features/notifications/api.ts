@@ -9,6 +9,7 @@ export interface ListNotificationsParams {
   page?: number;
   page_size?: number;
   unread_only?: boolean;
+  kind?: string;
 }
 
 export interface UpdateNotificationPreferencesPayload {

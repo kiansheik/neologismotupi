@@ -14,7 +14,7 @@ from app.core.enums import EntryStatus, ExampleStatus, ReportStatus, ReportTarge
 from app.core.errors import raise_api_error
 from app.core.permissions import can_edit_entry, can_edit_example, is_moderator
 from app.core.utils import collapse_whitespace, normalize_search_query, normalize_text, slugify
-from app.models.discussion import CommentVote, EntryComment
+from app.models.discussion import CommentVote, EntryComment, EntryCommentVersion
 from app.models.audio import AudioSample, AudioVote
 from app.models.entry import Entry, EntryTag, EntryVersion, Example, ExampleVersion, ExampleVote, Tag, Vote
 from app.models.moderation import ModerationAction, Report
@@ -22,7 +22,9 @@ from app.models.source import SourceEdition, SourceWork
 from app.models.user import Profile, User
 from app.schemas.entries import (
     CommentCreate,
+    CommentUpdate,
     CommentVoteOut,
+    CommentVersionOut,
     DuplicateHintOut,
     EntryCreate,
     EntryCommentOut,
@@ -1588,6 +1590,70 @@ async def create_comment(
 
 example_router = APIRouter(prefix="/examples", tags=["examples"])
 comment_router = APIRouter(prefix="/comments", tags=["comments"])
+
+
+@comment_router.patch("/{comment_id}", response_model=EntryCommentOut)
+async def update_comment(
+    comment_id: uuid.UUID,
+    payload: CommentUpdate,
+    db: SessionDep,
+    user: Annotated[User, Depends(get_current_user)],
+) -> EntryCommentOut:
+    comment = (
+        await db.execute(
+            select(EntryComment)
+            .where(EntryComment.id == comment_id)
+            .options(selectinload(EntryComment.author).selectinload(User.profile))
+        )
+    ).scalar_one_or_none()
+    if not comment:
+        raise_api_error(status_code=404, code="comment_not_found", message="Comment not found")
+
+    if comment.user_id != user.id and not is_moderator(user):
+        raise_api_error(status_code=403, code="forbidden", message="Not allowed to edit comment")
+
+    if is_effectively_empty(payload.body):
+        raise_api_error(status_code=400, code="empty_submission", message="Comment cannot be empty")
+
+    cleaned_body = collapse_whitespace(payload.body)
+    if cleaned_body == comment.body:
+        raise_api_error(status_code=400, code="no_changes", message="No changes to save")
+
+    next_version_stmt = select(func.coalesce(func.max(EntryCommentVersion.version_number), 0)).where(
+        EntryCommentVersion.comment_id == comment.id
+    )
+    next_version_number = int((await db.execute(next_version_stmt)).scalar_one()) + 1
+
+    version = EntryCommentVersion(
+        comment_id=comment.id,
+        edited_by_user_id=user.id,
+        version_number=next_version_number,
+        snapshot_json={"body": comment.body},
+    )
+    db.add(version)
+
+    comment.body = cleaned_body
+    comment.edited_at = datetime.now(UTC)
+    await db.commit()
+    await db.refresh(comment)
+
+    badge_leaders = await get_user_badge_leaders(db)
+    return serialize_entry_comment(comment, badge_leaders)
+
+
+@comment_router.get("/{comment_id}/versions", response_model=list[CommentVersionOut])
+async def list_comment_versions(
+    comment_id: uuid.UUID,
+    db: SessionDep,
+    _user: Annotated[User | None, Depends(get_current_user_optional)],
+) -> list[CommentVersionOut]:
+    stmt = (
+        select(EntryCommentVersion)
+        .where(EntryCommentVersion.comment_id == comment_id)
+        .order_by(EntryCommentVersion.version_number.desc())
+    )
+    versions = (await db.execute(stmt)).scalars().all()
+    return [CommentVersionOut.model_validate(version) for version in versions]
 
 
 @example_router.get("", response_model=ExampleListOut)

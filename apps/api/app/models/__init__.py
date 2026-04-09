@@ -1,4 +1,10 @@
-from app.models.discussion import CommentVote, EntryComment, Notification, NotificationPreference
+from app.models.discussion import (
+    CommentVote,
+    EntryComment,
+    EntryCommentVersion,
+    Notification,
+    NotificationPreference,
+)
 from app.models.audio import AudioSample, AudioVote
 from app.models.entry import Entry, EntryTag, EntryVersion, Example, ExampleVersion, ExampleVote, Tag, Vote
 from app.models.flashcards import (
@@ -20,6 +26,7 @@ __all__ = [
     "AudioVote",
     "Entry",
     "EntryComment",
+    "EntryCommentVersion",
     "EntryTag",
     "EntryVersion",
     "EmailActionToken",

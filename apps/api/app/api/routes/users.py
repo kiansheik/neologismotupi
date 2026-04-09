@@ -363,18 +363,23 @@ async def list_my_notifications(
     page: int = Query(default=1, ge=1),
     page_size: int = Query(default=20, ge=1, le=100),
     unread_only: bool = False,
+    kind: str | None = None,
 ) -> NotificationListOut:
     base_stmt = (
         select(Notification)
         .where(Notification.recipient_user_id == user.id)
         .order_by(Notification.created_at.desc())
     )
+    if kind:
+        base_stmt = base_stmt.where(Notification.kind == kind)
     if unread_only:
         base_stmt = base_stmt.where(Notification.is_read.is_(False))
 
     count_stmt = select(func.count()).select_from(Notification).where(
         Notification.recipient_user_id == user.id
     )
+    if kind:
+        count_stmt = count_stmt.where(Notification.kind == kind)
     if unread_only:
         count_stmt = count_stmt.where(Notification.is_read.is_(False))
 
@@ -384,6 +389,8 @@ async def list_my_notifications(
         .where(Notification.recipient_user_id == user.id)
         .where(Notification.is_read.is_(False))
     )
+    if kind:
+        unread_count_stmt = unread_count_stmt.where(Notification.kind == kind)
 
     notifications = (
         await db.execute(base_stmt.offset((page - 1) * page_size).limit(page_size))

@@ -26,7 +26,7 @@ import { UserBadge } from "@/components/user-badge";
 import { useCurrentUser } from "@/features/auth/hooks";
 import { AudioCapture, AudioQueueList, AudioSampleList } from "@/features/audio/components";
 import { deleteAudioSample, uploadEntryAudio, uploadExampleAudio, voteAudio } from "@/features/audio/api";
-import { createComment, voteComment } from "@/features/comments/api";
+import { createComment, listCommentVersions, updateComment, voteComment } from "@/features/comments/api";
 import { listExampleVersions, reportExample, updateExample, voteExample } from "@/features/examples/api";
 import { createExample, getEntry, reportEntry, updateEntry, voteEntry } from "@/features/entries/api";
 import { approveEntry, approveExample, rejectEntry, rejectExample } from "@/features/moderation/api";
@@ -323,6 +323,63 @@ function ExampleVersionHistory({
   );
 }
 
+function CommentVersionHistory({
+  commentId,
+  locale,
+  t,
+}: {
+  commentId: string;
+  locale: Locale;
+  t: TranslateFn;
+}) {
+  const [open, setOpen] = useState(false);
+  const versionsQuery = useQuery({
+    queryKey: ["comment-versions", commentId],
+    queryFn: () => listCommentVersions(commentId),
+    enabled: open,
+    staleTime: 60_000,
+  });
+
+  return (
+    <details
+      className="mt-2"
+      onToggle={(event) => {
+        setOpen(event.currentTarget.open);
+      }}
+    >
+      <summary className="cursor-pointer text-xs text-brand-700">{t("entry.showCommentVersions")}</summary>
+      <div className="mt-2 rounded-md border border-line-soft bg-surface/70 p-2">
+        <p className="text-xs font-semibold text-ink">{t("entry.commentVersionHistory")}</p>
+        {versionsQuery.isLoading ? (
+          <p className="mt-1 text-xs text-ink-muted">{t("entry.loading")}</p>
+        ) : null}
+        {versionsQuery.error ? (
+          <p className="mt-1 text-xs text-red-700">{t("entry.loadError")}</p>
+        ) : null}
+        {versionsQuery.data && versionsQuery.data.length === 0 ? (
+          <p className="mt-1 text-xs text-ink-muted">{t("entry.noCommentVersions")}</p>
+        ) : null}
+        {versionsQuery.data && versionsQuery.data.length > 0 ? (
+          <ul className="mt-1 space-y-2 text-xs text-ink">
+            {versionsQuery.data.map((version) => {
+              const snapshotBody = String((version.snapshot_json as { body?: string })?.body ?? "");
+              return (
+                <li key={version.id} className="rounded-md border border-line-soft bg-surface/80 p-2">
+                  <p className="text-[11px] text-ink-muted">
+                    {t("entry.history.versionPrefix", { version: version.version_number })} ·{" "}
+                    {formatDateTime(version.created_at, locale)}
+                  </p>
+                  <p className="mt-1 whitespace-pre-wrap text-xs text-ink">{snapshotBody}</p>
+                </li>
+              );
+            })}
+          </ul>
+        ) : null}
+      </div>
+    </details>
+  );
+}
+
 function buildEntryMetaDescription(entry: {
   headword: string;
   gloss_pt: string | null;
@@ -612,6 +669,9 @@ export function EntryDetailPage() {
       body: "",
     },
   });
+  const [editingCommentId, setEditingCommentId] = useState<string | null>(null);
+  const [editingCommentBody, setEditingCommentBody] = useState("");
+  const [editingCommentError, setEditingCommentError] = useState<string | null>(null);
 
   const entryEditForm = useForm<EntryEditForm>({
     defaultValues: {
@@ -819,6 +879,29 @@ export function EntryDetailPage() {
       trackEvent("comment_submit_failed", {
         error_code: error instanceof ApiError ? error.code : "unknown",
       });
+    },
+  });
+
+  const updateCommentMutation = useMutation({
+    mutationFn: (params: { commentId: string; body: string }) =>
+      updateComment(params.commentId, { body: params.body }),
+    onSuccess: () => {
+      trackEvent("comment_edited");
+      setEditingCommentId(null);
+      setEditingCommentBody("");
+      setEditingCommentError(null);
+      queryClient.invalidateQueries({ queryKey: ["entry", slug] });
+      queryClient.invalidateQueries({ queryKey: ["entries"] });
+    },
+    onError: (error) => {
+      trackEvent("comment_edit_failed", {
+        error_code: error instanceof ApiError ? error.code : "unknown",
+      });
+      if (error instanceof ApiError) {
+        setEditingCommentError(getLocalizedApiErrorMessage(error, t));
+      } else {
+        setEditingCommentError(t("api.request_failed"));
+      }
     },
   });
 
@@ -2201,6 +2284,11 @@ export function EntryDetailPage() {
                 comment.current_user_vote,
                 getCachedVote(currentUser?.id, "comment", comment.id),
               );
+              const canEditComment = Boolean(
+                currentUser && (isModerator || currentUser.id === comment.user_id),
+              );
+              const isEditingComment = editingCommentId === comment.id;
+              const wasEdited = Boolean(comment.edited_at);
               return (
                 <article key={comment.id} className="rounded-md border border-brand-100 p-3">
                 <div className="flex flex-wrap items-center justify-between gap-2">
@@ -2214,11 +2302,57 @@ export function EntryDetailPage() {
                       <span>· {t("reputation.label", { score: comment.author.reputation_score })}</span>
                     </span>
                   </p>
-                  <span className="text-xs text-slate-600">{formatRelativeOrDate(comment.created_at, locale)}</span>
+                  <span className="text-xs text-slate-600">
+                    {formatRelativeOrDate(comment.created_at, locale)}
+                    {wasEdited ? ` · ${t("entry.commentEdited")}` : ""}
+                  </span>
                 </div>
-                <p className="mt-2 whitespace-pre-wrap text-sm text-slate-800">
-                  {renderCommentBody(comment.body, mentionByHandle)}
-                </p>
+                {isEditingComment ? (
+                  <div className="mt-2 space-y-2">
+                    <Textarea
+                      rows={3}
+                      value={editingCommentBody}
+                      onChange={(event) => {
+                        setEditingCommentBody(event.target.value);
+                        setEditingCommentError(null);
+                      }}
+                    />
+                    {editingCommentError ? (
+                      <p className="text-xs text-red-700">{editingCommentError}</p>
+                    ) : null}
+                    <div className="flex flex-wrap gap-2">
+                      <Button
+                        type="button"
+                        onClick={() => {
+                          const trimmed = editingCommentBody.trim();
+                          if (!trimmed) {
+                            setEditingCommentError(t("entry.error.commentMin"));
+                            return;
+                          }
+                          updateCommentMutation.mutate({ commentId: comment.id, body: editingCommentBody });
+                        }}
+                        disabled={updateCommentMutation.isPending}
+                      >
+                        {t("entry.commentEditSave")}
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        onClick={() => {
+                          setEditingCommentId(null);
+                          setEditingCommentBody("");
+                          setEditingCommentError(null);
+                        }}
+                      >
+                        {t("entry.commentEditCancel")}
+                      </Button>
+                    </div>
+                  </div>
+                ) : (
+                  <p className="mt-2 whitespace-pre-wrap text-sm text-slate-800">
+                    {renderCommentBody(comment.body, mentionByHandle)}
+                  </p>
+                )}
                 <div className="mt-2 flex flex-wrap items-center gap-2">
                   <Button
                     type="button"
@@ -2255,7 +2389,24 @@ export function EntryDetailPage() {
                   <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-xs text-slate-700">
                     {t("entry.commentScore", { score: comment.score_cache })}
                   </span>
+                  {!isEditingComment && canEditComment ? (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      className="px-2 py-1 text-xs"
+                      onClick={() => {
+                        setEditingCommentId(comment.id);
+                        setEditingCommentBody(comment.body);
+                        setEditingCommentError(null);
+                      }}
+                    >
+                      {t("entry.commentEdit")}
+                    </Button>
+                  ) : null}
                 </div>
+                {!isEditingComment && wasEdited ? (
+                  <CommentVersionHistory commentId={comment.id} locale={locale} t={t} />
+                ) : null}
                 </article>
               );
             })
