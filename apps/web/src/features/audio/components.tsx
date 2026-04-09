@@ -15,9 +15,18 @@ export type CompactAudioPlayerProps = {
   t: TranslateFn;
   size?: "sm" | "md";
   className?: string;
+  autoPlay?: boolean;
+  autoPlayKey?: string | number;
 };
 
-export function CompactAudioPlayer({ src, t, size = "md", className }: CompactAudioPlayerProps) {
+export function CompactAudioPlayer({
+  src,
+  t,
+  size = "md",
+  className,
+  autoPlay = false,
+  autoPlayKey,
+}: CompactAudioPlayerProps) {
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const sizeClass = size === "sm" ? "h-8 w-8" : "h-9 w-9";
@@ -61,6 +70,22 @@ export function CompactAudioPlayer({ src, t, size = "md", className }: CompactAu
       stopPlayback(false);
     };
   }, []);
+
+  useEffect(() => {
+    if (!autoPlay) {
+      return;
+    }
+    const audio = audioRef.current;
+    if (!audio) {
+      return;
+    }
+    audio.currentTime = 0;
+    const playPromise = audio.play();
+    if (playPromise && typeof playPromise.catch === "function") {
+      playPromise.catch(() => setIsPlaying(false));
+    }
+    setIsPlaying(true);
+  }, [autoPlay, autoPlayKey, src]);
 
   return (
     <div className={className}>
