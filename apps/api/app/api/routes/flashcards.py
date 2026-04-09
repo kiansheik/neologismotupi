@@ -1,4 +1,3 @@
-from datetime import UTC, datetime
 from typing import Annotated
 
 from fastapi import APIRouter, Depends
@@ -8,21 +7,25 @@ from app.core.deps import SessionDep, get_current_user
 from app.core.enums import EntryStatus
 from app.core.errors import raise_api_error
 from app.models.entry import Entry
-from app.models.flashcards import FlashcardDailyPlan
 from app.models.user import User
 from app.schemas.flashcards import (
+    FlashcardActiveSessionOut,
     FlashcardCardOut,
+    FlashcardDailyStatsOut,
     FlashcardReviewRequest,
     FlashcardReviewResponse,
     FlashcardSessionOut,
     FlashcardSessionSummary,
     FlashcardSettingsOut,
     FlashcardSettingsUpdate,
+    FlashcardStatsOut,
 )
 from app.services.flashcards import (
     apply_flashcard_review,
     build_flashcard_session,
+    finish_flashcard_session,
     get_or_create_flashcard_settings,
+    get_flashcard_stats,
 )
 
 router = APIRouter(prefix="/flashcards", tags=["flashcards"])
@@ -58,6 +61,8 @@ async def update_flashcard_settings(
     settings = await get_or_create_flashcard_settings(db, user.id)
     if payload.new_cards_per_day is not None:
         settings.new_cards_per_day = payload.new_cards_per_day
+    if payload.advanced_grading_enabled is not None:
+        settings.advanced_grading_enabled = payload.advanced_grading_enabled
     await db.commit()
     await db.refresh(settings)
     return FlashcardSettingsOut.model_validate(settings)
@@ -68,7 +73,7 @@ async def get_flashcard_session(
     db: SessionDep,
     user: Annotated[User, Depends(get_current_user)],
 ) -> FlashcardSessionOut:
-    settings, summary, card = await build_flashcard_session(db, user.id)
+    settings, summary, card, active_session = await build_flashcard_session(db, user.id)
     return FlashcardSessionOut(
         settings=FlashcardSettingsOut.model_validate(settings),
         summary=FlashcardSessionSummary(
@@ -76,8 +81,10 @@ async def get_flashcard_session(
             review_remaining=summary.review_remaining,
             completed_today=summary.completed_today,
             due_now=summary.due_now,
+            due_later_today=summary.due_later_today,
         ),
         current_card=FlashcardCardOut(**card.__dict__) if card else None,
+        active_session=FlashcardActiveSessionOut(**active_session.__dict__) if active_session else None,
     )
 
 
@@ -98,34 +105,42 @@ async def review_flashcard(
         user_id=user.id,
         entry_id=payload.entry_id,
         direction=payload.direction,
-        result=payload.result,
+        grade=payload.grade,
         response_ms=payload.response_ms,
     )
-
-    today = datetime.now(UTC).date()
-    plan_item = (
-        await db.execute(
-            select(FlashcardDailyPlan).where(
-                FlashcardDailyPlan.user_id == user.id,
-                FlashcardDailyPlan.plan_date == today,
-                FlashcardDailyPlan.entry_id == payload.entry_id,
-                FlashcardDailyPlan.direction == payload.direction,
-            )
-        )
-    ).scalar_one_or_none()
-    if plan_item and plan_item.completed_at is None:
-        plan_item.completed_at = datetime.now(UTC)
-
     await db.commit()
     await db.refresh(progress)
 
-    settings, summary, card = await build_flashcard_session(db, user.id)
+    settings, summary, card, active_session = await build_flashcard_session(db, user.id)
     return FlashcardReviewResponse(
         summary=FlashcardSessionSummary(
             new_remaining=summary.new_remaining,
             review_remaining=summary.review_remaining,
             completed_today=summary.completed_today,
             due_now=summary.due_now,
+            due_later_today=summary.due_later_today,
         ),
         next_card=FlashcardCardOut(**card.__dict__) if card else None,
+        active_session=FlashcardActiveSessionOut(**active_session.__dict__) if active_session else None,
+    )
+
+
+@router.post("/finish-session", response_model=FlashcardActiveSessionOut | None)
+async def finish_flashcard_today(
+    db: SessionDep,
+    user: Annotated[User, Depends(get_current_user)],
+) -> FlashcardActiveSessionOut | None:
+    await finish_flashcard_session(db, user_id=user.id)
+    return None
+
+
+@router.get("/stats", response_model=FlashcardStatsOut)
+async def get_flashcard_stats_endpoint(
+    db: SessionDep,
+    user: Annotated[User, Depends(get_current_user)],
+) -> FlashcardStatsOut:
+    stats = await get_flashcard_stats(db, user_id=user.id)
+    return FlashcardStatsOut(
+        today=FlashcardDailyStatsOut(**stats.today.__dict__),
+        last_7_days=[FlashcardDailyStatsOut(**day.__dict__) for day in stats.last_7_days],
     )

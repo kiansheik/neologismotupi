@@ -5,13 +5,15 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { useI18n } from "@/i18n";
 import { trackEvent } from "@/lib/analytics";
-import type { FlashcardCard, FlashcardReviewResult } from "@/lib/types";
+import type { FlashcardCard, FlashcardGrade } from "@/lib/types";
 
 interface FlashcardSessionProps {
   card: FlashcardCard | null;
   isLoading: boolean;
   isSubmitting: boolean;
-  onReview: (result: FlashcardReviewResult, responseMs: number | null) => void;
+  onReview: (grade: FlashcardGrade, responseMs: number | null) => void;
+  advancedGrading?: boolean;
+  dueLaterToday?: number;
 }
 
 export function FlashcardSession({
@@ -19,6 +21,8 @@ export function FlashcardSession({
   isLoading,
   isSubmitting,
   onReview,
+  advancedGrading = false,
+  dueLaterToday = 0,
 }: FlashcardSessionProps) {
   const { t } = useI18n();
   const [revealed, setRevealed] = useState(false);
@@ -83,9 +87,13 @@ export function FlashcardSession({
     if (!card) {
       return "";
     }
-    return card.queue_type === "new"
-      ? t("flashcards.queue.new")
-      : t("flashcards.queue.review");
+    if (card.queue === "new") {
+      return t("flashcards.queue.new");
+    }
+    if (card.queue === "learn" || card.queue === "day_learn") {
+      return t("flashcards.queue.learn");
+    }
+    return t("flashcards.queue.review");
   }, [card, t]);
 
   const handleReveal = () => {
@@ -99,20 +107,20 @@ export function FlashcardSession({
     trackEvent("flashcard_reveal", {
       entry_id: card.entry_id,
       direction: card.direction,
-      queue_type: card.queue_type,
+      queue: card.queue,
     });
   };
 
-  const handleReview = (result: FlashcardReviewResult) => {
+  const handleReview = (grade: FlashcardGrade) => {
     if (!card) {
       return;
     }
-    onReview(result, responseMs);
+    onReview(grade, responseMs);
     trackEvent("flashcard_review_submitted", {
       entry_id: card.entry_id,
       direction: card.direction,
-      queue_type: card.queue_type,
-      result,
+      queue: card.queue,
+      grade,
       response_ms: responseMs ?? undefined,
     });
   };
@@ -130,6 +138,11 @@ export function FlashcardSession({
       <Card>
         <p className="text-lg font-semibold text-brand-900">{t("flashcards.emptyTitle")}</p>
         <p className="mt-2 text-sm text-ink-muted">{t("flashcards.emptyBody")}</p>
+        {dueLaterToday > 0 ? (
+          <p className="mt-3 text-xs text-ink-muted">
+            {t("flashcards.emptyDueLater", { count: dueLaterToday })}
+          </p>
+        ) : null}
       </Card>
     );
   }
@@ -204,21 +217,59 @@ export function FlashcardSession({
             </div>
           </div>
           <div className="flex flex-wrap gap-2">
-            <Button
-              type="button"
-              variant="danger"
-              onClick={() => handleReview("study_more")}
-              disabled={isSubmitting}
-            >
-              {t("flashcards.grade.studyMore")}
-            </Button>
-            <Button
-              type="button"
-              onClick={() => handleReview("correct")}
-              disabled={isSubmitting}
-            >
-              {t("flashcards.grade.correct")}
-            </Button>
+            {advancedGrading ? (
+              <>
+                <Button
+                  type="button"
+                  variant="danger"
+                  onClick={() => handleReview("again")}
+                  disabled={isSubmitting}
+                >
+                  {t("flashcards.grade.again")}
+                </Button>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  onClick={() => handleReview("hard")}
+                  disabled={isSubmitting}
+                >
+                  {t("flashcards.grade.hard")}
+                </Button>
+                <Button
+                  type="button"
+                  onClick={() => handleReview("good")}
+                  disabled={isSubmitting}
+                >
+                  {t("flashcards.grade.good")}
+                </Button>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  onClick={() => handleReview("easy")}
+                  disabled={isSubmitting}
+                >
+                  {t("flashcards.grade.easy")}
+                </Button>
+              </>
+            ) : (
+              <>
+                <Button
+                  type="button"
+                  variant="danger"
+                  onClick={() => handleReview("again")}
+                  disabled={isSubmitting}
+                >
+                  {t("flashcards.grade.studyMore")}
+                </Button>
+                <Button
+                  type="button"
+                  onClick={() => handleReview("good")}
+                  disabled={isSubmitting}
+                >
+                  {t("flashcards.grade.correct")}
+                </Button>
+              </>
+            )}
           </div>
         </div>
       )}

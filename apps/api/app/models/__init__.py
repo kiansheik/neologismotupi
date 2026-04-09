@@ -2,10 +2,12 @@ from app.models.discussion import CommentVote, EntryComment, Notification, Notif
 from app.models.audio import AudioSample, AudioVote
 from app.models.entry import Entry, EntryTag, EntryVersion, Example, ExampleVersion, ExampleVote, Tag, Vote
 from app.models.flashcards import (
+    FlashcardDailyIntake,
     FlashcardDailyPlan,
     FlashcardProgress,
     FlashcardReviewLog,
     FlashcardSettings,
+    FlashcardStudySession,
 )
 from app.models.moderation import ModerationAction, RateLimitEvent, Report
 from app.models.newsletter import NewsletterDelivery, NewsletterIssue, NewsletterSubscription
@@ -24,10 +26,12 @@ __all__ = [
     "Example",
     "ExampleVersion",
     "ExampleVote",
+    "FlashcardDailyIntake",
     "FlashcardDailyPlan",
     "FlashcardProgress",
     "FlashcardReviewLog",
     "FlashcardSettings",
+    "FlashcardStudySession",
     "ModerationAction",
     "NewsletterDelivery",
     "NewsletterIssue",

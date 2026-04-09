@@ -63,18 +63,24 @@ class FlashcardDirection(str, Enum):
     gloss_to_headword = "gloss_to_headword"
 
 
-class FlashcardState(str, Enum):
+class FlashcardCardType(str, Enum):
     new = "new"
-    learning = "learning"
+    learn = "learn"
     review = "review"
-    relearning = "relearning"
+    relearn = "relearn"
 
 
-class FlashcardQueueType(str, Enum):
+class FlashcardQueue(str, Enum):
     new = "new"
+    learn = "learn"
     review = "review"
+    day_learn = "day_learn"
+    buried = "buried"
+    suspended = "suspended"
 
 
-class FlashcardReviewResult(str, Enum):
-    correct = "correct"
-    study_more = "study_more"
+class FlashcardGrade(str, Enum):
+    again = "again"
+    hard = "hard"
+    good = "good"
+    easy = "easy"

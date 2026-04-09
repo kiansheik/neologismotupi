@@ -7,13 +7,19 @@ from sqlalchemy import func, select
 import app.db as db_module
 from app.core.enums import (
     EntryStatus,
+    FlashcardCardType,
     FlashcardDirection,
-    FlashcardQueueType,
-    FlashcardState,
+    FlashcardGrade,
+    FlashcardQueue,
 )
 from app.core.utils import normalize_text, slugify
 from app.models.entry import Entry
-from app.models.flashcards import FlashcardDailyPlan, FlashcardProgress, FlashcardReviewLog, FlashcardSettings
+from app.models.flashcards import (
+    FlashcardProgress,
+    FlashcardReviewLog,
+    FlashcardSettings,
+    FlashcardStudySession,
+)
 from app.models.user import User
 
 
@@ -96,7 +102,7 @@ async def test_ranking_order_uses_score_examples_created_at(client):
     user_id = await get_user_id("ranking@example.com")
 
     async with db_module.AsyncSessionLocal() as session:
-        session.add(FlashcardSettings(user_id=user_id, new_cards_per_day=4))
+        session.add(FlashcardSettings(user_id=user_id, new_cards_per_day=3))
         await session.commit()
 
     created_base = datetime(2024, 1, 1, tzinfo=UTC)
@@ -114,7 +120,7 @@ async def test_ranking_order_uses_score_examples_created_at(client):
         example_count_cache=2,
         created_at=created_base + timedelta(days=1),
     )
-    third = await seed_entry(
+    await seed_entry(
         user_id=user_id,
         headword="third",
         score_cache=9,
@@ -124,20 +130,37 @@ async def test_ranking_order_uses_score_examples_created_at(client):
 
     response = await client.get("/api/flashcards/session")
     assert response.status_code == 200, response.text
+    card = response.json()["current_card"]
+    assert card["entry_id"] == str(first.id)
 
-    today = datetime.now(UTC).date()
-    async with db_module.AsyncSessionLocal() as session:
-        plan_items = (
-            await session.execute(
-                select(FlashcardDailyPlan)
-                .where(FlashcardDailyPlan.user_id == user_id, FlashcardDailyPlan.plan_date == today)
-                .order_by(FlashcardDailyPlan.position)
-            )
-        ).scalars().all()
+    await client.post(
+        "/api/flashcards/review",
+        json={
+            "entry_id": card["entry_id"],
+            "direction": card["direction"],
+            "grade": "good",
+            "response_ms": 500,
+        },
+    )
 
-    assert [item.entry_id for item in plan_items[:4]] == [first.id, first.id, second.id, second.id]
-    assert plan_items[0].direction == FlashcardDirection.headword_to_gloss
-    assert plan_items[1].direction == FlashcardDirection.gloss_to_headword
+    response = await client.get("/api/flashcards/session")
+    sibling = response.json()["current_card"]
+    assert sibling["entry_id"] == str(first.id)
+    assert sibling["direction"] == "gloss_to_headword"
+
+    await client.post(
+        "/api/flashcards/review",
+        json={
+            "entry_id": sibling["entry_id"],
+            "direction": sibling["direction"],
+            "grade": "good",
+            "response_ms": 500,
+        },
+    )
+
+    response = await client.get("/api/flashcards/session")
+    card = response.json()["current_card"]
+    assert card["entry_id"] == str(second.id)
 
 
 @pytest.mark.asyncio
@@ -147,102 +170,25 @@ async def test_settings_default_and_bounds(client):
     response = await client.get("/api/flashcards/settings")
     assert response.status_code == 200, response.text
     assert response.json()["new_cards_per_day"] == 3
+    assert response.json()["advanced_grading_enabled"] is False
 
-    update = await client.patch("/api/flashcards/settings", json={"new_cards_per_day": 12})
+    update = await client.patch(
+        "/api/flashcards/settings",
+        json={"new_cards_per_day": 12, "advanced_grading_enabled": True},
+    )
     assert update.status_code == 200, update.text
     assert update.json()["new_cards_per_day"] == 12
+    assert update.json()["advanced_grading_enabled"] is True
 
     invalid = await client.patch("/api/flashcards/settings", json={"new_cards_per_day": 2})
     assert invalid.status_code == 422
 
 
 @pytest.mark.asyncio
-async def test_session_builds_daily_plan(client):
-    await register_user(client, "plan@example.com", "Plan User")
-    user_id = await get_user_id("plan@example.com")
-    await seed_entry(user_id=user_id, headword="plan-entry", status=EntryStatus.approved)
-
-    response = await client.get("/api/flashcards/session")
-    assert response.status_code == 200, response.text
-
-    today = datetime.now(UTC).date()
-    async with db_module.AsyncSessionLocal() as session:
-        total = (
-            await session.execute(
-                select(func.count())
-                .select_from(FlashcardDailyPlan)
-                .where(FlashcardDailyPlan.user_id == user_id, FlashcardDailyPlan.plan_date == today)
-            )
-        ).scalar_one()
-    assert total > 0
-
-
-@pytest.mark.asyncio
-async def test_new_cards_do_not_require_progress(client):
-    await register_user(client, "progress-free@example.com", "Progress Free")
-    user_id = await get_user_id("progress-free@example.com")
-    await seed_entry(user_id=user_id, headword="progress-free", status=EntryStatus.approved)
-
-    async with db_module.AsyncSessionLocal() as session:
-        progress_total = (
-            await session.execute(select(func.count()).select_from(FlashcardProgress))
-        ).scalar_one()
-        assert progress_total == 0
-
-    response = await client.get("/api/flashcards/session")
-    assert response.status_code == 200, response.text
-    assert response.json()["current_card"] is not None
-
-    async with db_module.AsyncSessionLocal() as session:
-        progress_total = (
-            await session.execute(select(func.count()).select_from(FlashcardProgress))
-        ).scalar_one()
-        assert progress_total == 0
-
-
-@pytest.mark.asyncio
-async def test_review_logs_update_progress(client):
-    await register_user(client, "review-log@example.com", "Review Log")
-    user_id = await get_user_id("review-log@example.com")
-    entry = await seed_entry(user_id=user_id, headword="log-entry", status=EntryStatus.approved)
-
-    session_response = await client.get("/api/flashcards/session")
-    assert session_response.status_code == 200, session_response.text
-    card = session_response.json()["current_card"]
-
-    review_response = await client.post(
-        "/api/flashcards/review",
-        json={
-            "entry_id": card["entry_id"],
-            "direction": card["direction"],
-            "result": "correct",
-            "response_ms": 1200,
-        },
-    )
-    assert review_response.status_code == 200, review_response.text
-
-    async with db_module.AsyncSessionLocal() as session:
-        log_count = (
-            await session.execute(select(func.count()).select_from(FlashcardReviewLog))
-        ).scalar_one()
-        progress = (
-            await session.execute(
-                select(FlashcardProgress).where(
-                    FlashcardProgress.user_id == user_id,
-                    FlashcardProgress.entry_id == entry.id,
-                )
-            )
-        ).scalar_one()
-
-    assert log_count == 1
-    assert progress.state == FlashcardState.learning
-
-
-@pytest.mark.asyncio
-async def test_correct_transitions_to_review(client):
-    await register_user(client, "correct@example.com", "Correct User")
-    user_id = await get_user_id("correct@example.com")
-    entry = await seed_entry(user_id=user_id, headword="correct-entry", status=EntryStatus.approved)
+async def test_learning_step_reappears_same_day(client):
+    await register_user(client, "learning@example.com", "Learning User")
+    user_id = await get_user_id("learning@example.com")
+    entry = await seed_entry(user_id=user_id, headword="learning-entry")
 
     session_response = await client.get("/api/flashcards/session")
     card = session_response.json()["current_card"]
@@ -252,18 +198,8 @@ async def test_correct_transitions_to_review(client):
         json={
             "entry_id": card["entry_id"],
             "direction": card["direction"],
-            "result": "correct",
-            "response_ms": 500,
-        },
-    )
-
-    await client.post(
-        "/api/flashcards/review",
-        json={
-            "entry_id": card["entry_id"],
-            "direction": card["direction"],
-            "result": "correct",
-            "response_ms": 400,
+            "grade": "again",
+            "response_ms": 300,
         },
     )
 
@@ -273,19 +209,25 @@ async def test_correct_transitions_to_review(client):
                 select(FlashcardProgress).where(
                     FlashcardProgress.user_id == user_id,
                     FlashcardProgress.entry_id == entry.id,
+                    FlashcardProgress.direction == FlashcardDirection.headword_to_gloss,
                 )
             )
         ).scalar_one()
+        progress.due_at = datetime.now(UTC) - timedelta(minutes=1)
+        await session.commit()
 
-    assert progress.state == FlashcardState.review
-    assert progress.interval_days == 1
+    session_response = await client.get("/api/flashcards/session")
+    next_card = session_response.json()["current_card"]
+    assert next_card is not None
+    assert next_card["entry_id"] == str(entry.id)
+    assert next_card["queue"] == "learn"
 
 
 @pytest.mark.asyncio
-async def test_study_more_transitions_to_relearning(client):
-    await register_user(client, "study-more@example.com", "Study More")
-    user_id = await get_user_id("study-more@example.com")
-    entry = await seed_entry(user_id=user_id, headword="study-entry", status=EntryStatus.approved)
+async def test_relearning_step_reappears_same_day(client):
+    await register_user(client, "relearning@example.com", "Relearning User")
+    user_id = await get_user_id("relearning@example.com")
+    entry = await seed_entry(user_id=user_id, headword="relearn-entry")
 
     async with db_module.AsyncSessionLocal() as session:
         session.add(
@@ -293,10 +235,13 @@ async def test_study_more_transitions_to_relearning(client):
                 user_id=user_id,
                 entry_id=entry.id,
                 direction=FlashcardDirection.headword_to_gloss,
-                state=FlashcardState.review,
-                interval_days=8,
-                ease_factor=2.5,
-                due_at=datetime.now(UTC),
+                card_type=FlashcardCardType.review,
+                queue=FlashcardQueue.review,
+                scheduled_days=5,
+                due_at=datetime.now(UTC) - timedelta(minutes=1),
+                memory_stability=5.0,
+                memory_difficulty=5.0,
+                reps=3,
             )
         )
         await session.commit()
@@ -306,7 +251,7 @@ async def test_study_more_transitions_to_relearning(client):
         json={
             "entry_id": str(entry.id),
             "direction": "headword_to_gloss",
-            "result": "study_more",
+            "grade": "again",
             "response_ms": 800,
         },
     )
@@ -322,41 +267,96 @@ async def test_study_more_transitions_to_relearning(client):
                 )
             )
         ).scalar_one()
+        progress.due_at = datetime.now(UTC) - timedelta(minutes=1)
+        await session.commit()
 
-    assert progress.state == FlashcardState.relearning
-    assert progress.ease_factor < 2.5
-    assert progress.interval_days == 4
+    session_response = await client.get("/api/flashcards/session")
+    next_card = session_response.json()["current_card"]
+    assert next_card is not None
+    assert next_card["entry_id"] == str(entry.id)
+    assert next_card["queue"] == "learn"
 
 
 @pytest.mark.asyncio
-async def test_first_time_pair_is_adjacent(client):
+async def test_review_schedules_long_term_interval(client):
+    await register_user(client, "review@example.com", "Review User")
+    user_id = await get_user_id("review@example.com")
+    entry = await seed_entry(user_id=user_id, headword="review-entry")
+
+    async with db_module.AsyncSessionLocal() as session:
+        session.add(
+            FlashcardProgress(
+                user_id=user_id,
+                entry_id=entry.id,
+                direction=FlashcardDirection.headword_to_gloss,
+                card_type=FlashcardCardType.review,
+                queue=FlashcardQueue.review,
+                scheduled_days=3,
+                due_at=datetime.now(UTC) - timedelta(minutes=1),
+                memory_stability=3.0,
+                memory_difficulty=4.0,
+                reps=4,
+            )
+        )
+        await session.commit()
+
+    response = await client.post(
+        "/api/flashcards/review",
+        json={
+            "entry_id": str(entry.id),
+            "direction": "headword_to_gloss",
+            "grade": "good",
+            "response_ms": 500,
+        },
+    )
+    assert response.status_code == 200, response.text
+
+    async with db_module.AsyncSessionLocal() as session:
+        progress = (
+            await session.execute(
+                select(FlashcardProgress).where(
+                    FlashcardProgress.user_id == user_id,
+                    FlashcardProgress.entry_id == entry.id,
+                )
+            )
+        ).scalar_one()
+
+    assert progress.card_type == FlashcardCardType.review
+    assert progress.scheduled_days >= 1
+    assert progress.due_at is not None
+
+
+@pytest.mark.asyncio
+async def test_new_pair_shows_back_to_back(client):
     await register_user(client, "siblings@example.com", "Sibling User")
     user_id = await get_user_id("siblings@example.com")
 
-    entry = await seed_entry(user_id=user_id, headword="alpha", score_cache=10)
+    await seed_entry(user_id=user_id, headword="alpha", score_cache=10)
+    await seed_entry(user_id=user_id, headword="beta", score_cache=9)
 
     async with db_module.AsyncSessionLocal() as session:
         session.add(FlashcardSettings(user_id=user_id, new_cards_per_day=2))
         await session.commit()
 
     response = await client.get("/api/flashcards/session")
-    assert response.status_code == 200, response.text
+    card = response.json()["current_card"]
+    assert card["direction"] == "headword_to_gloss"
 
-    today = datetime.now(UTC).date()
-    async with db_module.AsyncSessionLocal() as session:
-        plan_items = (
-            await session.execute(
-                select(FlashcardDailyPlan)
-                .where(FlashcardDailyPlan.user_id == user_id, FlashcardDailyPlan.plan_date == today)
-                .order_by(FlashcardDailyPlan.position)
-            )
-        ).scalars().all()
+    await client.post(
+        "/api/flashcards/review",
+        json={
+            "entry_id": card["entry_id"],
+            "direction": card["direction"],
+            "grade": "good",
+            "response_ms": 400,
+        },
+    )
 
-    assert len(plan_items) >= 2
-    assert plan_items[0].entry_id == entry.id
-    assert plan_items[1].entry_id == entry.id
-    assert plan_items[0].direction == FlashcardDirection.headword_to_gloss
-    assert plan_items[1].direction == FlashcardDirection.gloss_to_headword
+    response = await client.get("/api/flashcards/session")
+    next_card = response.json()["current_card"]
+    assert next_card is not None
+    assert next_card["entry_id"] == card["entry_id"]
+    assert next_card["direction"] == "gloss_to_headword"
 
 
 @pytest.mark.asyncio
@@ -373,7 +373,7 @@ async def test_progress_persists_across_sessions(client):
         json={
             "entry_id": card["entry_id"],
             "direction": card["direction"],
-            "result": "correct",
+            "grade": "good",
             "response_ms": 300,
         },
     )
@@ -390,59 +390,156 @@ async def test_progress_persists_across_sessions(client):
             )
         ).scalar_one()
 
-    assert progress_count == 1
+    assert progress_count == 2
 
 
 @pytest.mark.asyncio
-async def test_new_popular_entries_show_in_future_plans(client):
+async def test_new_popular_entries_show_in_future_sessions(client):
     await register_user(client, "future@example.com", "Future User")
     user_id = await get_user_id("future@example.com")
 
-    entry_old = await seed_entry(user_id=user_id, headword="old", score_cache=1)
-    await seed_entry(user_id=user_id, headword="mid", score_cache=2)
+    await seed_entry(user_id=user_id, headword="old", score_cache=1)
+    mid = await seed_entry(user_id=user_id, headword="mid", score_cache=2)
 
-    yesterday = datetime.now(UTC).date() - timedelta(days=1)
-    async with db_module.AsyncSessionLocal() as session:
-        session.add(
-            FlashcardDailyPlan(
-                user_id=user_id,
-                plan_date=yesterday,
-                entry_id=entry_old.id,
-                direction=FlashcardDirection.headword_to_gloss,
-                queue_type=FlashcardQueueType.new,
-                position=1,
-            )
-        )
-        session.add(
-            FlashcardProgress(
-                user_id=user_id,
-                entry_id=entry_old.id,
-                direction=FlashcardDirection.headword_to_gloss,
-                state=FlashcardState.review,
-                interval_days=3,
-                due_at=datetime.now(UTC) - timedelta(days=1),
-            )
-        )
-        await session.commit()
+    response = await client.get("/api/flashcards/session")
+    card = response.json()["current_card"]
 
-    entry_new = await seed_entry(user_id=user_id, headword="new", score_cache=99)
+    await client.post(
+        "/api/flashcards/review",
+        json={
+            "entry_id": card["entry_id"],
+            "direction": card["direction"],
+            "grade": "good",
+            "response_ms": 300,
+        },
+    )
+
+    new_entry = await seed_entry(user_id=user_id, headword="new", score_cache=99)
+
+    response = await client.get("/api/flashcards/session")
+    sibling_card = response.json()["current_card"]
+    assert sibling_card is not None
+    assert sibling_card["entry_id"] == card["entry_id"]
+    assert sibling_card["direction"] == "gloss_to_headword"
+
+    await client.post(
+        "/api/flashcards/review",
+        json={
+            "entry_id": sibling_card["entry_id"],
+            "direction": sibling_card["direction"],
+            "grade": "good",
+            "response_ms": 300,
+        },
+    )
 
     response = await client.get("/api/flashcards/session")
     assert response.status_code == 200, response.text
+    next_card = response.json()["current_card"]
+    assert next_card is not None
+    assert next_card["entry_id"] == str(new_entry.id)
 
-    today = datetime.now(UTC).date()
     async with db_module.AsyncSessionLocal() as session:
-        todays_plan = (
-            await session.execute(
-                select(FlashcardDailyPlan)
-                .where(FlashcardDailyPlan.user_id == user_id, FlashcardDailyPlan.plan_date == today)
-            )
-        ).scalars().all()
         progress_exists = (
             await session.execute(
-                select(func.count()).select_from(FlashcardProgress).where(FlashcardProgress.entry_id == entry_old.id)
+                select(func.count()).select_from(FlashcardProgress).where(FlashcardProgress.entry_id == mid.id)
             )
         ).scalar_one()
 
-    assert any(item.entry_id == entry_new.id for item in todays_plan)
-    assert progress_exists == 1
+    assert progress_exists == 0
+
+
+@pytest.mark.asyncio
+async def test_review_logs_capture_grade(client):
+    await register_user(client, "log@example.com", "Review Log")
+    user_id = await get_user_id("log@example.com")
+    entry = await seed_entry(user_id=user_id, headword="log-entry", status=EntryStatus.approved)
+
+    session_response = await client.get("/api/flashcards/session")
+    card = session_response.json()["current_card"]
+
+    await client.post(
+        "/api/flashcards/review",
+        json={
+            "entry_id": card["entry_id"],
+            "direction": card["direction"],
+            "grade": "hard",
+            "response_ms": 1200,
+        },
+    )
+
+    async with db_module.AsyncSessionLocal() as session:
+        log = (
+            await session.execute(select(FlashcardReviewLog).where(FlashcardReviewLog.entry_id == entry.id))
+        ).scalar_one()
+
+    assert log.grade == FlashcardGrade.hard
+
+
+@pytest.mark.asyncio
+async def test_finish_session_records_and_links_reviews(client):
+    await register_user(client, "session@example.com", "Session User")
+    user_id = await get_user_id("session@example.com")
+    entry = await seed_entry(user_id=user_id, headword="session-entry", status=EntryStatus.approved)
+
+    session_response = await client.get("/api/flashcards/session")
+    card = session_response.json()["current_card"]
+
+    await client.post(
+        "/api/flashcards/review",
+        json={
+            "entry_id": card["entry_id"],
+            "direction": card["direction"],
+            "grade": "good",
+            "response_ms": 400,
+        },
+    )
+
+    async with db_module.AsyncSessionLocal() as session:
+        log = (
+            await session.execute(select(FlashcardReviewLog).where(FlashcardReviewLog.entry_id == entry.id))
+        ).scalar_one()
+        assert log.session_id is not None
+
+    finish_response = await client.post("/api/flashcards/finish-session")
+    assert finish_response.status_code == 200, finish_response.text
+
+    async with db_module.AsyncSessionLocal() as session:
+        study_session = (
+            await session.execute(
+                select(FlashcardStudySession).where(
+                    FlashcardStudySession.user_id == user_id,
+                    FlashcardStudySession.ended_at.isnot(None),
+                )
+            )
+        ).scalar_one()
+        assert study_session.ended_at is not None
+
+
+@pytest.mark.asyncio
+async def test_stats_endpoint_returns_today_summary(client):
+    await register_user(client, "stats@example.com", "Stats User")
+    user_id = await get_user_id("stats@example.com")
+    entry = await seed_entry(user_id=user_id, headword="stats-entry", status=EntryStatus.approved)
+
+    session_response = await client.get("/api/flashcards/session")
+    card = session_response.json()["current_card"]
+
+    await client.post(
+        "/api/flashcards/review",
+        json={
+            "entry_id": card["entry_id"],
+            "direction": card["direction"],
+            "grade": "good",
+            "response_ms": 300,
+        },
+    )
+
+    await client.post("/api/flashcards/finish-session")
+
+    stats_response = await client.get("/api/flashcards/stats")
+    assert stats_response.status_code == 200, stats_response.text
+    stats = stats_response.json()
+    assert stats["today"]["reviews"] >= 1
+    assert stats["today"]["new_seen"] >= 1
+    assert stats["today"]["sessions"] >= 1
+    assert len(stats["last_7_days"]) == 7

@@ -1,20 +1,23 @@
 import { apiFetch } from "@/lib/api";
 import type {
+  FlashcardActiveSession,
+  FlashcardStats,
   FlashcardReviewResponse,
   FlashcardSession,
   FlashcardSettings,
   FlashcardDirection,
-  FlashcardReviewResult,
+  FlashcardGrade,
 } from "@/lib/types";
 
 export interface UpdateFlashcardSettingsPayload {
-  new_cards_per_day: number;
+  new_cards_per_day?: number;
+  advanced_grading_enabled?: boolean;
 }
 
 export interface FlashcardReviewPayload {
   entry_id: string;
   direction: FlashcardDirection;
-  result: FlashcardReviewResult;
+  grade: FlashcardGrade;
   response_ms: number | null;
 }
 
@@ -42,4 +45,14 @@ export function submitFlashcardReview(
     method: "POST",
     body: payload,
   });
+}
+
+export function finishFlashcardSession(): Promise<FlashcardActiveSession | null> {
+  return apiFetch<FlashcardActiveSession | null>("/flashcards/finish-session", {
+    method: "POST",
+  });
+}
+
+export function getFlashcardStats(): Promise<FlashcardStats> {
+  return apiFetch<FlashcardStats>("/flashcards/stats");
 }

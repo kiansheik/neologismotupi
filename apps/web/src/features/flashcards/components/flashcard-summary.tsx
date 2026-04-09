@@ -31,6 +31,10 @@ export function FlashcardSummary({ summary }: FlashcardSummaryProps) {
           <p className="text-xs text-ink-muted">{t("flashcards.summary.dueNow")}</p>
           <p className="text-lg font-semibold text-brand-900">{summary.due_now}</p>
         </div>
+        <div>
+          <p className="text-xs text-ink-muted">{t("flashcards.summary.dueLaterToday")}</p>
+          <p className="text-lg font-semibold text-brand-900">{summary.due_later_today}</p>
+        </div>
       </div>
     </Card>
   );

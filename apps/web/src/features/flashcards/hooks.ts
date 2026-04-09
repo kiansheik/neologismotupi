@@ -1,7 +1,9 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
-import type { FlashcardReviewResponse, FlashcardSession } from "@/lib/types";
+import type { FlashcardActiveSession, FlashcardReviewResponse, FlashcardSession } from "@/lib/types";
 import {
+  finishFlashcardSession,
+  getFlashcardStats,
   getFlashcardSession,
   submitFlashcardReview,
   updateFlashcardSettings,
@@ -48,8 +50,37 @@ export function useFlashcardReview() {
           ...session,
           summary: data.summary,
           current_card: data.next_card,
+          active_session: data.active_session,
+        };
+      });
+      queryClient.invalidateQueries({ queryKey: ["flashcards-stats"] });
+    },
+  });
+}
+
+export function useFinishFlashcardSession() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: finishFlashcardSession,
+    onSuccess: (data: FlashcardActiveSession | null) => {
+      queryClient.setQueryData(["flashcards-session"], (prev) => {
+        if (!prev) {
+          return prev;
+        }
+        const session = prev as FlashcardSession;
+        return {
+          ...session,
+          active_session: data,
         };
       });
     },
+  });
+}
+
+export function useFlashcardStats(enabled: boolean) {
+  return useQuery({
+    queryKey: ["flashcards-stats"],
+    queryFn: getFlashcardStats,
+    enabled,
   });
 }
