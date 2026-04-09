@@ -25,7 +25,7 @@ export function EtymologyBuilder({
   onApplyPartOfSpeech,
   onPydicateChange,
 }: EtymologyBuilderProps) {
-  const [isOpen, setIsOpen] = useState(true);
+  const [isOpen, setIsOpen] = useState(false);
   const [mode, setMode] = useState<BuilderMode>("simple");
   const [proPydicate, setProPydicate] = useState("");
   const store = useEtymologyBuilderStore();
@@ -65,21 +65,32 @@ export function EtymologyBuilder({
   }, [mode, proPydicate, store.pydicatePreview]);
 
   return (
-    <div className="rounded-md border border-brand-200 bg-surface/70 p-3">
+    <div
+      className={`rounded-md border border-brand-200 bg-surface/70 ${isOpen ? "p-3" : "p-2"}`}
+    >
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <p className="text-sm font-semibold text-brand-900">Construtor de etimologia (beta)</p>
-          <p className="mt-1 text-xs text-slate-600">
-            Monte a etimologia em etapas e gere uma nota automática sem mudar o envio.
-          </p>
+          {isOpen ? (
+            <p className="mt-1 text-xs text-slate-600">
+              Monte a etimologia em etapas e gere uma nota automática sem mudar o envio.
+            </p>
+          ) : null}
         </div>
-        <Button type="button" variant="secondary" onClick={() => setIsOpen((prev) => !prev)}>
+        <Button
+          type="button"
+          variant="ghost"
+          className="px-3 py-1 text-xs"
+          aria-expanded={isOpen}
+          aria-controls="etymology-builder-panel"
+          onClick={() => setIsOpen((prev) => !prev)}
+        >
           {isOpen ? "Ocultar" : "Expandir"}
         </Button>
       </div>
 
       {!isOpen ? null : (
-        <div className="mt-3 space-y-4">
+        <div id="etymology-builder-panel" className="mt-3 space-y-4">
           <ModeSwitcher mode={mode} onChange={setMode} />
           {mode === "simple" ? (
             <SimplePipelineBuilder
