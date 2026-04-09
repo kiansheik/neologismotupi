@@ -1,7 +1,6 @@
 import { useEffect } from "react";
 import { Link } from "react-router-dom";
 
-import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { useCurrentUser } from "@/features/auth/hooks";
 import { useI18n } from "@/i18n";
@@ -33,9 +32,12 @@ export function GamesPage() {
             <p className="mt-2 text-sm text-ink-muted">{t("games.flashcards.description")}</p>
           </div>
           <div>
-            <Button asChild>
-              <Link to="/games/flashcards">{t("games.flashcards.cta")}</Link>
-            </Button>
+            <Link
+              to="/games/flashcards"
+              className="inline-flex items-center rounded-md bg-accent px-4 py-2 text-sm font-medium text-accent-contrast transition-colors hover:bg-accent-strong"
+            >
+              {t("games.flashcards.cta")}
+            </Link>
           </div>
         </Card>
 

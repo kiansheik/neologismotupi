@@ -191,7 +191,6 @@ Tracked in the frontend:
 - `flashcard_review_submitted`
 - `flashcard_settings_updated`
 - `flashcard_session_completed`
-- `flashcards_continue_today`
 
 **Legacy table note**
 - `flashcard_daily_plan` still exists, but it is not used as the authoritative queue and does not block same-day learning or relearning.

@@ -67,12 +67,18 @@ export function FlashcardsPage() {
           <p className="text-lg font-semibold text-brand-900">{t("flashcards.signInTitle")}</p>
           <p className="mt-2 text-sm text-ink-muted">{t("flashcards.signInBody")}</p>
           <div className="mt-4 flex flex-wrap gap-2">
-            <Button asChild>
-              <Link to="/login">{t("flashcards.signInCtaLogin")}</Link>
-            </Button>
-            <Button asChild variant="secondary">
-              <Link to="/signup">{t("flashcards.signInCtaSignup")}</Link>
-            </Button>
+            <Link
+              to="/login"
+              className="inline-flex items-center rounded-md bg-accent px-4 py-2 text-sm font-medium text-accent-contrast transition-colors hover:bg-accent-strong"
+            >
+              {t("flashcards.signInCtaLogin")}
+            </Link>
+            <Link
+              to="/signup"
+              className="inline-flex items-center rounded-md bg-surface-input px-4 py-2 text-sm font-medium text-brand-800 ring-1 ring-line-strong transition-colors hover:bg-surface-hover"
+            >
+              {t("flashcards.signInCtaSignup")}
+            </Link>
           </div>
         </Card>
       </div>
