@@ -403,7 +403,7 @@ export function EntryBrowser({
                 key={entry.id}
                 className="rounded-md border border-brand-100 p-3"
               >
-                <div className="flex items-center justify-between gap-2">
+                <div className="flex flex-wrap items-center justify-between gap-2">
                   <Link
                     className="font-semibold text-brand-800 hover:underline"
                     to={`/entries/${entry.slug}`}
@@ -419,7 +419,10 @@ export function EntryBrowser({
                   >
                     {apply(entry.headword)}
                   </Link>
-                  <StatusBadge status={entry.status} />
+                  <div className="flex items-center gap-2">
+                    <StatusBadge status={entry.status} />
+                    <EntryListPicker entryId={entry.id} />
+                  </div>
                 </div>
                 {shouldShowGloss ? (
                   <p className="mt-1 text-sm font-medium text-slate-900">
@@ -430,7 +433,6 @@ export function EntryBrowser({
                   {entryDefinitionPreview(entry.short_definition)}
                 </p>
                 <div className="mt-2 flex flex-wrap items-center gap-2">
-                  <EntryListPicker entryId={entry.id} />
                   <Button
                     type="button"
                     variant="secondary"

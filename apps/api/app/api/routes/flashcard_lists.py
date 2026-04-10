@@ -7,7 +7,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.deps import SessionDep, get_current_user, get_current_user_optional
 from app.core.errors import raise_api_error
-from app.core.enums import EntryStatus
 from app.models.entry import Entry
 from app.models.flashcards import (
     FlashcardList,
@@ -29,7 +28,6 @@ from app.schemas.flashcard_lists import (
     FlashcardListUpdate,
     FlashcardListVoteOut,
 )
-from app.services.flashcards import _entry_card_exists
 from app.services.serializers import serialize_entry_summary
 from app.services.user_badges import get_user_badge_leaders, resolve_user_badges
 
@@ -396,7 +394,7 @@ async def add_flashcard_list_item(
         raise_api_error(status_code=403, code="forbidden", message="List owner required")
 
     entry = (await db.execute(select(Entry).where(Entry.id == payload.entry_id))).scalar_one_or_none()
-    if not entry or entry.status != EntryStatus.approved or not _entry_card_exists(entry):
+    if not entry:
         raise_api_error(status_code=404, code="entry_not_found", message="Entry not found")
 
     existing = (
