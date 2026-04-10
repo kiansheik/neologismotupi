@@ -51,8 +51,6 @@ const {
     comments: [],
   }),
   authState: { currentUser: undefined as unknown },
-  updateCommentMock: vi.fn(),
-  listCommentVersionsMock: vi.fn(),
 }));
 
 vi.mock("@/features/entries/api", () => ({
