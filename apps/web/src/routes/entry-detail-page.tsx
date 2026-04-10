@@ -874,6 +874,7 @@ export function EntryDetailPage() {
       queryClient.invalidateQueries({ queryKey: ["entry", slug] });
       queryClient.invalidateQueries({ queryKey: ["entries"] });
       queryClient.invalidateQueries({ queryKey: ["notifications"] });
+      queryClient.invalidateQueries({ queryKey: ["notifications", "unread"] });
     },
     onError: (error) => {
       trackEvent("comment_submit_failed", {

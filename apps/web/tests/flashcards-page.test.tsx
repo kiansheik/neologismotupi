@@ -38,6 +38,11 @@ vi.mock("@/features/flashcards/api", () => ({
   getFlashcardLeaderboard: getFlashcardLeaderboardMock,
 }));
 
+vi.mock("@/features/flashcard-lists/hooks", () => ({
+  useFlashcardLists: () => ({ data: { items: [] }, isLoading: false }),
+  useFlashcardListDetail: () => ({ data: null, isLoading: false }),
+}));
+
 describe("FlashcardsPage", () => {
   beforeEach(() => {
     getFlashcardSessionMock.mockResolvedValue({

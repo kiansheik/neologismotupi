@@ -1,6 +1,6 @@
 import { useSyncExternalStore } from "react";
 
-type VoteType = "entry" | "example" | "audio" | "comment";
+type VoteType = "entry" | "example" | "audio" | "comment" | "list";
 type VoteValue = -1 | 1;
 
 interface VoteRecord {

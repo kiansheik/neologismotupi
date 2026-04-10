@@ -1,12 +1,14 @@
+import uuid
 from typing import Annotated
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy import select
 
 from app.core.deps import SessionDep, get_current_user
 from app.core.enums import EntryStatus
 from app.core.errors import raise_api_error
 from app.models.entry import Entry
+from app.models.flashcards import FlashcardList
 from app.models.user import User
 from app.schemas.flashcards import (
     FlashcardActiveSessionOut,
@@ -79,8 +81,15 @@ async def update_flashcard_settings(
 async def get_flashcard_session(
     db: SessionDep,
     user: Annotated[User, Depends(get_current_user)],
+    list_id: uuid.UUID | None = Query(default=None),
 ) -> FlashcardSessionOut:
-    settings, summary, card, active_session = await build_flashcard_session(db, user.id)
+    if list_id:
+        list_row = (
+            await db.execute(select(FlashcardList).where(FlashcardList.id == list_id))
+        ).scalar_one_or_none()
+        if not list_row or (not list_row.is_public and list_row.owner_user_id != user.id):
+            raise_api_error(status_code=404, code="flashcard_list_not_found", message="List not found")
+    settings, summary, card, active_session = await build_flashcard_session(db, user.id, list_id=list_id)
     return FlashcardSessionOut(
         settings=FlashcardSettingsOut.model_validate(settings),
         summary=FlashcardSessionSummary(
@@ -107,6 +116,13 @@ async def review_flashcard(
     if not entry or not _entry_has_card_fields(entry):
         raise_api_error(status_code=404, code="flashcard_not_found", message="Card not available")
 
+    if payload.list_id:
+        list_row = (
+            await db.execute(select(FlashcardList).where(FlashcardList.id == payload.list_id))
+        ).scalar_one_or_none()
+        if not list_row or (not list_row.is_public and list_row.owner_user_id != user.id):
+            raise_api_error(status_code=404, code="flashcard_list_not_found", message="List not found")
+
     progress = await apply_flashcard_review(
         db,
         user_id=user.id,
@@ -119,7 +135,9 @@ async def review_flashcard(
     await db.commit()
     await db.refresh(progress)
 
-    settings, summary, card, active_session = await build_flashcard_session(db, user.id)
+    settings, summary, card, active_session = await build_flashcard_session(
+        db, user.id, list_id=payload.list_id
+    )
     return FlashcardReviewResponse(
         summary=FlashcardSessionSummary(
             new_remaining=summary.new_remaining,

@@ -207,6 +207,66 @@ class FlashcardDailyPlan(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
 
+class FlashcardList(Base, UUIDPrimaryKeyMixin, TimestampMixin):
+    __tablename__ = "flashcard_list"
+
+    owner_user_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    title_pt: Mapped[str] = mapped_column(String(140), nullable=False)
+    title_en: Mapped[str | None] = mapped_column(String(140), nullable=True)
+    description_pt: Mapped[str | None] = mapped_column(Text, nullable=True)
+    description_en: Mapped[str | None] = mapped_column(Text, nullable=True)
+    theme_label: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    is_public: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    score_cache: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    upvote_count_cache: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    downvote_count_cache: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    item_count_cache: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+
+
+class FlashcardListItem(Base, UUIDPrimaryKeyMixin, TimestampMixin):
+    __tablename__ = "flashcard_list_item"
+    __table_args__ = (
+        UniqueConstraint("list_id", "entry_id", name="uq_flashcard_list_item_list_entry"),
+    )
+
+    list_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid, ForeignKey("flashcard_list.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    entry_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid, ForeignKey("entries.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    position: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+
+
+class FlashcardListVote(Base, UUIDPrimaryKeyMixin, TimestampMixin):
+    __tablename__ = "flashcard_list_vote"
+    __table_args__ = (
+        UniqueConstraint("list_id", "user_id", name="uq_flashcard_list_vote_user_list"),
+    )
+
+    list_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid, ForeignKey("flashcard_list.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    value: Mapped[int] = mapped_column(Integer, nullable=False)
+
+
+class FlashcardListComment(Base, UUIDPrimaryKeyMixin, TimestampMixin):
+    __tablename__ = "flashcard_list_comment"
+
+    list_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid, ForeignKey("flashcard_list.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    body: Mapped[str] = mapped_column(Text, nullable=False)
+
+
 class FlashcardReminder(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     __tablename__ = "flashcard_reminders"
     __table_args__ = (

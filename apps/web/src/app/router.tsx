@@ -6,10 +6,13 @@ import { EntriesPage } from "@/routes/entries-page";
 import { EntryDetailPage } from "@/routes/entry-detail-page";
 import { ExamplesPage } from "@/routes/examples-page";
 import { FlashcardsPage } from "@/routes/flashcards-page";
+import { FlashcardListDetailPage } from "@/routes/flashcard-list-detail-page";
+import { FlashcardListsPage } from "@/routes/flashcard-lists-page";
 import { GamesPage } from "@/routes/games-page";
 import { LoginPage } from "@/routes/login-page";
 import { MePage } from "@/routes/me-page";
 import { ModerationPage } from "@/routes/moderation-page";
+import { NotificationsPage } from "@/routes/notifications-page";
 import { ProfilePage } from "@/routes/profile-page";
 import { RecoverAccountPage } from "@/routes/recover-account-page";
 import { ResetPasswordPage } from "@/routes/reset-password-page";
@@ -30,6 +33,8 @@ export const router = createBrowserRouter([
       { path: "about", element: <AboutPage /> },
       { path: "games", element: <GamesPage /> },
       { path: "games/flashcards", element: <FlashcardsPage /> },
+      { path: "lists", element: <FlashcardListsPage /> },
+      { path: "lists/:listId", element: <FlashcardListDetailPage /> },
       { path: "entries/:slug", element: <EntryDetailPage /> },
       { path: "sources/:workId", element: <SourceDetailPage /> },
       { path: "profiles/:userId", element: <ProfilePage /> },
@@ -40,6 +45,7 @@ export const router = createBrowserRouter([
       { path: "verify-email", element: <VerifyEmailPage /> },
       { path: "reset-password", element: <ResetPasswordPage /> },
       { path: "unsubscribe", element: <UnsubscribePage /> },
+      { path: "notifications", element: <NotificationsPage /> },
       { path: "me", element: <MePage /> },
       { path: "moderation", element: <ModerationPage /> },
     ],

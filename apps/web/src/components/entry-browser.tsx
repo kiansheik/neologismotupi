@@ -19,6 +19,7 @@ import { getLocalizedApiErrorMessage } from "@/lib/localized-api-error";
 import { entryDefinitionPreview } from "@/lib/entry-definition";
 import { useOrthography } from "@/lib/orthography";
 import { getCachedVote, resolveVote, setCachedVote, useVoteMemoryVersion } from "@/lib/vote-memory";
+import { EntryListPicker } from "@/features/flashcard-lists/components/entry-list-picker";
 
 type EntrySort = "alphabetical" | "recent" | "score" | "most_examples" | "unseen";
 
@@ -402,7 +403,7 @@ export function EntryBrowser({
                 key={entry.id}
                 className="rounded-md border border-brand-100 p-3"
               >
-                <div className="flex items-center justify-between gap-2">
+                <div className="flex flex-wrap items-center justify-between gap-2">
                   <Link
                     className="font-semibold text-brand-800 hover:underline"
                     to={`/entries/${entry.slug}`}
@@ -418,7 +419,10 @@ export function EntryBrowser({
                   >
                     {apply(entry.headword)}
                   </Link>
-                  <StatusBadge status={entry.status} />
+                  <div className="flex items-center gap-2">
+                    <StatusBadge status={entry.status} />
+                    <EntryListPicker entryId={entry.id} />
+                  </div>
                 </div>
                 {shouldShowGloss ? (
                   <p className="mt-1 text-sm font-medium text-slate-900">

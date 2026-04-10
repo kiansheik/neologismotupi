@@ -16,6 +16,7 @@ from app.api.routes import (
     comment_router,
     entries_router,
     example_router,
+    flashcard_lists_router,
     flashcards_router,
     meta_router,
     moderation_router,
@@ -89,6 +90,7 @@ def create_app() -> FastAPI:
     app.include_router(example_router, prefix="/api")
     app.include_router(comment_router, prefix="/api")
     app.include_router(flashcards_router, prefix="/api")
+    app.include_router(flashcard_lists_router, prefix="/api")
     app.include_router(moderation_router, prefix="/api")
     app.include_router(newsletters_router, prefix="/api")
     app.include_router(meta_router, prefix="/api")

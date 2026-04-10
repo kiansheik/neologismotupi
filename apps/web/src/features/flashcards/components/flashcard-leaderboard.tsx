@@ -24,6 +24,9 @@ export function FlashcardLeaderboard({ enabled }: FlashcardLeaderboardProps) {
               <th className="pb-1 pr-2 font-medium">{t("flashcards.leaderboard.rank")}</th>
               <th className="pb-1 pr-2 font-medium">{t("flashcards.leaderboard.name")}</th>
               <th className="pb-1 pr-2 text-right font-medium">
+                {t("flashcards.leaderboard.today")}
+              </th>
+              <th className="pb-1 pr-2 text-right font-medium">
                 {t("flashcards.leaderboard.thisWeek")}
               </th>
               <th className="pb-1 text-right font-medium">
@@ -36,6 +39,7 @@ export function FlashcardLeaderboard({ enabled }: FlashcardLeaderboardProps) {
               <tr key={entry.rank} className="border-t border-line-soft">
                 <td className="py-1.5 pr-2 text-xs text-ink-muted">{entry.rank}</td>
                 <td className="py-1.5 pr-2 font-medium text-brand-900">{entry.display_name}</td>
+                <td className="py-1.5 pr-2 text-right text-brand-800">{entry.reviews_today}</td>
                 <td className="py-1.5 pr-2 text-right text-brand-800">{entry.reviews_this_week}</td>
                 <td className="py-1.5 text-right text-ink-muted">{entry.total_reviews}</td>
               </tr>

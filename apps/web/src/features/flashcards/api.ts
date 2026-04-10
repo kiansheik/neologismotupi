@@ -21,6 +21,7 @@ export interface FlashcardReviewPayload {
   grade: FlashcardGrade;
   response_ms: number | null;
   user_response?: string;
+  list_id?: string | null;
 }
 
 export interface FinishFlashcardSessionPayload {
@@ -46,8 +47,9 @@ export function updateFlashcardSettings(
   });
 }
 
-export function getFlashcardSession(): Promise<FlashcardSession> {
-  return apiFetch<FlashcardSession>("/flashcards/session");
+export function getFlashcardSession(listId?: string | null): Promise<FlashcardSession> {
+  const query = listId ? `?list_id=${encodeURIComponent(listId)}` : "";
+  return apiFetch<FlashcardSession>(`/flashcards/session${query}`);
 }
 
 export function submitFlashcardReview(

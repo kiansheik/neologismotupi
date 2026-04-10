@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -8,6 +8,8 @@ import { FlashcardLeaderboard } from "@/features/flashcards/components/flashcard
 import { FlashcardSession } from "@/features/flashcards/components/flashcard-session";
 import { FlashcardStatsPanel } from "@/features/flashcards/components/flashcard-stats";
 import { FlashcardSummary } from "@/features/flashcards/components/flashcard-summary";
+import { useFlashcardListDetail, useFlashcardLists } from "@/features/flashcard-lists/hooks";
+import { resolveFlashcardListTitle } from "@/features/flashcard-lists/lib";
 import {
   useFinishFlashcardSession,
   useFlashcardReview,
@@ -19,11 +21,15 @@ import { useI18n } from "@/i18n";
 import { trackEvent } from "@/lib/analytics";
 
 export function FlashcardsPage() {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const { data: user, isLoading: userLoading } = useCurrentUser();
-  const sessionQuery = useFlashcardSession(Boolean(user));
+  const [searchParams, setSearchParams] = useSearchParams();
+  const listId = searchParams.get("list_id");
+  const sessionQuery = useFlashcardSession(Boolean(user), listId);
+  const listsQuery = useFlashcardLists({ owner_id: "me", page_size: 50 }, Boolean(user));
+  const selectedListQuery = useFlashcardListDetail(listId, Boolean(listId));
   const statsQuery = useFlashcardStats(Boolean(user));
-  const reviewMutation = useFlashcardReview();
+  const reviewMutation = useFlashcardReview(listId);
   const finishSessionMutation = useFinishFlashcardSession();
   const presenceMutation = useFlashcardPresence();
   const completionTracked = useRef(false);
@@ -36,6 +42,8 @@ export function FlashcardsPage() {
   const activeSession = session?.active_session ?? null;
   const isPaused = Boolean(activeSession?.is_paused);
   const stats = statsQuery.data;
+  const listItems = listsQuery.data?.items ?? [];
+  const selectedList = selectedListQuery.data?.list ?? null;
 
   useEffect(() => {
     trackEvent("flashcards_page_view");
@@ -125,6 +133,42 @@ export function FlashcardsPage() {
       <Card>
         <h1 className="text-2xl font-semibold text-brand-900">{t("flashcards.title")}</h1>
         <p className="mt-2 text-sm text-ink-muted">{t("flashcards.subtitle")}</p>
+        <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-ink-muted">
+          <span className="font-medium text-ink">{t("flashcards.listLabel")}</span>
+          <select
+            className="rounded-md border border-line-strong bg-surface-input px-2 py-1 text-xs text-ink"
+            value={listId ?? ""}
+            onChange={(event) => {
+              const next = event.target.value;
+              const nextParams = new URLSearchParams(searchParams);
+              if (!next) {
+                nextParams.delete("list_id");
+              } else {
+                nextParams.set("list_id", next);
+              }
+              setSearchParams(nextParams);
+              sessionEnded.current = false;
+            }}
+          >
+            <option value="">{t("flashcards.listAll")}</option>
+            {listItems.map((list) => (
+              <option key={list.id} value={list.id}>
+                {resolveFlashcardListTitle(list, locale)}
+              </option>
+            ))}
+            {listId && !listItems.find((list) => list.id === listId) && selectedList ? (
+              <option value={listId}>{resolveFlashcardListTitle(selectedList, locale)}</option>
+            ) : null}
+          </select>
+          {listId && selectedList ? (
+            <Link
+              to={`/lists/${listId}`}
+              className="text-brand-700 hover:underline"
+            >
+              {t("flashcards.viewList")}
+            </Link>
+          ) : null}
+        </div>
       </Card>
 
       <div className="grid gap-4 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">

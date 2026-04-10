@@ -27,6 +27,7 @@ from app.models.audio import AudioSample
 from app.models.entry import Entry
 from app.models.user import Profile, User
 from app.models.flashcards import (
+    FlashcardListItem,
     FlashcardProgress,
     FlashcardReminder,
     FlashcardReviewLog,
@@ -261,13 +262,19 @@ async def _load_progress_map(
 
 
 async def _load_reviewed_cards_today(
-    db: AsyncSession, user_id: uuid.UUID, start: datetime, end: datetime
+    db: AsyncSession, user_id: uuid.UUID, start: datetime, end: datetime, list_id: uuid.UUID | None
 ) -> set[tuple[uuid.UUID, FlashcardDirection]]:
     stmt = select(FlashcardReviewLog.entry_id, FlashcardReviewLog.direction).where(
         FlashcardReviewLog.user_id == user_id,
         FlashcardReviewLog.reviewed_at >= start,
         FlashcardReviewLog.reviewed_at < end,
     )
+    if list_id:
+        stmt = stmt.where(
+            FlashcardReviewLog.entry_id.in_(
+                select(FlashcardListItem.entry_id).where(FlashcardListItem.list_id == list_id)
+            )
+        )
     rows = (await db.execute(stmt)).all()
     return {(entry_id, direction) for entry_id, direction in rows}
 
@@ -474,6 +481,7 @@ async def _select_pending_sibling(
     db: AsyncSession,
     user_id: uuid.UUID,
     now: datetime,
+    list_id: uuid.UUID | None,
 ) -> FlashcardProgress | None:
     primary = aliased(FlashcardProgress)
     sibling = aliased(FlashcardProgress)
@@ -498,6 +506,12 @@ async def _select_pending_sibling(
         .order_by(sibling.last_review_at.desc().nullslast(), sibling.updated_at.desc())
         .limit(1)
     )
+    if list_id:
+        stmt = stmt.where(
+            primary.entry_id.in_(
+                select(FlashcardListItem.entry_id).where(FlashcardListItem.list_id == list_id)
+            )
+        )
     pending = (await db.execute(stmt)).scalars().first()
     if pending:
         return pending
@@ -526,6 +540,12 @@ async def _select_pending_sibling(
         )
         .limit(1)
     )
+    if list_id:
+        orphan_stmt = orphan_stmt.where(
+            orphan_primary.entry_id.in_(
+                select(FlashcardListItem.entry_id).where(FlashcardListItem.list_id == list_id)
+            )
+        )
     orphan = (await db.execute(orphan_stmt)).scalars().first()
     if orphan:
         return await _ensure_sibling_progress(
@@ -561,6 +581,12 @@ async def _select_pending_sibling(
         )
         .limit(1)
     )
+    if list_id:
+        reverse_stmt = reverse_stmt.where(
+            orphan_primary.entry_id.in_(
+                select(FlashcardListItem.entry_id).where(FlashcardListItem.list_id == list_id)
+            )
+        )
     orphan = (await db.execute(reverse_stmt)).scalars().first()
     if orphan:
         return await _ensure_sibling_progress(
@@ -648,7 +674,7 @@ def _review_limit_remaining(max_reviews: int | None, reviews_done_today: int) ->
 
 
 async def _count_reviews_today(
-    db: AsyncSession, user_id: uuid.UUID, start: datetime, end: datetime
+    db: AsyncSession, user_id: uuid.UUID, start: datetime, end: datetime, list_id: uuid.UUID | None
 ) -> int:
     stmt = (
         select(func.count())
@@ -659,11 +685,17 @@ async def _count_reviews_today(
             FlashcardReviewLog.reviewed_at < end,
         )
     )
+    if list_id:
+        stmt = stmt.where(
+            FlashcardReviewLog.entry_id.in_(
+                select(FlashcardListItem.entry_id).where(FlashcardListItem.list_id == list_id)
+            )
+        )
     return int((await db.execute(stmt)).scalar_one())
 
 
 async def _count_review_queue_today(
-    db: AsyncSession, user_id: uuid.UUID, start: datetime, end: datetime
+    db: AsyncSession, user_id: uuid.UUID, start: datetime, end: datetime, list_id: uuid.UUID | None
 ) -> int:
     stmt = (
         select(func.count())
@@ -675,6 +707,12 @@ async def _count_review_queue_today(
             FlashcardReviewLog.card_type_before == FlashcardCardType.review,
         )
     )
+    if list_id:
+        stmt = stmt.where(
+            FlashcardReviewLog.entry_id.in_(
+                select(FlashcardListItem.entry_id).where(FlashcardListItem.list_id == list_id)
+            )
+        )
     return int((await db.execute(stmt)).scalar_one())
 
 
@@ -686,6 +724,7 @@ async def _select_due_progress(
     reviewed_cards_today: set[tuple[uuid.UUID, FlashcardDirection]],
     *,
     bury_siblings: bool,
+    list_id: uuid.UUID | None = None,
     limit: int | None = None,
 ) -> list[FlashcardProgress]:
     stmt = (
@@ -700,6 +739,12 @@ async def _select_due_progress(
         )
         .order_by(FlashcardProgress.due_at.asc(), FlashcardProgress.updated_at.asc())
     )
+    if list_id:
+        stmt = stmt.where(
+            FlashcardProgress.entry_id.in_(
+                select(FlashcardListItem.entry_id).where(FlashcardListItem.list_id == list_id)
+            )
+        )
     if limit is not None:
         stmt = stmt.limit(limit)
     rows = list((await db.execute(stmt)).scalars().all())
@@ -720,6 +765,7 @@ async def _count_due_later_today(
     reviewed_cards_today: set[tuple[uuid.UUID, FlashcardDirection]],
     *,
     bury_siblings: bool,
+    list_id: uuid.UUID | None = None,
 ) -> int:
     stmt = (
         select(FlashcardProgress)
@@ -735,6 +781,12 @@ async def _count_due_later_today(
             _entry_card_filters(),
         )
     )
+    if list_id:
+        stmt = stmt.where(
+            FlashcardProgress.entry_id.in_(
+                select(FlashcardListItem.entry_id).where(FlashcardListItem.list_id == list_id)
+            )
+        )
     rows = list((await db.execute(stmt)).scalars().all())
     if not bury_siblings:
         return len(rows)
@@ -750,33 +802,61 @@ async def _select_new_candidates(
     user_id: uuid.UUID,
     limit: int,
     reviewed_cards_today: set[tuple[uuid.UUID, FlashcardDirection]],
+    list_id: uuid.UUID | None = None,
 ) -> tuple[list[PlannedCard], int]:
     limit = max(0, limit)
     progress_map = await _load_progress_map(db, user_id)
     reviewed_entry_ids = {entry_id for entry_id, _ in reviewed_cards_today}
 
-    stmt = (
-        select(Entry)
-        .where(_entry_card_filters())
-        .order_by(
-            Entry.score_cache.desc(),
-            Entry.example_count_cache.desc(),
-            Entry.created_at.asc(),
-            Entry.id.asc(),
+    if list_id:
+        stmt = (
+            select(Entry)
+            .join(FlashcardListItem, FlashcardListItem.entry_id == Entry.id)
+            .where(FlashcardListItem.list_id == list_id, _entry_card_filters())
+            .order_by(
+                FlashcardListItem.position.asc(),
+                FlashcardListItem.created_at.asc(),
+                Entry.created_at.asc(),
+                Entry.id.asc(),
+            )
+            .limit(NEW_CARD_SCAN_LIMIT)
         )
-        .limit(NEW_CARD_SCAN_LIMIT)
-    )
+    else:
+        stmt = (
+            select(Entry)
+            .where(_entry_card_filters())
+            .order_by(
+                Entry.score_cache.desc(),
+                Entry.example_count_cache.desc(),
+                Entry.created_at.asc(),
+                Entry.id.asc(),
+            )
+            .limit(NEW_CARD_SCAN_LIMIT)
+        )
     entries = list((await db.execute(stmt)).scalars().all())
 
     planned: list[PlannedCard] = []
     eligible_total = 0
+    if list_id:
+        eligible_stmt = (
+            select(func.count())
+            .select_from(FlashcardListItem)
+            .join(Entry, Entry.id == FlashcardListItem.entry_id)
+            .where(FlashcardListItem.list_id == list_id, _entry_card_filters())
+        )
+        if reviewed_entry_ids:
+            eligible_stmt = eligible_stmt.where(~Entry.id.in_(reviewed_entry_ids))
+        if progress_map:
+            eligible_stmt = eligible_stmt.where(~Entry.id.in_(list(progress_map.keys())))
+        eligible_total = int((await db.execute(eligible_stmt)).scalar_one())
 
     for entry in entries:
         if entry.id in reviewed_entry_ids:
             continue
         if entry.id in progress_map:
             continue
-        eligible_total += 1
+        if not list_id:
+            eligible_total += 1
         if len(planned) >= limit:
             continue
         planned.append(
@@ -842,6 +922,7 @@ def _entry_card_exists(entry: Entry) -> bool:
 async def build_flashcard_session(
     db: AsyncSession,
     user_id: uuid.UUID,
+    list_id: uuid.UUID | None = None,
 ) -> tuple[
     FlashcardSettings,
     FlashcardSummary,
@@ -857,13 +938,13 @@ async def build_flashcard_session(
         db, await _get_active_session(db, user_id), now
     )
 
-    reviewed_cards_today = await _load_reviewed_cards_today(db, user_id, day_start, day_end)
-    completed_today = await _count_reviews_today(db, user_id, day_start, day_end)
-    reviews_done_today = await _count_review_queue_today(db, user_id, day_start, day_end)
+    reviewed_cards_today = await _load_reviewed_cards_today(db, user_id, day_start, day_end, list_id)
+    completed_today = await _count_reviews_today(db, user_id, day_start, day_end, list_id)
+    reviews_done_today = await _count_review_queue_today(db, user_id, day_start, day_end, list_id)
 
     review_limit_remaining = _review_limit_remaining(settings.max_reviews_per_day, reviews_done_today)
 
-    pending_sibling = await _select_pending_sibling(db, user_id, now)
+    pending_sibling = await _select_pending_sibling(db, user_id, now, list_id)
     due_learning = await _select_due_progress(
         db,
         user_id,
@@ -871,6 +952,7 @@ async def build_flashcard_session(
         [FlashcardCardType.learn, FlashcardCardType.relearn],
         reviewed_cards_today,
         bury_siblings=settings.bury_siblings,
+        list_id=list_id,
     )
     due_review = await _select_due_progress(
         db,
@@ -879,12 +961,13 @@ async def build_flashcard_session(
         [FlashcardCardType.review],
         reviewed_cards_today,
         bury_siblings=settings.bury_siblings,
+        list_id=list_id,
         limit=review_limit_remaining,
     )
     review_remaining = len(due_learning) + len(due_review)
 
     new_candidates, eligible_total = await _select_new_candidates(
-        db, user_id, NEW_CARD_SCAN_LIMIT, reviewed_cards_today
+        db, user_id, NEW_CARD_SCAN_LIMIT, reviewed_cards_today, list_id
     )
     new_remaining = eligible_total
 
@@ -895,6 +978,7 @@ async def build_flashcard_session(
         day_end,
         reviewed_cards_today,
         bury_siblings=settings.bury_siblings,
+        list_id=list_id,
     )
 
     due_now = review_remaining + new_remaining + (1 if pending_sibling else 0)
@@ -1340,29 +1424,59 @@ async def get_flashcard_stats(
 class FlashcardLeaderboardData:
     rank: int
     display_name: str
+    reviews_today: int
     reviews_this_week: int
     total_reviews: int
 
 
 async def get_flashcard_leaderboard(db: AsyncSession, limit: int = 20) -> list[FlashcardLeaderboardData]:
     now = utc_now()
+    today_start, today_end = _day_bounds(now.date())
     week_ago = now - timedelta(days=7)
 
-    reviews_this_week_expr = func.count(
-        case((FlashcardReviewLog.reviewed_at >= week_ago, FlashcardReviewLog.id))
+    reviews_subq = (
+        select(
+            FlashcardReviewLog.user_id.label("user_id"),
+            func.count(FlashcardReviewLog.id).label("total_reviews"),
+            func.count(
+                case((FlashcardReviewLog.reviewed_at >= week_ago, FlashcardReviewLog.id))
+            ).label("reviews_this_week"),
+        )
+        .group_by(FlashcardReviewLog.user_id)
+        .subquery()
     )
-    total_reviews_expr = func.count(FlashcardReviewLog.id)
+
+    completed_today_subq = (
+        select(
+            FlashcardProgress.user_id.label("user_id"),
+            func.count(FlashcardProgress.id).label("reviews_today"),
+        )
+        .where(
+            FlashcardProgress.last_review_at.isnot(None),
+            FlashcardProgress.last_review_at >= today_start,
+            FlashcardProgress.last_review_at < today_end,
+            FlashcardProgress.due_at.isnot(None),
+            FlashcardProgress.due_at >= today_end,
+        )
+        .group_by(FlashcardProgress.user_id)
+        .subquery()
+    )
 
     rows = (
         await db.execute(
             select(
                 Profile.display_name,
-                total_reviews_expr.label("total_reviews"),
-                reviews_this_week_expr.label("reviews_this_week"),
+                reviews_subq.c.total_reviews,
+                reviews_subq.c.reviews_this_week,
+                func.coalesce(completed_today_subq.c.reviews_today, 0).label("reviews_today"),
             )
-            .join(Profile, Profile.user_id == FlashcardReviewLog.user_id)
-            .group_by(Profile.user_id, Profile.display_name)
-            .order_by(reviews_this_week_expr.desc(), total_reviews_expr.desc())
+            .join(Profile, Profile.user_id == reviews_subq.c.user_id)
+            .outerjoin(completed_today_subq, completed_today_subq.c.user_id == reviews_subq.c.user_id)
+            .order_by(
+                func.coalesce(completed_today_subq.c.reviews_today, 0).desc(),
+                reviews_subq.c.reviews_this_week.desc(),
+                reviews_subq.c.total_reviews.desc(),
+            )
             .limit(limit)
         )
     ).all()
@@ -1371,6 +1485,7 @@ async def get_flashcard_leaderboard(db: AsyncSession, limit: int = 20) -> list[F
         FlashcardLeaderboardData(
             rank=i + 1,
             display_name=row.display_name,
+            reviews_today=row.reviews_today,
             total_reviews=row.total_reviews,
             reviews_this_week=row.reviews_this_week,
         )

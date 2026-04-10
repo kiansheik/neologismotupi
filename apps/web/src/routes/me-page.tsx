@@ -4,7 +4,6 @@ import { Link } from "react-router-dom";
 
 import { EntryBrowser } from "@/components/entry-browser";
 import { OrthographyMappingCard } from "@/components/orthography-mapping-card";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
@@ -17,19 +16,11 @@ import {
   NEWSLETTER_WORD_OF_DAY,
   updateMyNewsletter,
 } from "@/features/newsletters/api";
-import {
-  getNotificationPreferences,
-  listNotifications,
-  markAllNotificationsRead,
-  markNotificationRead,
-  updateNotificationPreferences,
-} from "@/features/notifications/api";
+import { getNotificationPreferences, updateNotificationPreferences } from "@/features/notifications/api";
 import { updateMyProfile } from "@/features/users/api";
 import { useI18n } from "@/i18n";
-import { formatRelativeOrDate } from "@/i18n/formatters";
 import { ApiError } from "@/lib/api";
 import { getLocalizedApiErrorMessage } from "@/lib/localized-api-error";
-import { useOrthography } from "@/lib/orthography";
 import { buildProfileLinks } from "@/lib/profile-links";
 import type { User } from "@/lib/types";
 
@@ -49,9 +40,8 @@ function profileToForm(profile: User["profile"]) {
 
 export function MePage() {
   const queryClient = useQueryClient();
-  const { locale, t } = useI18n();
+  const { t } = useI18n();
   const { data: currentUser } = useCurrentUser();
-  const { apply } = useOrthography();
   const [profileForm, setProfileForm] = useState(profileToForm(null));
   const [isEditingProfile, setIsEditingProfile] = useState(false);
   const whatsappGroupUrl = (import.meta.env.VITE_WHATSAPP_GROUP_URL as string | undefined)?.trim();
@@ -71,33 +61,12 @@ export function MePage() {
     enabled: Boolean(currentUser),
   });
 
-  const notificationsQuery = useQuery({
-    queryKey: ["notifications"],
-    queryFn: () => listNotifications({ page: 1, page_size: 20 }),
-    enabled: Boolean(currentUser),
-  });
-
   const updatePreferencesMutation = useMutation({
     mutationFn: updateNotificationPreferences,
     onSuccess: async () => {
       await queryClient.invalidateQueries({
         queryKey: ["notification-preferences"],
       });
-    },
-  });
-
-  const markNotificationReadMutation = useMutation({
-    mutationFn: (notificationId: string) =>
-      markNotificationRead(notificationId),
-    onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ["notifications"] });
-    },
-  });
-
-  const markAllReadMutation = useMutation({
-    mutationFn: () => markAllNotificationsRead(),
-    onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ["notifications"] });
     },
   });
 
@@ -141,8 +110,6 @@ export function MePage() {
   const wordOfDaySubscription = newsletterSubscriptions.find(
     (item) => item.newsletter_key === NEWSLETTER_WORD_OF_DAY,
   );
-  const unreadCount = notificationsQuery.data?.unread_count ?? 0;
-  const notifications = notificationsQuery.data?.items ?? [];
   const profileLinks = useMemo(
     () => (currentUser?.profile ? buildProfileLinks(currentUser.profile) : []),
     [currentUser?.profile],
@@ -569,86 +536,25 @@ export function MePage() {
       <Card>
         <div className="flex flex-wrap items-center justify-between gap-2">
           <h2 className="text-lg font-semibold text-brand-900">
-            {t("me.notificationsTitle")}
+            {t("notifications.title")}
           </h2>
-          <div className="flex items-center gap-2">
-            <Badge tone={unreadCount > 0 ? "pending" : "neutral"}>
-              {t("me.notificationsUnread", { count: unreadCount })}
-            </Badge>
-            <Button
-              type="button"
-              variant="secondary"
-              onClick={() => markAllReadMutation.mutate()}
-              disabled={markAllReadMutation.isPending || unreadCount === 0}
-            >
-              {t("me.markAllRead")}
-            </Button>
-          </div>
+          <Link
+            to="/notifications"
+            className="text-sm font-medium text-brand-700 hover:underline"
+          >
+            {t("notifications.viewAll")}
+          </Link>
         </div>
-        <div className="mt-3 space-y-2">
-          {notifications.length ? (
-            notifications.map((notification) => (
-              <article
-                key={notification.id}
-                className="rounded-md border border-brand-100 p-3"
-              >
-                <div className="flex flex-wrap items-center gap-2">
-                  <p className="text-sm font-medium text-slate-900">
-                    {notification.title}
-                  </p>
-                  {!notification.is_read ? (
-                    <Badge tone="pending">{t("me.notificationNew")}</Badge>
-                  ) : null}
-                </div>
-                {notification.body ? (
-                  <p className="mt-1 text-sm text-slate-700">
-                    {notification.body}
-                  </p>
-                ) : null}
-                <p className="mt-1 text-xs text-slate-600">
-                  {formatRelativeOrDate(notification.created_at, locale)}
-                </p>
-                <div className="mt-2 flex flex-wrap items-center gap-2">
-                  {notification.entry_url ? (
-                    <Link
-                      className="text-sm text-brand-700 hover:underline"
-                      to={notification.entry_url}
-                    >
-                      {notification.entry_headword
-                        ? apply(notification.entry_headword)
-                        : notification.entry_url}
-                    </Link>
-                  ) : null}
-                  {notification.actor_profile_url &&
-                  notification.actor_display_name ? (
-                    <Link
-                      className="text-sm text-brand-700 hover:underline"
-                      to={notification.actor_profile_url}
-                    >
-                      {notification.actor_display_name}
-                    </Link>
-                  ) : null}
-                  {!notification.is_read ? (
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      className="px-2 py-1"
-                      onClick={() =>
-                        markNotificationReadMutation.mutate(notification.id)
-                      }
-                      disabled={markNotificationReadMutation.isPending}
-                    >
-                      {t("me.markRead")}
-                    </Button>
-                  ) : null}
-                </div>
-              </article>
-            ))
-          ) : (
-            <p className="text-sm text-slate-600">
-              {t("me.notificationsNone")}
-            </p>
-          )}
+        <p className="mt-2 text-sm text-ink-muted">
+          {t("notifications.profileHint")}
+        </p>
+        <div className="mt-3">
+          <Link
+            to="/notifications"
+            className="inline-flex items-center rounded-md bg-surface-input px-4 py-2 text-sm font-medium text-brand-800 ring-1 ring-line-strong transition-colors hover:bg-surface-hover"
+          >
+            {t("notifications.openInbox")}
+          </Link>
         </div>
       </Card>
 

@@ -146,6 +146,21 @@ export function GamesPage() {
           </div>
         </Card>
 
+        <Card className="flex flex-col justify-between gap-4">
+          <div>
+            <p className="text-lg font-semibold text-brand-900">{t("games.lists.title")}</p>
+            <p className="mt-2 text-sm text-ink-muted">{t("games.lists.description")}</p>
+          </div>
+          <div>
+            <Link
+              to="/lists"
+              className="inline-flex items-center rounded-md bg-surface-input px-4 py-2 text-sm font-medium text-brand-800 ring-1 ring-line-strong transition-colors hover:bg-surface-hover"
+            >
+              {t("games.lists.cta")}
+            </Link>
+          </div>
+        </Card>
+
         <Card>
           <p className="text-lg font-semibold text-brand-900">{t("games.comingSoon.title")}</p>
           <p className="mt-2 text-sm text-ink-muted">{t("games.comingSoon.body")}</p>

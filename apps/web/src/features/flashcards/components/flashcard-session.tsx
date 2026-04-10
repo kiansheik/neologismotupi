@@ -8,6 +8,7 @@ import { uploadEntryAudio } from "@/features/audio/api";
 import { useI18n } from "@/i18n";
 import { useOrthography } from "@/lib/orthography";
 import { trackEvent } from "@/lib/analytics";
+import { playSfx } from "@/lib/sfx";
 import type { FlashcardCard, FlashcardGrade } from "@/lib/types";
 
 function normalizeAnswer(s: string): string {
@@ -220,6 +221,7 @@ export function FlashcardSession({
     ratio: number;
     expected: string;
   } | null>(null);
+  const [audioReplayKey, setAudioReplayKey] = useState(0);
   const [shownAt, setShownAt] = useState<number | null>(null);
   const [responseMs, setResponseMs] = useState<number | null>(null);
   const [audioSubmitted, setAudioSubmitted] = useState(false);
@@ -233,6 +235,7 @@ export function FlashcardSession({
       setResponseMs(null);
       setShownAt(null);
       setAudioSubmitted(false);
+      setAudioReplayKey(0);
       return;
     }
     setUserInput("");
@@ -241,6 +244,7 @@ export function FlashcardSession({
     setResponseMs(null);
     setShownAt(Date.now());
     setAudioSubmitted(false);
+    setAudioReplayKey(0);
     setTimeout(() => inputRef.current?.focus(), 50);
   }, [card?.entry_id, card?.direction]);
 
@@ -288,6 +292,10 @@ export function FlashcardSession({
     const result = computeAutoGrade(userInput, expected);
     setGradeResult(result);
     setSubmitted(true);
+    playSfx(result.grade === "good" || result.grade === "easy" ? "correct" : "incorrect");
+    if (card.audio_url) {
+      setAudioReplayKey((prev) => prev + 1);
+    }
     trackEvent("flashcard_reveal", {
       entry_id: card.entry_id,
       direction: card.direction,
@@ -307,24 +315,28 @@ export function FlashcardSession({
     });
   };
 
+  const handleOverride = () => {
+    if (!card) return;
+    playSfx("correct");
+    if (card.audio_url) {
+      setAudioReplayKey((prev) => prev + 1);
+    }
+    onReview("good", responseMs, userInput);
+    trackEvent("flashcard_review_overridden", {
+      entry_id: card.entry_id,
+      direction: card.direction,
+      queue: card.queue,
+      grade: "good",
+      response_ms: responseMs ?? undefined,
+    });
+  };
+
   useEffect(() => {
     if (!submitted || !gradeResult) {
       return;
     }
 
     const canOverride = gradeResult.grade !== "good" && gradeResult.grade !== "easy";
-
-    const handleOverride = () => {
-      if (!card) return;
-      onReview("good", responseMs, userInput);
-      trackEvent("flashcard_review_overridden", {
-        entry_id: card.entry_id,
-        direction: card.direction,
-        queue: card.queue,
-        grade: "good",
-        response_ms: responseMs ?? undefined,
-      });
-    };
 
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key !== "Enter" || isSubmitting) {
@@ -361,7 +373,7 @@ export function FlashcardSession({
       window.removeEventListener("keydown", onKeyDown);
       window.removeEventListener("keydown", onShortcut);
     };
-  }, [submitted, gradeResult, isSubmitting, responseMs, userInput, card]);
+  }, [submitted, gradeResult, isSubmitting, handleOverride]);
 
   if (isLoading) {
     return (
@@ -407,7 +419,7 @@ export function FlashcardSession({
               t={t}
               size="sm"
               autoPlay
-              autoPlayKey={`${card.entry_id}-${card.direction}`}
+              autoPlayKey={`${card.entry_id}-${card.direction}-${audioReplayKey}`}
             />
             <p className="text-xs text-ink-muted">{t("flashcards.audioLabel")}</p>
           </div>
@@ -476,17 +488,7 @@ export function FlashcardSession({
               <Button
                 type="button"
                 variant="secondary"
-                onClick={() => {
-                  if (!card) return;
-                  onReview("good", responseMs, userInput);
-                  trackEvent("flashcard_review_overridden", {
-                    entry_id: card.entry_id,
-                    direction: card.direction,
-                    queue: card.queue,
-                    grade: "good",
-                    response_ms: responseMs ?? undefined,
-                  });
-                }}
+                onClick={handleOverride}
                 disabled={isSubmitting}
               >
                 <span className="flex items-center gap-2">
@@ -530,7 +532,7 @@ export function FlashcardSession({
                     t={t}
                     size="sm"
                     autoPlay={submitted}
-                    autoPlayKey={`${card.entry_id}-${card.direction}-reveal`}
+                    autoPlayKey={`${card.entry_id}-${card.direction}-reveal-${audioReplayKey}`}
                   />
                   <p className="text-xs text-ink-muted">{t("flashcards.audioLabel")}</p>
                 </div>
