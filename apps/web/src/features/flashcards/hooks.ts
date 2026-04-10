@@ -10,12 +10,16 @@ import {
   updateFlashcardPresence,
   updateFlashcardSettings,
 } from "@/features/flashcards/api";
-import type { FinishFlashcardSessionPayload, FlashcardPresencePayload } from "@/features/flashcards/api";
+import type {
+  FinishFlashcardSessionPayload,
+  FlashcardPresencePayload,
+  FlashcardReviewPayload,
+} from "@/features/flashcards/api";
 
-export function useFlashcardSession(enabled: boolean) {
+export function useFlashcardSession(enabled: boolean, listId?: string | null) {
   return useQuery({
-    queryKey: ["flashcards-session"],
-    queryFn: getFlashcardSession,
+    queryKey: ["flashcards-session", listId ?? "default"],
+    queryFn: () => getFlashcardSession(listId),
     enabled,
   });
 }
@@ -25,7 +29,7 @@ export function useUpdateFlashcardSettings() {
   return useMutation({
     mutationFn: updateFlashcardSettings,
     onSuccess: (data) => {
-      queryClient.setQueryData(["flashcards-session"], (prev) => {
+      queryClient.setQueriesData({ queryKey: ["flashcards-session"] }, (prev) => {
         if (!prev) {
           return prev;
         }
@@ -39,12 +43,16 @@ export function useUpdateFlashcardSettings() {
   });
 }
 
-export function useFlashcardReview() {
+export function useFlashcardReview(listId?: string | null) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: submitFlashcardReview,
+    mutationFn: (payload: FlashcardReviewPayload) =>
+      submitFlashcardReview({
+        ...payload,
+        list_id: listId ?? undefined,
+      }),
     onSuccess: (data: FlashcardReviewResponse) => {
-      queryClient.setQueryData(["flashcards-session"], (prev) => {
+      queryClient.setQueryData(["flashcards-session", listId ?? "default"], (prev) => {
         if (!prev) {
           return prev;
         }
@@ -66,7 +74,7 @@ export function useFinishFlashcardSession() {
   return useMutation({
     mutationFn: (payload?: FinishFlashcardSessionPayload) => finishFlashcardSession(payload),
     onSuccess: (data: FlashcardActiveSession | null) => {
-      queryClient.setQueryData(["flashcards-session"], (prev) => {
+      queryClient.setQueriesData({ queryKey: ["flashcards-session"] }, (prev) => {
         if (!prev) {
           return prev;
         }
@@ -85,7 +93,7 @@ export function useFlashcardPresence() {
   return useMutation({
     mutationFn: (payload: FlashcardPresencePayload) => updateFlashcardPresence(payload),
     onSuccess: (data: FlashcardActiveSession | null) => {
-      queryClient.setQueryData(["flashcards-session"], (prev) => {
+      queryClient.setQueriesData({ queryKey: ["flashcards-session"] }, (prev) => {
         if (!prev) {
           return prev;
         }

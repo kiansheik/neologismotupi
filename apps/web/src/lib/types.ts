@@ -574,12 +574,64 @@ export interface FlashcardReviewResponse {
 export interface FlashcardLeaderboardEntry {
   rank: number;
   display_name: string;
+  reviews_today: number;
   reviews_this_week: number;
   total_reviews: number;
 }
 
 export interface FlashcardLeaderboard {
   entries: FlashcardLeaderboardEntry[];
+}
+
+export interface FlashcardList {
+  id: string;
+  owner: EntryAuthor;
+  title_pt: string;
+  title_en: string | null;
+  description_pt: string | null;
+  description_en: string | null;
+  theme_label: string | null;
+  is_public: boolean;
+  score_cache: number;
+  upvote_count_cache: number;
+  downvote_count_cache: number;
+  item_count_cache: number;
+  current_user_vote?: number | null;
+  contains_entry?: boolean | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface FlashcardListListResponse {
+  items: FlashcardList[];
+  page: number;
+  page_size: number;
+  total: number;
+}
+
+export interface FlashcardListDetail {
+  list: FlashcardList;
+  items: EntrySummary[];
+  page: number;
+  page_size: number;
+  total: number;
+}
+
+export interface FlashcardListComment {
+  id: string;
+  list_id: string;
+  user_id: string;
+  body: string;
+  created_at: string;
+  updated_at: string;
+  author: EntryAuthor;
+}
+
+export interface FlashcardListCommentListResponse {
+  items: FlashcardListComment[];
+  page: number;
+  page_size: number;
+  total: number;
 }
 
 export interface ApiErrorShape {

@@ -60,6 +60,7 @@ class FlashcardReviewRequest(BaseModel):
     grade: FlashcardGrade
     response_ms: int | None = Field(default=None, ge=0, le=600_000)
     user_response: str | None = Field(default=None, max_length=1000)
+    list_id: uuid.UUID | None = None
 
 
 class FlashcardReviewResponse(BaseModel):
@@ -94,6 +95,7 @@ class FlashcardStatsOut(BaseModel):
 class FlashcardLeaderboardEntry(BaseModel):
     rank: int
     display_name: str
+    reviews_today: int
     reviews_this_week: int
     total_reviews: int
 

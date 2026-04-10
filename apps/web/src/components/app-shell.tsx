@@ -35,14 +35,13 @@ export function AppShell() {
     enabled: Boolean(user),
   });
 
-  const mentionNotificationsQuery = useQuery({
-    queryKey: ["notifications", "mentions-unread"],
+  const notificationsUnreadQuery = useQuery({
+    queryKey: ["notifications", "unread"],
     queryFn: () =>
       listNotifications({
         page: 1,
         page_size: 1,
         unread_only: true,
-        kind: "comment_mention",
       }),
     enabled: Boolean(user),
   });
@@ -124,6 +123,7 @@ export function AppShell() {
     normalizedPath === "/entries" ||
     normalizedPath === "/examples" ||
     normalizedPath === "/about" ||
+    normalizedPath.startsWith("/lists") ||
     normalizedPath.startsWith("/entries/") ||
     normalizedPath.startsWith("/sources/") ||
     normalizedPath.startsWith("/profiles/");
@@ -134,6 +134,7 @@ export function AppShell() {
     "/verify-email",
     "/reset-password",
     "/me",
+    "/notifications",
     "/moderation",
     "/unsubscribe",
   ]);
@@ -150,6 +151,10 @@ export function AppShell() {
     pageTitle = `${t("games.title")} | ${pageTitle}`;
   } else if (normalizedPath === "/games/flashcards") {
     pageTitle = `${t("flashcards.title")} | ${pageTitle}`;
+  } else if (normalizedPath === "/lists") {
+    pageTitle = `${t("lists.title")} | ${pageTitle}`;
+  } else if (normalizedPath === "/notifications") {
+    pageTitle = `${t("notifications.title")} | ${pageTitle}`;
   } else if (normalizedPath === "/login") {
     pageTitle = `${t("auth.loginTitle")} | ${pageTitle}`;
   } else if (normalizedPath === "/signup") {
@@ -199,7 +204,7 @@ export function AppShell() {
     },
   });
 
-  const unreadMentions = mentionNotificationsQuery.data?.unread_count ?? 0;
+  const unreadNotifications = notificationsUnreadQuery.data?.unread_count ?? 0;
 
   return (
     <div className="min-h-screen">
@@ -234,20 +239,31 @@ export function AppShell() {
             ) : null}
             {user ? (
               <>
-                <Link to="/me" className="rounded-md px-2 py-1 text-brand-700 hover:bg-accent hover:text-accent-contrast">
-                  <span className="inline-flex items-center gap-1">
-                    {t("nav.me")}
-                    {unreadMentions > 0 ? (
-                      <span
-                        role="img"
-                        aria-label={t("nav.mentionsIndicator", { count: unreadMentions })}
-                        title={t("nav.mentionsIndicator", { count: unreadMentions })}
-                        className="text-sm"
-                      >
-                        📬
-                      </span>
-                    ) : null}
+                <Link
+                  to="/notifications"
+                  className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-brand-700 hover:bg-accent hover:text-accent-contrast"
+                  aria-label={
+                    unreadNotifications > 0
+                      ? t("nav.notificationsIndicator", { count: unreadNotifications })
+                      : t("nav.notifications")
+                  }
+                  title={
+                    unreadNotifications > 0
+                      ? t("nav.notificationsIndicator", { count: unreadNotifications })
+                      : t("nav.notifications")
+                  }
+                >
+                  <span aria-hidden className="text-base leading-none">
+                    📩
                   </span>
+                  {unreadNotifications > 0 ? (
+                    <span className="rounded-full bg-red-600 px-1.5 py-0.5 text-[10px] font-semibold text-white">
+                      {unreadNotifications}
+                    </span>
+                  ) : null}
+                </Link>
+                <Link to="/me" className="rounded-md px-2 py-1 text-brand-700 hover:bg-accent hover:text-accent-contrast">
+                  {t("nav.me")}
                 </Link>
                 <Button
                   type="button"

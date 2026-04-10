@@ -203,6 +203,58 @@ async def test_learning_step_reappears_same_day(client):
         },
     )
 
+
+@pytest.mark.asyncio
+async def test_leaderboard_counts_completed_cards_today(client):
+    await register_user(client, "leaderboard@example.com", "Leaderboard User")
+    user_id = await get_user_id("leaderboard@example.com")
+    entry = await seed_entry(user_id=user_id, headword="leaderboard-entry")
+
+    now = datetime.now(UTC)
+    async with db_module.AsyncSessionLocal() as session:
+        session.add(
+            FlashcardProgress(
+                user_id=user_id,
+                entry_id=entry.id,
+                direction=FlashcardDirection.headword_to_gloss,
+                card_type=FlashcardCardType.review,
+                queue=FlashcardQueue.review,
+                due_at=now + timedelta(days=1),
+                scheduled_days=1,
+                learning_step_index=0,
+                remaining_steps=0,
+                reps=1,
+                lapses=0,
+                ease_factor=2.5,
+                last_review_at=now,
+            )
+        )
+        session.add(
+            FlashcardReviewLog(
+                user_id=user_id,
+                session_id=None,
+                entry_id=entry.id,
+                direction=FlashcardDirection.headword_to_gloss,
+                grade=FlashcardGrade.good,
+                response_ms=500,
+                reviewed_at=now,
+                card_type_before=FlashcardCardType.review,
+                card_type_after=FlashcardCardType.review,
+                scheduled_days_before=1,
+                scheduled_days_after=1,
+                memory_stability_before=1.2,
+                memory_stability_after=1.4,
+                memory_difficulty_before=5.0,
+                memory_difficulty_after=4.8,
+            )
+        )
+        await session.commit()
+
+    response = await client.get("/api/flashcards/leaderboard")
+    assert response.status_code == 200, response.text
+    payload = response.json()
+    assert payload["entries"][0]["reviews_today"] == 1
+
     async with db_module.AsyncSessionLocal() as session:
         progress = (
             await session.execute(

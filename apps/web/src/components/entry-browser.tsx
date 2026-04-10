@@ -19,6 +19,7 @@ import { getLocalizedApiErrorMessage } from "@/lib/localized-api-error";
 import { entryDefinitionPreview } from "@/lib/entry-definition";
 import { useOrthography } from "@/lib/orthography";
 import { getCachedVote, resolveVote, setCachedVote, useVoteMemoryVersion } from "@/lib/vote-memory";
+import { EntryListPicker } from "@/features/flashcard-lists/components/entry-list-picker";
 
 type EntrySort = "alphabetical" | "recent" | "score" | "most_examples" | "unseen";
 
@@ -429,6 +430,7 @@ export function EntryBrowser({
                   {entryDefinitionPreview(entry.short_definition)}
                 </p>
                 <div className="mt-2 flex flex-wrap items-center gap-2">
+                  <EntryListPicker entryId={entry.id} />
                   <Button
                     type="button"
                     variant="secondary"
