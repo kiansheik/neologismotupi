@@ -11,6 +11,10 @@ vi.mock("@/features/auth/hooks", () => ({
   useCurrentUser: () => ({ data: authState.currentUser }),
 }));
 
+vi.mock("@/features/flashcards/hooks", () => ({
+  useFlashcardStats: () => ({ data: { last_7_days: [] } }),
+}));
+
 describe("GamesPage", () => {
   it("renders games landing content and flashcards card", () => {
     authState.currentUser = undefined;
