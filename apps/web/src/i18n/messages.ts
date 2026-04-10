@@ -684,6 +684,10 @@ export const ptBR = {
   "about.opensourceBody":
     "O projeto é 100% open-source. Se você tiver boas ideias para melhorar a plataforma, faça um fork no GitHub e contribua.",
   "about.githubCta": "Ver repositório no GitHub",
+  "about.communityTitle": "Comunidade e discussão",
+  "about.communityBody":
+    "Quer conversar sobre Tupi, neologismos e usos? Participe do nosso grupo de discussão.",
+  "about.whatsappCta": "Entrar no grupo de WhatsApp",
 
   "api.unauthenticated": "Autenticação necessária.",
   "api.invalid_credentials": "E-mail ou senha inválidos.",
@@ -1397,6 +1401,10 @@ export const enUS: Record<TranslationKey, string> = {
   "about.opensourceBody":
     "The project is 100% open source. If you have good ideas to improve the platform, fork it on GitHub and contribute.",
   "about.githubCta": "View repository on GitHub",
+  "about.communityTitle": "Community and discussion",
+  "about.communityBody":
+    "Want to talk about Tupi, neologisms, and usage? Join our discussion group.",
+  "about.whatsappCta": "Join the WhatsApp group",
 
   "api.unauthenticated": "Authentication required.",
   "api.invalid_credentials": "Invalid email or password.",

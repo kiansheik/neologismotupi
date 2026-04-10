@@ -6,6 +6,9 @@ const GITHUB_URL =
   (import.meta.env.VITE_GITHUB_URL as string | undefined)?.trim() ||
   "https://github.com/kiansheik/neologismotupi";
 const CONTACT_EMAIL = "ksheik@usp.br";
+const WHATSAPP_GROUP_URL = (
+  import.meta.env.VITE_WHATSAPP_GROUP_URL as string | undefined
+)?.trim();
 
 export function AboutPage() {
   const { locale, t } = useI18n();
@@ -72,6 +75,24 @@ export function AboutPage() {
           </a>
         </p>
       </Card>
+
+      {WHATSAPP_GROUP_URL ? (
+        <Card>
+          <h2 className="text-lg font-semibold text-brand-900">{t("about.communityTitle")}</h2>
+          <p className="mt-2 text-sm text-slate-700">{t("about.communityBody")}</p>
+          <p className="mt-2 text-sm">
+            <a
+              className="inline-flex items-center gap-2 font-medium text-brand-700 hover:underline"
+              href={WHATSAPP_GROUP_URL}
+              target="_blank"
+              rel="noreferrer"
+            >
+              <span aria-hidden="true">💬</span>
+              <span>{t("about.whatsappCta")}</span>
+            </a>
+          </p>
+        </Card>
+      ) : null}
     </section>
   );
 }
