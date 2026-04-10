@@ -156,23 +156,44 @@ function AnswerDiff({ userInput, expected }: { userInput: string; expected: stri
 
 // ─── Auto-grader ─────────────────────────────────────────────────────────────
 
+function splitExpectedOptions(expected: string): string[] {
+  const options = expected
+    .split(";")
+    .map((value) => value.trim())
+    .filter(Boolean);
+  return options.length ? options : [expected];
+}
+
 function computeAutoGrade(
   userResponse: string,
   expected: string,
-): { grade: FlashcardGrade; ratio: number } {
+): { grade: FlashcardGrade; ratio: number; expected: string } {
   const a = normalizeAnswer(userResponse);
-  const b = normalizeAnswer(expected);
-  if (!a) return { grade: "again", ratio: 0 };
-  // Exact match ignoring whitespace and hyphens → good
-  if (normalizeStrict(userResponse) === normalizeStrict(expected)) return { grade: "good", ratio: 1 };
-  const dp = buildDpMatrix(a, b);
-  const dist = dp[a.length][b.length];
-  const maxLen = Math.max(a.length, b.length);
-  const ratio = maxLen === 0 ? 1 : 1 - dist / maxLen;
-  let grade: FlashcardGrade;
-  if (ratio >= 0.85) grade = "hard";
-  else grade = "again";
-  return { grade, ratio };
+  const options = splitExpectedOptions(expected);
+  if (!a) {
+    return { grade: "again", ratio: 0, expected: options[0] ?? expected };
+  }
+
+  let bestRatio = 0;
+  let bestExpected = options[0] ?? expected;
+
+  for (const option of options) {
+    if (normalizeStrict(userResponse) === normalizeStrict(option)) {
+      return { grade: "good", ratio: 1, expected: option };
+    }
+    const b = normalizeAnswer(option);
+    const dp = buildDpMatrix(a, b);
+    const dist = dp[a.length][b.length];
+    const maxLen = Math.max(a.length, b.length);
+    const ratio = maxLen === 0 ? 1 : 1 - dist / maxLen;
+    if (ratio > bestRatio) {
+      bestRatio = ratio;
+      bestExpected = option;
+    }
+  }
+
+  const grade: FlashcardGrade = bestRatio >= 0.85 ? "hard" : "again";
+  return { grade, ratio: bestRatio, expected: bestExpected };
 }
 
 interface FlashcardSessionProps {
@@ -194,9 +215,11 @@ export function FlashcardSession({
   const { apply } = useOrthography();
   const [userInput, setUserInput] = useState("");
   const [submitted, setSubmitted] = useState(false);
-  const [gradeResult, setGradeResult] = useState<{ grade: FlashcardGrade; ratio: number } | null>(
-    null,
-  );
+  const [gradeResult, setGradeResult] = useState<{
+    grade: FlashcardGrade;
+    ratio: number;
+    expected: string;
+  } | null>(null);
   const [shownAt, setShownAt] = useState<number | null>(null);
   const [responseMs, setResponseMs] = useState<number | null>(null);
   const [audioSubmitted, setAudioSubmitted] = useState(false);
@@ -284,6 +307,62 @@ export function FlashcardSession({
     });
   };
 
+  useEffect(() => {
+    if (!submitted || !gradeResult) {
+      return;
+    }
+
+    const canOverride = gradeResult.grade !== "good" && gradeResult.grade !== "easy";
+
+    const handleOverride = () => {
+      if (!card) return;
+      onReview("good", responseMs, userInput);
+      trackEvent("flashcard_review_overridden", {
+        entry_id: card.entry_id,
+        direction: card.direction,
+        queue: card.queue,
+        grade: "good",
+        response_ms: responseMs ?? undefined,
+      });
+    };
+
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== "Enter" || isSubmitting) {
+        return;
+      }
+      const target = event.target as HTMLElement | null;
+      if (target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable)) {
+        return;
+      }
+      event.preventDefault();
+      handleContinue();
+    };
+
+    const onShortcut = (event: KeyboardEvent) => {
+      if (isSubmitting) {
+        return;
+      }
+      const target = event.target as HTMLElement | null;
+      if (target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable)) {
+        return;
+      }
+      if (event.key === "1") {
+        event.preventDefault();
+        handleContinue();
+      } else if (event.key === "2" && canOverride) {
+        event.preventDefault();
+        handleOverride();
+      }
+    };
+
+    window.addEventListener("keydown", onKeyDown);
+    window.addEventListener("keydown", onShortcut);
+    return () => {
+      window.removeEventListener("keydown", onKeyDown);
+      window.removeEventListener("keydown", onShortcut);
+    };
+  }, [submitted, gradeResult, isSubmitting, responseMs, userInput, card]);
+
   if (isLoading) {
     return (
       <Card>
@@ -341,7 +420,7 @@ export function FlashcardSession({
       {!submitted ? (
         <div className="mt-4 space-y-2">
           <p className="text-xs text-ink-muted">{typeAnswerHint}</p>
-          <div className="flex gap-2">
+          <div className="flex flex-col gap-2 sm:flex-row">
             <input
               ref={inputRef}
               type="text"
@@ -351,10 +430,10 @@ export function FlashcardSession({
                 if (e.key === "Enter") handleSubmit();
               }}
               placeholder={t("flashcards.typeAnswerPlaceholder")}
-              className="flex-1 rounded-md border border-line-strong bg-surface-input px-3 py-2 text-sm text-brand-900 placeholder:text-ink-muted focus:border-brand-500 focus:outline-none"
+              className="w-full min-w-0 rounded-md border border-line-strong bg-surface-input px-3 py-2 text-sm text-brand-900 placeholder:text-ink-muted focus:border-brand-500 focus:outline-none sm:flex-1"
               autoComplete="off"
             />
-            <Button type="button" onClick={handleSubmit} disabled={isSubmitting}>
+            <Button type="button" onClick={handleSubmit} disabled={isSubmitting} className="w-full sm:w-auto">
               {t("flashcards.submitAnswer")}
             </Button>
           </div>
@@ -378,10 +457,52 @@ export function FlashcardSession({
             </div>
           )}
 
+          {/* Primary actions */}
+          <div className="flex flex-wrap gap-2">
+            <Button
+              type="button"
+              variant={isSuccess ? undefined : "danger"}
+              onClick={handleContinue}
+              disabled={isSubmitting}
+            >
+              <span className="flex items-center gap-2">
+                {isSuccess ? t("flashcards.result.congrats") : t("flashcards.result.studyMore")}
+                <span className="text-[10px] font-semibold text-ink-muted/70" aria-hidden>
+                  1
+                </span>
+              </span>
+            </Button>
+            {!isSuccess ? (
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={() => {
+                  if (!card) return;
+                  onReview("good", responseMs, userInput);
+                  trackEvent("flashcard_review_overridden", {
+                    entry_id: card.entry_id,
+                    direction: card.direction,
+                    queue: card.queue,
+                    grade: "good",
+                    response_ms: responseMs ?? undefined,
+                  });
+                }}
+                disabled={isSubmitting}
+              >
+                <span className="flex items-center gap-2">
+                  {t("flashcards.result.overrideCorrect")}
+                  <span className="text-[10px] font-semibold text-ink-muted/70" aria-hidden>
+                    2
+                  </span>
+                </span>
+              </Button>
+            ) : null}
+          </div>
+
           {/* Character-level diff */}
           <div>
             <p className="mb-1 text-xs text-ink-muted">{t("flashcards.result.yourAnswer")}</p>
-            <AnswerDiff userInput={userInput} expected={expected} />
+            <AnswerDiff userInput={userInput} expected={gradeResult?.expected ?? expected} />
           </div>
 
           {/* Full answer card */}
@@ -454,14 +575,6 @@ export function FlashcardSession({
           ) : null}
 
           {/* Continue button */}
-          <Button
-            type="button"
-            variant={isSuccess ? undefined : "danger"}
-            onClick={handleContinue}
-            disabled={isSubmitting}
-          >
-            {isSuccess ? t("flashcards.result.congrats") : t("flashcards.result.studyMore")}
-          </Button>
         </div>
       )}
     </Card>
