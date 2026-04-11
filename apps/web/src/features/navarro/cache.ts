@@ -34,6 +34,25 @@ export async function loadNavarroCache(): Promise<NavarroCacheEntry[]> {
   return cachePromise;
 }
 
+export function navarroKeyForEntry(
+  firstWord: string,
+  optionalNumber: string | null | undefined,
+  definition: string | null | undefined,
+): string {
+  return `${firstWord}||${optionalNumber ?? ""}||${definition ?? ""}`;
+}
+
+export function buildNavarroLookup(entries: NavarroEntry[]): Map<string, string> {
+  const map = new Map<string, string>();
+  entries.forEach((entry) => {
+    const key = navarroKeyForEntry(entry.first_word, entry.optional_number, entry.definition);
+    if (!map.has(key)) {
+      map.set(key, entry.id);
+    }
+  });
+  return map;
+}
+
 export async function getNavarroEntryCached(id: string): Promise<NavarroEntry> {
   const cache = await loadNavarroCache();
   if (!cacheById) {

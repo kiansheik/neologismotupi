@@ -39,11 +39,9 @@ export function InlineReferenceLink({ token }: InlineReferenceLinkProps) {
   const label = token.label || token.raw;
 
   const navarroExternalLink = useMemo(() => {
-    if (!navarroEntry?.definition) {
-      return "https://kiansheik.io/nhe-enga";
-    }
-    return buildNavarroExternalSearch(navarroEntry.definition);
-  }, [navarroEntry]);
+    const navarroLabel = navarroEntry ? buildNavarroLabel(navarroEntry) : label;
+    return buildNavarroExternalSearch(navarroLabel);
+  }, [navarroEntry, label]);
 
   return (
     <span

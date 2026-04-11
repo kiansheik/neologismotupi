@@ -52,7 +52,7 @@ export function InlineReferenceSuggestions({
     Boolean(collapseAfter && suggestions.length > collapseAfter && !expanded);
 
   return (
-    <div className="absolute left-0 right-0 z-20 mt-1 rounded-md border border-line-strong bg-surface-input shadow-lg">
+    <div className="absolute left-0 z-20 mt-1 w-full max-w-[calc(100vw-2rem)] overflow-x-hidden rounded-md border border-line-strong bg-surface-input shadow-lg">
       <div className="flex items-center justify-between border-b border-line-weak px-3 py-2 text-xs font-semibold text-slate-600">
         <span>{title}</span>
         <button

@@ -1,6 +1,7 @@
 import { DERIVE_OPERATIONS } from "./builder-types";
 import type { PipelineState, RootEntry } from "./builder-types";
 import { compactDefinition } from "./pos";
+import { buildInlineDtaToken } from "@/features/inline-references/utils";
 
 export function renderHumanNote(state: PipelineState): string {
   if (!state.base) return "";
@@ -38,12 +39,13 @@ export function renderHumanNote(state: PipelineState): string {
 }
 
 function describeEntry(entry: RootEntry): string {
+  const headword = entry.sourceId ? buildInlineDtaToken(entry.sourceId, entry.headword) : entry.headword;
   const pos = entry.posAbbrev ? `(${entry.posAbbrev})` : "";
   const gloss = entry.rawDefinition ? compactDefinition(entry.rawDefinition) : entry.gloss ? compactDefinition(entry.gloss) : undefined;
-  if (!gloss) return `${entry.headword} ${pos}`.trim();
-  return `${entry.headword} ${pos} — ${gloss}`.trim();
+  if (!gloss) return `${headword} ${pos}`.trim();
+  return `${headword} ${pos} — ${gloss}`.trim();
 }
 
 function describeEntryShort(entry: RootEntry): string {
-  return entry.headword;
+  return entry.sourceId ? buildInlineDtaToken(entry.sourceId, entry.headword) : entry.headword;
 }

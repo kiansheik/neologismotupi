@@ -1,7 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { buildNavarroLookup, loadNavarroCache, navarroKeyForEntry } from "@/features/navarro/cache";
 
 import type { RootEntry } from "./builder-types";
 import { DictionaryResultCard } from "./DictionaryResultCard";
@@ -29,6 +31,16 @@ export function RootPicker({
   manualPosKinds,
 }: RootPickerProps) {
   const { index, error } = useDictionaryIndex();
+  const navarroCacheQuery = useQuery({
+    queryKey: ["navarro", "cache"],
+    queryFn: loadNavarroCache,
+    staleTime: Infinity,
+    gcTime: Infinity,
+  });
+  const navarroLookup = useMemo(
+    () => buildNavarroLookup(navarroCacheQuery.data ?? []),
+    [navarroCacheQuery.data],
+  );
   const [query, setQuery] = useState("");
   const [manualHeadword, setManualHeadword] = useState("");
   const [manualGloss, setManualGloss] = useState("");
@@ -122,7 +134,19 @@ export function RootPicker({
               <p className="text-xs text-slate-500">Nenhum resultado.</p>
             ) : null}
             {filteredResults.map((result) => (
-              <DictionaryResultCard key={`${result.first_word}-${result.definition}`} result={result} onPick={onChange} compact />
+              <DictionaryResultCard
+                key={`${result.first_word}-${result.definition}`}
+                result={result}
+                navarroId={
+                  result.type === "dict"
+                    ? navarroLookup.get(
+                        navarroKeyForEntry(result.first_word, result.optional_number, result.definition),
+                      )
+                    : undefined
+                }
+                onPick={onChange}
+                compact
+              />
             ))}
           </div>
           {allowManual ? (

@@ -9,11 +9,12 @@ import { compactDefinition, defaultPosInfo, formatPosDisplay, parsePosInfo } fro
 
 type DictionaryResultCardProps = {
   result: SearchResult;
+  navarroId?: string;
   onPick: (entry: RootEntry) => void;
   compact?: boolean;
 };
 
-export function DictionaryResultCard({ result, onPick, compact }: DictionaryResultCardProps) {
+export function DictionaryResultCard({ result, navarroId, onPick, compact }: DictionaryResultCardProps) {
   const [expanded, setExpanded] = useState(false);
   const parsedPos = parsePosInfo(result.definition);
   const posInfo = parsedPos ?? defaultPosInfo();
@@ -86,6 +87,7 @@ export function DictionaryResultCard({ result, onPick, compact }: DictionaryResu
               type: result.type,
               orthVariants,
               rawDefinition: result.definition,
+              sourceId: navarroId,
             })
           }
         >

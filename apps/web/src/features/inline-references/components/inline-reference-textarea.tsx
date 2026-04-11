@@ -2,11 +2,11 @@ import { useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 
 import { useI18n } from "@/i18n";
-import { Textarea } from "@/components/ui/textarea";
 import { listEntries } from "@/features/entries/api";
 import { loadNavarroCache, searchNavarroCache } from "@/features/navarro/cache";
 import type { EntrySummary } from "@/lib/types";
 
+import { InlineReferenceHighlight } from "./inline-reference-highlight";
 import {
   buildNavarroLabel,
   buildNavarroToken,
@@ -178,7 +178,7 @@ export function InlineReferenceTextarea({
 
   return (
     <div className="relative">
-      <Textarea
+      <InlineReferenceHighlight
         ref={textareaRef}
         id={id}
         name={name}

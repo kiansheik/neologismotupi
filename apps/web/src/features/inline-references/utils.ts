@@ -36,6 +36,11 @@ export function buildNavarroToken(entry: NavarroEntry): string {
   return `[[dta:${entry.id}|${label}]]`;
 }
 
+export function buildInlineDtaToken(id: string, label: string): string {
+  const cleaned = label.replace(TOKEN_CLEAN_PATTERN, "");
+  return `[[dta:${id}|${cleaned}]]`;
+}
+
 export function buildNeoToken(entry: EntrySummary): string {
   const label = (entry.headword || entry.slug).replace(TOKEN_CLEAN_PATTERN, "");
   return `[[neo:${entry.id}|${entry.slug}|${label}]]`;
@@ -135,19 +140,11 @@ export function parseInlineReferenceToken(raw: string): InlineReferenceToken | n
   };
 }
 
-export function buildNavarroExternalSearch(definition: string): string {
-  const trimmed = definition.trim();
+export function buildNavarroExternalSearch(headword: string): string {
+  const trimmed = headword.trim();
   if (!trimmed) {
     return "https://kiansheik.io/nhe-enga";
   }
-  const maxLength = 100;
-  const chunk = (() => {
-    if (trimmed.length <= maxLength) {
-      return trimmed;
-    }
-    const start = Math.max(0, Math.floor((trimmed.length - maxLength) / 2));
-    return trimmed.slice(start, start + maxLength);
-  })();
-  const query = encodeURIComponent(chunk);
+  const query = encodeURIComponent(trimmed);
   return `https://kiansheik.io/nhe-enga/?q=${query}`;
 }

@@ -29,6 +29,7 @@ import { deleteAudioSample, uploadEntryAudio, uploadExampleAudio, voteAudio } fr
 import { createComment, listCommentVersions, updateComment, voteComment } from "@/features/comments/api";
 import { listExampleVersions, reportExample, updateExample, voteExample } from "@/features/examples/api";
 import { createExample, getEntry, listEntries, reportEntry, updateEntry, voteEntry } from "@/features/entries/api";
+import { InlineReferenceHighlight } from "@/features/inline-references/components/inline-reference-highlight";
 import { InlineReferenceLink } from "@/features/inline-references/components/inline-reference-link";
 import {
   InlineReferenceSuggestions,
@@ -2603,7 +2604,7 @@ export function EntryDetailPage() {
             }}
           >
             <div className="relative">
-              <Textarea
+              <InlineReferenceHighlight
                 id="comment_body"
                 rows={4}
                 ref={commentTextareaRef}
@@ -2665,7 +2666,7 @@ export function EntryDetailPage() {
                 />
               ) : null}
               {showMentionSuggestions ? (
-                <div className="absolute left-0 right-0 z-20 mt-1 rounded-md border border-line-strong bg-surface-input shadow-lg">
+                <div className="absolute left-0 z-20 mt-1 w-full max-w-[calc(100vw-2rem)] overflow-x-hidden rounded-md border border-line-strong bg-surface-input shadow-lg">
                   {mentionSuggestionsQuery.isLoading ? (
                     <p className="px-3 py-2 text-xs text-slate-600">{t("entry.mentionLoading")}</p>
                   ) : mentionSuggestions.length ? (
