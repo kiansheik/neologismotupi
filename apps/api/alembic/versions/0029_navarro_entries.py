@@ -45,7 +45,14 @@ def _normalize_search(value: str) -> str:
 
 
 def _load_navarro_entries() -> list[dict[str, Any]]:
-    repo_root = Path(__file__).resolve().parents[4]
+    repo_root = None
+    for parent in Path(__file__).resolve().parents:
+        candidate = parent / "apps" / "web" / "public" / "etymology" / "dict-conjugated.json"
+        if candidate.exists():
+            repo_root = parent
+            break
+    if repo_root is None:
+        repo_root = Path(__file__).resolve().parents[0]
     candidates = [
         repo_root / "apps" / "web" / "public" / "etymology" / "dict-conjugated.json",
         repo_root.parent / "nhe-enga" / "docs" / "tupi_dict_navarro.json",

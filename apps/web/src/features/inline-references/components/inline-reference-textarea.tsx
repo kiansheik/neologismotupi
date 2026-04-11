@@ -95,7 +95,7 @@ export function InlineReferenceTextarea({
       secondary: entry.gloss_pt ?? undefined,
       tokenText: buildNeoToken(entry),
     }));
-  }, [context, navarroQuery.data, neoQuery.data]);
+  }, [context, navarroCacheQuery.data, neoQuery.data, query]);
 
   const updateContext = (nextValue: string, caret: number | null) => {
     const nextContext = detectInlineReferenceContext(nextValue, caret);

@@ -889,7 +889,7 @@ export function EntryDetailPage() {
       secondary: entry.gloss_pt ?? undefined,
       tokenText: buildNeoToken(entry),
     }));
-  }, [inlineContext, navarroSuggestionsQuery.data, neoSuggestionsQuery.data]);
+  }, [inlineContext, navarroCacheQuery.data, neoSuggestionsQuery.data, inlineQuery]);
 
   useEffect(() => {
     if (!entry) {
