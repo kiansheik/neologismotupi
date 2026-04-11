@@ -1772,12 +1772,6 @@ export function EntryDetailPage() {
                       <p className="mt-1 text-xs text-red-700">{entryEditForm.formState.errors.source_url.message}</p>
                     ) : null}
                   </div>
-                  <div>
-                    <label className="mb-1 block text-sm font-medium" htmlFor="edit_source_citation">
-                      {t("entry.sourceIfApplicableOptional", { optional: t("form.optional") })}
-                    </label>
-                    <Input id="edit_source_citation" {...entryEditForm.register("source_citation")} />
-                  </div>
                   {entrySourceSuggestionsQuery.data && entrySourceSuggestionsQuery.data.length > 0 ? (
                     <div className="rounded-md border border-brand-200 bg-surface-soft p-2">
                       <p className="text-xs font-semibold text-brand-900">{t("submit.sourceSuggestionsTitle")}</p>
@@ -2208,18 +2202,6 @@ export function EntryDetailPage() {
                                 </p>
                               ) : null}
                             </div>
-                            <div>
-                              <label
-                                className="mb-1 block text-sm font-medium"
-                                htmlFor={`example_source_citation_${example.id}`}
-                              >
-                                {t("entry.sourceIfApplicableOptional", { optional: t("form.optional") })}
-                              </label>
-                              <Input
-                                id={`example_source_citation_${example.id}`}
-                                {...exampleEditForm.register("source_citation")}
-                              />
-                            </div>
                             {exampleEditSourceSuggestionsQuery.data &&
                             exampleEditSourceSuggestionsQuery.data.length > 0 ? (
                               <div className="rounded-md border border-brand-200 bg-surface-soft p-2">
@@ -2627,12 +2609,6 @@ export function EntryDetailPage() {
                     {exampleForm.formState.errors.source_url?.message ? (
                       <p className="mt-1 text-xs text-red-700">{exampleForm.formState.errors.source_url.message}</p>
                     ) : null}
-                  </div>
-                  <div>
-                    <label className="mb-1 block text-sm font-medium" htmlFor="source_citation">
-                      {t("entry.sourceIfApplicableOptional", { optional: t("form.optional") })}
-                    </label>
-                    <Input id="source_citation" {...exampleForm.register("source_citation")} />
                   </div>
                   {exampleSourceSuggestionsQuery.data && exampleSourceSuggestionsQuery.data.length > 0 ? (
                     <div className="rounded-md border border-brand-200 bg-surface-soft p-2">
