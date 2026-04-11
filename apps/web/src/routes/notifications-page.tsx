@@ -110,16 +110,22 @@ export function NotificationsPage() {
             >
               {t("notifications.markAllRead")}
             </Button>
-            <Button
-              type="button"
-              variant="ghost"
-              className="px-2 py-1"
-              onClick={() => setShowAll((prev) => !prev)}
-            >
-              {showAll ? t("notifications.showUnread") : t("notifications.showAll")}
-            </Button>
           </div>
         </div>
+        <details className="mt-3">
+          <summary className="cursor-pointer text-sm font-semibold text-brand-700">
+            {t("notifications.filters")}
+          </summary>
+          <div className="mt-2 flex items-center gap-2 text-sm text-ink-muted">
+            <input
+              id="notifications_show_all"
+              type="checkbox"
+              checked={showAll}
+              onChange={(event) => setShowAll(event.target.checked)}
+            />
+            <label htmlFor="notifications_show_all">{t("notifications.showRead")}</label>
+          </div>
+        </details>
         {markAllReadMutation.error instanceof ApiError ? (
           <p className="mt-3 text-sm text-red-700">
             {getLocalizedApiErrorMessage(markAllReadMutation.error, t)}
