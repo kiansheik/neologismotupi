@@ -16,6 +16,7 @@ from app.models.flashcards import (
     FlashcardStudySession,
 )
 from app.models.moderation import ModerationAction, RateLimitEvent, Report
+from app.models.navarro import NavarroEntry
 from app.models.newsletter import NewsletterDelivery, NewsletterIssue, NewsletterSubscription
 from app.models.source import SourceEdition, SourceLink, SourceWork
 from app.models.user import EmailActionToken, Profile, Session, User
@@ -43,6 +44,7 @@ __all__ = [
     "NewsletterDelivery",
     "NewsletterIssue",
     "NewsletterSubscription",
+    "NavarroEntry",
     "Notification",
     "NotificationPreference",
     "Profile",

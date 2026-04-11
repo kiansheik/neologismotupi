@@ -20,6 +20,7 @@ from app.api.routes import (
     flashcards_router,
     meta_router,
     moderation_router,
+    navarro_router,
     newsletters_router,
     sources_router,
     users_router,
@@ -27,6 +28,7 @@ from app.api.routes import (
 from app.config import get_settings
 from app.core.errors import http_exception_handler, validation_exception_handler
 from app.db import AsyncSessionLocal
+from app.services.navarro import load_navarro_cache
 
 request_logger = logging.getLogger("uvicorn.error")
 
@@ -92,10 +94,19 @@ def create_app() -> FastAPI:
     app.include_router(flashcards_router, prefix="/api")
     app.include_router(flashcard_lists_router, prefix="/api")
     app.include_router(moderation_router, prefix="/api")
+    app.include_router(navarro_router, prefix="/api")
     app.include_router(newsletters_router, prefix="/api")
     app.include_router(meta_router, prefix="/api")
     app.include_router(sources_router, prefix="/api")
     app.include_router(users_router, prefix="/api")
+
+    @app.on_event("startup")
+    async def preload_navarro_cache() -> None:
+        try:
+            async with AsyncSessionLocal() as db:
+                await load_navarro_cache(db)
+        except Exception:
+            request_logger.exception("Failed to preload Navarro cache")
 
     @app.get("/healthz")
     async def healthz():

@@ -5,6 +5,7 @@ from app.api.routes.flashcards import router as flashcards_router
 from app.api.routes.flashcard_lists import router as flashcard_lists_router
 from app.api.routes.meta import router as meta_router
 from app.api.routes.moderation import router as moderation_router
+from app.api.routes.navarro import router as navarro_router
 from app.api.routes.newsletters import router as newsletters_router
 from app.api.routes.sources import router as sources_router
 from app.api.routes.users import router as users_router
@@ -19,6 +20,7 @@ __all__ = [
     "flashcard_lists_router",
     "meta_router",
     "moderation_router",
+    "navarro_router",
     "newsletters_router",
     "sources_router",
     "users_router",

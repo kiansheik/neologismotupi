@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useForm } from "react-hook-form";
+import { Controller, useForm } from "react-hook-form";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { KeyboardEvent, ReactNode } from "react";
 import { Link, useParams } from "react-router-dom";
@@ -28,8 +28,23 @@ import { AudioCapture, AudioQueueList, AudioSampleList } from "@/features/audio/
 import { deleteAudioSample, uploadEntryAudio, uploadExampleAudio, voteAudio } from "@/features/audio/api";
 import { createComment, listCommentVersions, updateComment, voteComment } from "@/features/comments/api";
 import { listExampleVersions, reportExample, updateExample, voteExample } from "@/features/examples/api";
-import { createExample, getEntry, reportEntry, updateEntry, voteEntry } from "@/features/entries/api";
+import { createExample, getEntry, listEntries, reportEntry, updateEntry, voteEntry } from "@/features/entries/api";
+import { InlineReferenceLink } from "@/features/inline-references/components/inline-reference-link";
+import {
+  InlineReferenceSuggestions,
+  type InlineReferenceSuggestion,
+} from "@/features/inline-references/components/inline-reference-suggestions";
+import { InlineReferenceTextarea } from "@/features/inline-references/components/inline-reference-textarea";
+import {
+  buildNavarroLabel,
+  buildNavarroToken,
+  buildNeoToken,
+  detectInlineReferenceContext,
+  parseInlineReferenceSegments,
+  type InlineReferenceContext,
+} from "@/features/inline-references/utils";
 import { approveEntry, approveExample, rejectEntry, rejectExample } from "@/features/moderation/api";
+import { loadNavarroCache, searchNavarroCache } from "@/features/navarro/cache";
 import { listSources } from "@/features/sources/api";
 import { listMentionUsers, resolveMentionUsers } from "@/features/users/api";
 
@@ -75,6 +90,7 @@ type EntryEditForm = {
 const REPORT_REASON_MAX = 280;
 const MENTION_TOKEN_PATTERN = /@([A-Za-z0-9._-]{2,50})/g;
 const MENTION_CONTEXT_PATTERN = /(?:^|[\s(])@([A-Za-z0-9._-]{0,50})$/;
+const INLINE_MIN_QUERY_LENGTH = 1;
 
 type MentionContext = {
   start: number;
@@ -204,7 +220,11 @@ function detectMentionContext(value: string, caret: number | null): MentionConte
   return { start, end: caret, query };
 }
 
-function renderCommentBody(text: string, mentionByHandle: Record<string, MentionUser>): ReactNode {
+function renderTextWithMentions(
+  text: string,
+  mentionByHandle: Record<string, MentionUser>,
+  keyPrefix = "mention",
+): ReactNode[] {
   const nodes: ReactNode[] = [];
   let cursor = 0;
   let tokenIndex = 0;
@@ -228,7 +248,7 @@ function renderCommentBody(text: string, mentionByHandle: Record<string, Mention
     if (mention) {
       nodes.push(
         <Link
-          key={`mention-${tokenIndex}-${start}`}
+          key={`${keyPrefix}-${tokenIndex}-${start}`}
           to={mention.profile_url}
           className="font-medium text-brand-700 hover:underline"
         >
@@ -249,7 +269,35 @@ function renderCommentBody(text: string, mentionByHandle: Record<string, Mention
   if (cursor < text.length) {
     nodes.push(text.slice(cursor));
   }
-  return nodes.length ? nodes : text;
+  return nodes.length ? nodes : [text];
+}
+
+function renderInlineReferenceText(text: string): ReactNode[] {
+  const segments = parseInlineReferenceSegments(text);
+  const nodes: ReactNode[] = [];
+  segments.forEach((segment, index) => {
+    if (segment.type === "text") {
+      nodes.push(segment.value);
+      return;
+    }
+    nodes.push(<InlineReferenceLink key={`inline-ref-${index}`} token={segment.value} />);
+  });
+  return nodes;
+}
+
+function renderCommentBody(text: string, mentionByHandle: Record<string, MentionUser>): ReactNode {
+  const segments = parseInlineReferenceSegments(text);
+  const nodes: ReactNode[] = [];
+  segments.forEach((segment, index) => {
+    if (segment.type === "text") {
+      nodes.push(
+        ...renderTextWithMentions(segment.value, mentionByHandle, `mention-${index}`),
+      );
+      return;
+    }
+    nodes.push(<InlineReferenceLink key={`inline-comment-${index}`} token={segment.value} />);
+  });
+  return nodes;
 }
 
 function historyActionLabel(actionType: string | null, t: TranslateFn): string {
@@ -695,6 +743,9 @@ export function EntryDetailPage() {
   const commentTextareaRef = useRef<HTMLTextAreaElement | null>(null);
   const [mentionContext, setMentionContext] = useState<MentionContext | null>(null);
   const [mentionSelectionIndex, setMentionSelectionIndex] = useState(0);
+  const [inlineContext, setInlineContext] = useState<InlineReferenceContext | null>(null);
+  const [inlineSelectionIndex, setInlineSelectionIndex] = useState(0);
+  const [inlineDismissedContext, setInlineDismissedContext] = useState<InlineReferenceContext | null>(null);
   const commentBodyValue = commentForm.watch("body");
   const entryHasSource = entryEditForm.watch("has_source");
   const entrySourceAuthors = entryEditForm.watch("source_authors");
@@ -795,6 +846,51 @@ export function EntryDetailPage() {
 
   const mentionSuggestions = mentionSuggestionsQuery.data ?? [];
 
+  const inlineQuery = inlineContext?.query.trim() ?? "";
+  const navarroCacheQuery = useQuery({
+    queryKey: ["navarro", "cache"],
+    queryFn: loadNavarroCache,
+    staleTime: Infinity,
+    gcTime: Infinity,
+    enabled: canWrite && inlineContext?.type === "dta",
+  });
+  const neoSuggestionsQuery = useQuery({
+    queryKey: ["inline", "neo", inlineQuery],
+    queryFn: async () => {
+      const response = await listEntries({
+        page: 1,
+        page_size: 6,
+        search: inlineQuery,
+        status: "approved",
+      });
+      return response.items;
+    },
+    enabled:
+      canWrite && inlineContext?.type === "neo" && inlineQuery.length >= INLINE_MIN_QUERY_LENGTH,
+    staleTime: 30 * 1000,
+  });
+
+  const inlineSuggestions = useMemo(() => {
+    if (!inlineContext) {
+      return [];
+    }
+    if (inlineContext.type === "dta") {
+      const results = searchNavarroCache(navarroCacheQuery.data ?? [], inlineQuery, 12);
+      return results.map((entry) => ({
+        key: entry.id,
+        label: buildNavarroLabel(entry),
+        secondary: entry.definition,
+        tokenText: buildNavarroToken(entry),
+      }));
+    }
+    return (neoSuggestionsQuery.data ?? []).map((entry) => ({
+      key: entry.id,
+      label: entry.headword || entry.slug,
+      secondary: entry.gloss_pt ?? undefined,
+      tokenText: buildNeoToken(entry),
+    }));
+  }, [inlineContext, navarroSuggestionsQuery.data, neoSuggestionsQuery.data]);
+
   useEffect(() => {
     if (!entry) {
       return;
@@ -826,11 +922,22 @@ export function EntryDetailPage() {
   }, [mentionContext?.query]);
 
   useEffect(() => {
+    setInlineSelectionIndex(0);
+  }, [inlineContext?.query]);
+
+  useEffect(() => {
     if (mentionSelectionIndex < mentionSuggestions.length) {
       return;
     }
     setMentionSelectionIndex(0);
   }, [mentionSelectionIndex, mentionSuggestions.length]);
+
+  useEffect(() => {
+    if (inlineSelectionIndex < inlineSuggestions.length) {
+      return;
+    }
+    setInlineSelectionIndex(0);
+  }, [inlineSelectionIndex, inlineSuggestions.length]);
 
   const createExampleMutation = useMutation({
     mutationFn: (payload: Parameters<typeof createExample>[1]) => createExample(String(entry?.id), payload),
@@ -1207,6 +1314,28 @@ export function EntryDetailPage() {
     setMentionContext(detectMentionContext(value, caret));
   };
 
+  const updateInlineContextFromInput = (value: string, caret: number | null) => {
+    const nextContext = detectInlineReferenceContext(value, caret);
+    if (
+      inlineDismissedContext &&
+      nextContext &&
+      inlineDismissedContext.start === nextContext.start &&
+      inlineDismissedContext.type === nextContext.type
+    ) {
+      setInlineContext(null);
+      return;
+    }
+    if (
+      inlineDismissedContext &&
+      (!nextContext ||
+        inlineDismissedContext.start !== nextContext.start ||
+        inlineDismissedContext.type !== nextContext.type)
+    ) {
+      setInlineDismissedContext(null);
+    }
+    setInlineContext(nextContext);
+  };
+
   const insertMentionSuggestion = (mention: MentionUser) => {
     if (!mentionContext) {
       return;
@@ -1229,7 +1358,57 @@ export function EntryDetailPage() {
     });
   };
 
+  const insertInlineSuggestion = (suggestion: InlineReferenceSuggestion) => {
+    if (!inlineContext) {
+      return;
+    }
+    const current = commentForm.getValues("body") ?? "";
+    const insertText = `${suggestion.tokenText} `;
+    const cursorAfterInsert = inlineContext.start + insertText.length;
+    const nextBody =
+      current.slice(0, inlineContext.start) + insertText + current.slice(inlineContext.end);
+    commentForm.setValue("body", nextBody, { shouldDirty: true, shouldTouch: true });
+    setInlineContext(null);
+    setInlineSelectionIndex(0);
+    window.requestAnimationFrame(() => {
+      const textarea = commentTextareaRef.current;
+      if (!textarea) {
+        return;
+      }
+      textarea.focus();
+      textarea.setSelectionRange(cursorAfterInsert, cursorAfterInsert);
+    });
+  };
+
   const onCommentTextareaKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
+    if (inlineContext) {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        setInlineContext(null);
+        return;
+      }
+      if (!inlineSuggestions.length) {
+        return;
+      }
+      if (event.key === "ArrowDown") {
+        event.preventDefault();
+        setInlineSelectionIndex((current) => (current + 1) % inlineSuggestions.length);
+        return;
+      }
+      if (event.key === "ArrowUp") {
+        event.preventDefault();
+        setInlineSelectionIndex((current) =>
+          current === 0 ? inlineSuggestions.length - 1 : current - 1,
+        );
+        return;
+      }
+      if (event.key === "Tab" || event.key === "Enter") {
+        event.preventDefault();
+        insertInlineSuggestion(inlineSuggestions[inlineSelectionIndex] ?? inlineSuggestions[0]);
+      }
+      return;
+    }
+
     if (!mentionContext) {
       return;
     }
@@ -1258,7 +1437,8 @@ export function EntryDetailPage() {
       insertMentionSuggestion(mentionSuggestions[mentionSelectionIndex] ?? mentionSuggestions[0]);
     }
   };
-  const showMentionSuggestions = mentionContext !== null;
+  const showInlineSuggestions = inlineContext !== null;
+  const showMentionSuggestions = mentionContext !== null && !showInlineSuggestions;
 
   const applySourceSuggestionToEntryEdit = (source: SourceSuggestion) => {
     entryEditForm.setValue("source_authors", source.authors ?? "");
@@ -1428,9 +1608,9 @@ export function EntryDetailPage() {
           </p>
         ) : null}
         {entry.morphology_notes ? (
-          <p className="mt-2 text-sm text-slate-700">
+          <p className="mt-2 whitespace-pre-wrap text-sm text-slate-700">
             <span className="font-semibold text-slate-900">{t("entry.morphology")}:</span>{" "}
-            {entry.morphology_notes}
+            {renderInlineReferenceText(entry.morphology_notes)}
           </p>
         ) : null}
         {displayedSourceCitation ? (
@@ -1693,7 +1873,6 @@ export function EntryDetailPage() {
                 <option value="demonstrative">{t("partOfSpeech.demonstrative")}</option>
                 <option value="number">{t("partOfSpeech.number")}</option>
                 <option value="proper_noun">{t("partOfSpeech.proper_noun")}</option>
-                <option value="copula">{t("partOfSpeech.copula")}</option>
                 <option value="other">{t("partOfSpeech.other")}</option>
               </select>
             </div>
@@ -1796,7 +1975,20 @@ export function EntryDetailPage() {
               <label className="mb-1 block text-sm font-medium" htmlFor="edit_morphology_notes">
                 {t("entry.morphology")} ({t("form.optional")})
               </label>
-              <Textarea id="edit_morphology_notes" {...entryEditForm.register("morphology_notes")} />
+              <Controller
+                control={entryEditForm.control}
+                name="morphology_notes"
+                render={({ field }) => (
+                  <InlineReferenceTextarea
+                    id="edit_morphology_notes"
+                    value={field.value ?? ""}
+                    onValueChange={(nextValue) => {
+                      field.onChange(nextValue);
+                    }}
+                    onBlur={field.onBlur}
+                  />
+                )}
+              />
             </div>
             <div>
               <label className="mb-1 block text-sm font-medium" htmlFor="edit_summary">
@@ -2420,20 +2612,58 @@ export function EntryDetailPage() {
                 onChange={(event) => {
                   commentForm.setValue("body", event.target.value, { shouldDirty: true, shouldTouch: true });
                   updateMentionContextFromInput(event.target.value, event.target.selectionStart);
+                  updateInlineContextFromInput(event.target.value, event.target.selectionStart);
                 }}
                 onClick={(event) => {
                   updateMentionContextFromInput(event.currentTarget.value, event.currentTarget.selectionStart);
+                  updateInlineContextFromInput(event.currentTarget.value, event.currentTarget.selectionStart);
                 }}
                 onKeyUp={(event) => {
                   updateMentionContextFromInput(event.currentTarget.value, event.currentTarget.selectionStart);
+                  updateInlineContextFromInput(event.currentTarget.value, event.currentTarget.selectionStart);
                 }}
                 onKeyDown={onCommentTextareaKeyDown}
                 onBlur={() => {
                   window.setTimeout(() => {
                     setMentionContext(null);
+                    setInlineContext(null);
                   }, 120);
                 }}
               />
+              {showInlineSuggestions ? (
+                <InlineReferenceSuggestions
+                  type={inlineContext!.type}
+                  title={
+                    inlineContext?.type === "dta"
+                      ? t("inlineRef.searchNavarro")
+                      : t("inlineRef.searchEntries")
+                  }
+                  isLoading={
+                    inlineContext?.type === "dta"
+                      ? navarroCacheQuery.isLoading
+                      : neoSuggestionsQuery.isLoading
+                  }
+                  suggestions={inlineSuggestions}
+                  selectionIndex={inlineSelectionIndex}
+                  onSelect={insertInlineSuggestion}
+                  onDismiss={() => {
+                    if (inlineContext) {
+                      setInlineDismissedContext(inlineContext);
+                    }
+                    setInlineContext(null);
+                  }}
+                  emptyLabel={t("inlineRef.empty")}
+                  loadingLabel={t("inlineRef.loading")}
+                  minCharsLabel={
+                    inlineQuery.length < INLINE_MIN_QUERY_LENGTH
+                      ? t("inlineRef.minChars")
+                      : undefined
+                  }
+                  dismissLabel={t("inlineRef.dismiss")}
+                  collapseAfter={5}
+                  seeMoreLabel={t("inlineRef.seeMore")}
+                />
+              ) : null}
               {showMentionSuggestions ? (
                 <div className="absolute left-0 right-0 z-20 mt-1 rounded-md border border-line-strong bg-surface-input shadow-lg">
                   {mentionSuggestionsQuery.isLoading ? (

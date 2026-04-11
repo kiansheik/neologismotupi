@@ -1,6 +1,6 @@
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { useForm } from "react-hook-form";
+import { Controller, useForm } from "react-hook-form";
 import { Link, useNavigate } from "react-router-dom";
 import { z } from "zod";
 
@@ -20,6 +20,7 @@ import { useCurrentUser } from "@/features/auth/hooks";
 import { AudioCapture, AudioQueueList } from "@/features/audio/components";
 import { uploadEntryAudio } from "@/features/audio/api";
 import { createEntry, getEntrySubmissionGate, listEntries } from "@/features/entries/api";
+import { InlineReferenceTextarea } from "@/features/inline-references/components/inline-reference-textarea";
 import { listSources } from "@/features/sources/api";
 import { EtymologyBuilder } from "@/features/etymology-builder/EtymologyBuilder";
 import type { SourceSuggestion } from "@/lib/types";
@@ -134,11 +135,6 @@ export function SubmitPage() {
 
   const headwordValid = isValidHeadword(watchedHeadword);
   const showHeadwordRules = watchedHeadword.trim().length > 0 && !headwordValid;
-  const morphologyNotesField = form.register("morphology_notes", {
-    onChange: () => {
-      setIsMorphologyOverride(true);
-    },
-  });
 
   const addQueuedAudio = (file: File) => {
     setQueuedAudio((current) => [...current, file]);
@@ -582,7 +578,6 @@ export function SubmitPage() {
             <option value="demonstrative">{partOfSpeechLabel("demonstrative", t)}</option>
             <option value="number">{partOfSpeechLabel("number", t)}</option>
             <option value="proper_noun">{partOfSpeechLabel("proper_noun", t)}</option>
-            <option value="copula">{partOfSpeechLabel("copula", t)}</option>
             <option value="other">{partOfSpeechLabel("other", t)}</option>
           </select>
         </div>
@@ -697,10 +692,21 @@ export function SubmitPage() {
             {t("submit.morphologyNotes")} ({t("form.optional")})
           </label>
           <p className="mb-1 text-xs text-slate-600">{t("submit.help.morphologyNotes")}</p>
-          <Textarea
-            id="morphology_notes"
-            placeholder="bebé - voar; sara - agente; o que voa"
-            {...morphologyNotesField}
+          <Controller
+            control={form.control}
+            name="morphology_notes"
+            render={({ field }) => (
+              <InlineReferenceTextarea
+                id="morphology_notes"
+                placeholder="bebé - voar; sara - agente; o que voa"
+                value={field.value ?? ""}
+                onValueChange={(nextValue) => {
+                  field.onChange(nextValue);
+                  setIsMorphologyOverride(true);
+                }}
+                onBlur={field.onBlur}
+              />
+            )}
           />
         </div>
         <div className="rounded-md border border-brand-100 bg-surface/70 p-3">

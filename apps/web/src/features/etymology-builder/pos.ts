@@ -278,7 +278,6 @@ export const POS_OPTIONS: Array<{ kind: RootPosKind; label: string; abbrev: stri
   { kind: "particle", label: "Partícula", abbrev: "part." },
   { kind: "article", label: "Artigo", abbrev: "art." },
   { kind: "preposition", label: "Preposição", abbrev: "prep." },
-  { kind: "copula", label: "Cópula", abbrev: "cop." },
   { kind: "deadverbal", label: "Deadverbal (adj. de adv.)", abbrev: "deadv." },
   { kind: "proper_noun", label: "Nome próprio", abbrev: "n. prop." },
   { kind: "composition", label: "Composição", abbrev: "comp." },

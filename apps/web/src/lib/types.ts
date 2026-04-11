@@ -7,6 +7,13 @@ export type EntryStatus =
 export type ExampleStatus = "pending" | "approved" | "hidden" | "rejected";
 export type UserBadgeKind = "founder" | "top_contributor" | "karma_leader";
 
+export interface NavarroEntry {
+  id: string;
+  first_word: string;
+  optional_number: string;
+  definition: string;
+}
+
 export interface Tag {
   id: string;
   name: string;

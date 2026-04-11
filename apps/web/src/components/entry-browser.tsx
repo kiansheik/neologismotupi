@@ -331,7 +331,6 @@ export function EntryBrowser({
             <option value="demonstrative">{partOfSpeechLabel("demonstrative", t)}</option>
             <option value="number">{partOfSpeechLabel("number", t)}</option>
             <option value="proper_noun">{partOfSpeechLabel("proper_noun", t)}</option>
-            <option value="copula">{partOfSpeechLabel("copula", t)}</option>
             <option value="other">{partOfSpeechLabel("other", t)}</option>
           </select>
           <select
