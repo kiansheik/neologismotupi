@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from "react";
+import { forwardRef, useImperativeHandle, useMemo, useRef, useState, useEffect, type Ref } from "react";
 import { useQuery } from "@tanstack/react-query";
 
 import { useI18n } from "@/i18n";
@@ -6,18 +6,27 @@ import { listEntries } from "@/features/entries/api";
 import { loadNavarroCache, searchNavarroCache } from "@/features/navarro/cache";
 import type { EntrySummary } from "@/lib/types";
 
-import { InlineReferenceHighlight } from "./inline-reference-highlight";
+import { Textarea } from "@/components/ui/textarea";
 import {
   buildNavarroLabel,
   buildNavarroToken,
   buildNeoToken,
+  containsInlineReferenceTokens,
   detectInlineReferenceContext,
+  extractInlineTokensToDisplay,
+  applyInlineTokens,
+  updateInlineTokenPositions,
   type InlineReferenceContext,
+  type InlineReferenceSpan,
 } from "../utils";
 import {
   InlineReferenceSuggestions,
   type InlineReferenceSuggestion,
 } from "./inline-reference-suggestions";
+
+export type InlineReferenceTextareaHandle = {
+  getRawValue: () => string;
+};
 
 type InlineReferenceTextareaProps = {
   value: string;
@@ -33,7 +42,7 @@ type InlineReferenceTextareaProps = {
 
 const MIN_QUERY_LENGTH = 1;
 
-export function InlineReferenceTextarea({
+function InlineReferenceTextareaBase({
   value,
   onValueChange,
   placeholder,
@@ -43,12 +52,22 @@ export function InlineReferenceTextarea({
   disabled,
   className,
   onBlur,
-}: InlineReferenceTextareaProps) {
+}: InlineReferenceTextareaProps, ref: Ref<InlineReferenceTextareaHandle>) {
   const { t } = useI18n();
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const [context, setContext] = useState<InlineReferenceContext | null>(null);
   const [selectionIndex, setSelectionIndex] = useState(0);
   const [dismissedContext, setDismissedContext] = useState<InlineReferenceContext | null>(null);
+  const tokensRef = useRef<InlineReferenceSpan[]>([]);
+  const lastValueRef = useRef(value);
+
+  useImperativeHandle(
+    ref,
+    () => ({
+      getRawValue: () => applyInlineTokens(lastValueRef.current, tokensRef.current),
+    }),
+    [],
+  );
 
   const query = context?.query.trim() ?? "";
   const showSuggestions = Boolean(context);
@@ -125,9 +144,19 @@ export function InlineReferenceTextarea({
       return;
     }
     const tokenText = `${suggestion.tokenText} `;
-    const nextValue =
-      value.slice(0, context.start) + tokenText + value.slice(context.end);
+    const nextValue = value.slice(0, context.start) + suggestion.label + " " + value.slice(context.end);
+    tokensRef.current = updateInlineTokenPositions(value, nextValue, tokensRef.current);
+    tokensRef.current = [
+      ...tokensRef.current,
+      {
+        start: context.start,
+        end: context.start + suggestion.label.length,
+        raw: suggestion.tokenText,
+        label: suggestion.label,
+      },
+    ];
     onValueChange(nextValue);
+    lastValueRef.current = nextValue;
     setContext(null);
     setSelectionIndex(0);
     window.requestAnimationFrame(() => {
@@ -176,9 +205,26 @@ export function InlineReferenceTextarea({
       ? t("inlineRef.searchNavarro")
       : t("inlineRef.searchEntries");
 
+  useEffect(() => {
+    if (value === lastValueRef.current) {
+      return;
+    }
+    if (containsInlineReferenceTokens(value)) {
+      const { display, tokens } = extractInlineTokensToDisplay(value);
+      tokensRef.current = tokens;
+      lastValueRef.current = display;
+      if (display !== value) {
+        onValueChange(display);
+      }
+      return;
+    }
+    tokensRef.current = updateInlineTokenPositions(lastValueRef.current, value, tokensRef.current);
+    lastValueRef.current = value;
+  }, [value, onValueChange]);
+
   return (
     <div className="relative">
-      <InlineReferenceHighlight
+      <Textarea
         ref={textareaRef}
         id={id}
         name={name}
@@ -188,8 +234,11 @@ export function InlineReferenceTextarea({
         placeholder={placeholder}
         value={value}
         onChange={(event) => {
-          onValueChange(event.target.value);
-          updateContext(event.target.value, event.target.selectionStart);
+          const nextValue = event.target.value;
+          tokensRef.current = updateInlineTokenPositions(value, nextValue, tokensRef.current);
+          lastValueRef.current = nextValue;
+          onValueChange(nextValue);
+          updateContext(nextValue, event.target.selectionStart);
         }}
         onClick={(event) => {
           updateContext(event.currentTarget.value, event.currentTarget.selectionStart);
@@ -234,3 +283,5 @@ export function InlineReferenceTextarea({
     </div>
   );
 }
+
+export const InlineReferenceTextarea = forwardRef(InlineReferenceTextareaBase);

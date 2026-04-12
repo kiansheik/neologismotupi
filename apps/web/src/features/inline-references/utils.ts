@@ -17,6 +17,13 @@ export type InlineReferenceContext = {
   end: number;
 };
 
+export type InlineReferenceSpan = {
+  start: number;
+  end: number;
+  raw: string;
+  label: string;
+};
+
 export type InlineReferenceSegment =
   | { type: "text"; value: string }
   | { type: "token"; value: InlineReferenceToken };
@@ -138,6 +145,97 @@ export function parseInlineReferenceToken(raw: string): InlineReferenceToken | n
     label,
     raw,
   };
+}
+
+export function containsInlineReferenceTokens(text: string): boolean {
+  INLINE_TOKEN_PATTERN.lastIndex = 0;
+  return INLINE_TOKEN_PATTERN.test(text);
+}
+
+export function extractInlineTokensToDisplay(text: string): {
+  display: string;
+  tokens: InlineReferenceSpan[];
+} {
+  const segments = parseInlineReferenceSegments(text);
+  let cursor = 0;
+  let display = "";
+  const tokens: InlineReferenceSpan[] = [];
+  segments.forEach((segment) => {
+    if (segment.type === "text") {
+      display += segment.value;
+      cursor += segment.value.length;
+      return;
+    }
+    const label = segment.value.label;
+    const start = cursor;
+    const end = start + label.length;
+    tokens.push({
+      start,
+      end,
+      raw: segment.value.raw,
+      label,
+    });
+    display += label;
+    cursor = end;
+  });
+  return { display, tokens };
+}
+
+export function applyInlineTokens(display: string, tokens: InlineReferenceSpan[]): string {
+  if (!tokens.length) {
+    return display;
+  }
+  const ordered = [...tokens].sort((a, b) => b.start - a.start);
+  let output = display;
+  for (const token of ordered) {
+    if (token.start < 0 || token.end > output.length || token.start > token.end) {
+      continue;
+    }
+    output = output.slice(0, token.start) + token.raw + output.slice(token.end);
+  }
+  return output;
+}
+
+export function updateInlineTokenPositions(
+  prev: string,
+  next: string,
+  tokens: InlineReferenceSpan[],
+): InlineReferenceSpan[] {
+  if (!tokens.length) {
+    return tokens;
+  }
+  let prefix = 0;
+  while (prefix < prev.length && prefix < next.length && prev[prefix] === next[prefix]) {
+    prefix += 1;
+  }
+  let suffix = 0;
+  while (
+    suffix < prev.length - prefix &&
+    suffix < next.length - prefix &&
+    prev[prev.length - 1 - suffix] === next[next.length - 1 - suffix]
+  ) {
+    suffix += 1;
+  }
+  const prevChangeEnd = prev.length - suffix;
+  const delta = next.length - prev.length;
+
+  const updated: InlineReferenceSpan[] = [];
+  for (const token of tokens) {
+    if (token.end <= prefix) {
+      updated.push(token);
+      continue;
+    }
+    if (token.start >= prevChangeEnd) {
+      updated.push({
+        ...token,
+        start: token.start + delta,
+        end: token.end + delta,
+      });
+      continue;
+    }
+    // token overlaps edited region; drop it
+  }
+  return updated;
 }
 
 export function buildNavarroExternalSearch(headword: string): string {

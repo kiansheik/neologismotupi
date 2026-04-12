@@ -1,5 +1,5 @@
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Controller, useForm } from "react-hook-form";
 import { Link, useNavigate } from "react-router-dom";
 import { z } from "zod";
@@ -20,7 +20,10 @@ import { useCurrentUser } from "@/features/auth/hooks";
 import { AudioCapture, AudioQueueList } from "@/features/audio/components";
 import { uploadEntryAudio } from "@/features/audio/api";
 import { createEntry, getEntrySubmissionGate, listEntries } from "@/features/entries/api";
-import { InlineReferenceTextarea } from "@/features/inline-references/components/inline-reference-textarea";
+import {
+  InlineReferenceTextarea,
+  type InlineReferenceTextareaHandle,
+} from "@/features/inline-references/components/inline-reference-textarea";
 import { listSources } from "@/features/sources/api";
 import { EtymologyBuilder } from "@/features/etymology-builder/EtymologyBuilder";
 import type { SourceSuggestion } from "@/lib/types";
@@ -64,6 +67,7 @@ export function SubmitPage() {
   const [builderNote, setBuilderNote] = useState("");
   const [builderPydicate, setBuilderPydicate] = useState("");
   const [isMorphologyOverride, setIsMorphologyOverride] = useState(false);
+  const morphologyRef = useRef<InlineReferenceTextareaHandle | null>(null);
 
   const form = useForm<SubmitForm>({
     defaultValues: {
@@ -308,7 +312,8 @@ export function SubmitPage() {
                 url: parsed.data.source_url || undefined,
               }
             : undefined,
-        morphology_notes: parsed.data.morphology_notes,
+        morphology_notes:
+          morphologyRef.current?.getRawValue() ?? parsed.data.morphology_notes,
         pydicate: normalizedPydicate.length ? normalizedPydicate : undefined,
         force_submit: parsed.data.force_submit,
       });
@@ -697,6 +702,7 @@ export function SubmitPage() {
             name="morphology_notes"
             render={({ field }) => (
               <InlineReferenceTextarea
+                ref={morphologyRef}
                 id="morphology_notes"
                 placeholder="bebé - voar; sara - agente; o que voa"
                 value={field.value ?? ""}

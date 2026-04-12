@@ -29,17 +29,21 @@ import { deleteAudioSample, uploadEntryAudio, uploadExampleAudio, voteAudio } fr
 import { createComment, listCommentVersions, updateComment, voteComment } from "@/features/comments/api";
 import { listExampleVersions, reportExample, updateExample, voteExample } from "@/features/examples/api";
 import { createExample, getEntry, listEntries, reportEntry, updateEntry, voteEntry } from "@/features/entries/api";
-import { InlineReferenceHighlight } from "@/features/inline-references/components/inline-reference-highlight";
 import { InlineReferenceLink } from "@/features/inline-references/components/inline-reference-link";
 import {
   InlineReferenceSuggestions,
   type InlineReferenceSuggestion,
 } from "@/features/inline-references/components/inline-reference-suggestions";
-import { InlineReferenceTextarea } from "@/features/inline-references/components/inline-reference-textarea";
 import {
+  InlineReferenceTextarea,
+  type InlineReferenceTextareaHandle,
+} from "@/features/inline-references/components/inline-reference-textarea";
+import {
+  applyInlineTokens,
   buildNavarroLabel,
   buildNavarroToken,
   buildNeoToken,
+  updateInlineTokenPositions,
   detectInlineReferenceContext,
   parseInlineReferenceSegments,
   type InlineReferenceContext,
@@ -742,11 +746,14 @@ export function EntryDetailPage() {
     },
   });
   const commentTextareaRef = useRef<HTMLTextAreaElement | null>(null);
+  const commentInlineTokensRef = useRef<Array<{ start: number; end: number; raw: string; label: string }>>([]);
+  const commentLastValueRef = useRef("");
   const [mentionContext, setMentionContext] = useState<MentionContext | null>(null);
   const [mentionSelectionIndex, setMentionSelectionIndex] = useState(0);
   const [inlineContext, setInlineContext] = useState<InlineReferenceContext | null>(null);
   const [inlineSelectionIndex, setInlineSelectionIndex] = useState(0);
   const [inlineDismissedContext, setInlineDismissedContext] = useState<InlineReferenceContext | null>(null);
+  const morphologyRef = useRef<InlineReferenceTextareaHandle | null>(null);
   const commentBodyValue = commentForm.watch("body");
   const entryHasSource = entryEditForm.watch("has_source");
   const entrySourceAuthors = entryEditForm.watch("source_authors");
@@ -979,6 +986,8 @@ export function EntryDetailPage() {
       commentForm.reset();
       setMentionContext(null);
       setMentionSelectionIndex(0);
+      commentInlineTokensRef.current = [];
+      commentLastValueRef.current = "";
       queryClient.invalidateQueries({ queryKey: ["entry", slug] });
       queryClient.invalidateQueries({ queryKey: ["entries"] });
       queryClient.invalidateQueries({ queryKey: ["notifications"] });
@@ -1214,7 +1223,9 @@ export function EntryDetailPage() {
       applyZodErrors(parsed.error, commentForm.setError);
       return;
     }
-    createCommentMutation.mutate(parsed.data);
+    createCommentMutation.mutate({
+      body: applyInlineTokens(parsed.data.body, commentInlineTokensRef.current),
+    });
   });
 
   const onEntryReportSubmit = entryReportForm.handleSubmit((payload) => {
@@ -1306,7 +1317,7 @@ export function EntryDetailPage() {
       short_definition: parsed.data.short_definition,
       source: normalizedSource.source,
       source_citation: normalizedSource.source_citation,
-      morphology_notes: parsed.data.morphology_notes,
+      morphology_notes: morphologyRef.current?.getRawValue() ?? parsed.data.morphology_notes,
       edit_summary: parsed.data.edit_summary.trim(),
     });
   });
@@ -1364,10 +1375,25 @@ export function EntryDetailPage() {
       return;
     }
     const current = commentForm.getValues("body") ?? "";
-    const insertText = `${suggestion.tokenText} `;
+    const insertText = `${suggestion.label} `;
     const cursorAfterInsert = inlineContext.start + insertText.length;
     const nextBody =
       current.slice(0, inlineContext.start) + insertText + current.slice(inlineContext.end);
+    commentInlineTokensRef.current = updateInlineTokenPositions(
+      current,
+      nextBody,
+      commentInlineTokensRef.current,
+    );
+    commentInlineTokensRef.current = [
+      ...commentInlineTokensRef.current,
+      {
+        start: inlineContext.start,
+        end: inlineContext.start + suggestion.label.length,
+        raw: suggestion.tokenText,
+        label: suggestion.label,
+      },
+    ];
+    commentLastValueRef.current = nextBody;
     commentForm.setValue("body", nextBody, { shouldDirty: true, shouldTouch: true });
     setInlineContext(null);
     setInlineSelectionIndex(0);
@@ -1981,6 +2007,7 @@ export function EntryDetailPage() {
                 name="morphology_notes"
                 render={({ field }) => (
                   <InlineReferenceTextarea
+                    ref={morphologyRef}
                     id="edit_morphology_notes"
                     value={field.value ?? ""}
                     onValueChange={(nextValue) => {
@@ -2604,16 +2631,23 @@ export function EntryDetailPage() {
             }}
           >
             <div className="relative">
-              <InlineReferenceHighlight
+              <Textarea
                 id="comment_body"
                 rows={4}
                 ref={commentTextareaRef}
                 placeholder={t("entry.commentPlaceholder")}
                 value={commentBodyValue ?? ""}
                 onChange={(event) => {
-                  commentForm.setValue("body", event.target.value, { shouldDirty: true, shouldTouch: true });
-                  updateMentionContextFromInput(event.target.value, event.target.selectionStart);
-                  updateInlineContextFromInput(event.target.value, event.target.selectionStart);
+                  const nextValue = event.target.value;
+                  commentInlineTokensRef.current = updateInlineTokenPositions(
+                    commentLastValueRef.current,
+                    nextValue,
+                    commentInlineTokensRef.current,
+                  );
+                  commentLastValueRef.current = nextValue;
+                  commentForm.setValue("body", nextValue, { shouldDirty: true, shouldTouch: true });
+                  updateMentionContextFromInput(nextValue, event.target.selectionStart);
+                  updateInlineContextFromInput(nextValue, event.target.selectionStart);
                 }}
                 onClick={(event) => {
                   updateMentionContextFromInput(event.currentTarget.value, event.currentTarget.selectionStart);
