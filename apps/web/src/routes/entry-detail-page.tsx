@@ -2002,6 +2002,7 @@ export function EntryDetailPage() {
               <label className="mb-1 block text-sm font-medium" htmlFor="edit_morphology_notes">
                 {t("entry.morphology")} ({t("form.optional")})
               </label>
+              <p className="mb-2 text-xs text-slate-500">{t("inlineRef.hint")}</p>
               <Controller
                 control={entryEditForm.control}
                 name="morphology_notes"
@@ -2697,6 +2698,7 @@ export function EntryDetailPage() {
                   dismissLabel={t("inlineRef.dismiss")}
                   collapseAfter={5}
                   seeMoreLabel={t("inlineRef.seeMore")}
+                  seeLessLabel={t("inlineRef.seeLess")}
                 />
               ) : null}
               {showMentionSuggestions ? (
@@ -2734,6 +2736,7 @@ export function EntryDetailPage() {
               ) : null}
             </div>
             <p className="text-xs text-slate-600">{t("entry.commentHelpMention")}</p>
+            <p className="text-xs text-slate-500">{t("inlineRef.hint")}</p>
             {commentForm.formState.errors.body?.message ? (
               <p className="text-xs text-red-700">{commentForm.formState.errors.body.message}</p>
             ) : null}

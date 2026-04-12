@@ -697,6 +697,7 @@ export function SubmitPage() {
             {t("submit.morphologyNotes")} ({t("form.optional")})
           </label>
           <p className="mb-1 text-xs text-slate-600">{t("submit.help.morphologyNotes")}</p>
+          <p className="mb-2 text-xs text-slate-500">{t("inlineRef.hint")}</p>
           <Controller
             control={form.control}
             name="morphology_notes"

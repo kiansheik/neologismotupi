@@ -23,6 +23,7 @@ type InlineReferenceSuggestionsProps = {
   dismissLabel: string;
   collapseAfter?: number;
   seeMoreLabel?: string;
+  seeLessLabel?: string;
 };
 
 export function InlineReferenceSuggestions({
@@ -39,6 +40,7 @@ export function InlineReferenceSuggestions({
   dismissLabel,
   collapseAfter,
   seeMoreLabel,
+  seeLessLabel,
 }: InlineReferenceSuggestionsProps) {
   const [expanded, setExpanded] = useState(false);
 
@@ -48,11 +50,13 @@ export function InlineReferenceSuggestions({
 
   const visibleSuggestions =
     collapseAfter && !expanded ? suggestions.slice(0, collapseAfter) : suggestions;
-  const canExpand =
-    Boolean(collapseAfter && suggestions.length > collapseAfter && !expanded);
+  const canToggle = Boolean(collapseAfter && suggestions.length > collapseAfter);
+  const canExpand = canToggle && !expanded;
+  const canCollapse = canToggle && expanded;
+  const listMaxHeightClass = expanded ? "max-h-[70vh]" : "max-h-52";
 
   return (
-    <div className="absolute left-0 z-20 mt-1 w-full max-w-[calc(100vw-2rem)] overflow-x-hidden rounded-md border border-line-strong bg-surface-input shadow-lg">
+    <div className="absolute left-0 right-0 z-20 mt-1 w-full max-w-[calc(100vw-2rem)] overflow-x-hidden rounded-md border border-line-strong bg-surface-input shadow-lg">
       <div className="flex items-center justify-between border-b border-line-weak px-3 py-2 text-xs font-semibold text-slate-600">
         <span>{title}</span>
         <button
@@ -68,7 +72,7 @@ export function InlineReferenceSuggestions({
       {isLoading ? (
         <p className="px-3 py-2 text-xs text-slate-600">{loadingLabel}</p>
       ) : visibleSuggestions.length ? (
-        <ul className="max-h-52 overflow-y-auto py-1">
+        <ul className={`${listMaxHeightClass} overflow-y-auto py-1`}>
           {visibleSuggestions.map((suggestion, index) => (
             <li key={`${type}-${suggestion.key}`}>
               <button
@@ -99,6 +103,18 @@ export function InlineReferenceSuggestions({
                 onClick={() => setExpanded(true)}
               >
                 {seeMoreLabel ?? "See more"}
+              </button>
+            </li>
+          ) : null}
+          {canCollapse ? (
+            <li>
+              <button
+                type="button"
+                className="flex w-full items-center justify-center px-3 py-2 text-xs font-semibold text-brand-700 hover:bg-surface-hover"
+                onMouseDown={(event) => event.preventDefault()}
+                onClick={() => setExpanded(false)}
+              >
+                {seeLessLabel ?? "See less"}
               </button>
             </li>
           ) : null}

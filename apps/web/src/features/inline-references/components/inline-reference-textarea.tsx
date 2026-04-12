@@ -278,6 +278,7 @@ function InlineReferenceTextareaBase({
           dismissLabel={t("inlineRef.dismiss")}
           collapseAfter={5}
           seeMoreLabel={t("inlineRef.seeMore")}
+          seeLessLabel={t("inlineRef.seeLess")}
         />
       ) : null}
     </div>

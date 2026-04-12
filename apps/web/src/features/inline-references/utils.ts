@@ -244,5 +244,5 @@ export function buildNavarroExternalSearch(headword: string): string {
     return "https://kiansheik.io/nhe-enga";
   }
   const query = encodeURIComponent(trimmed);
-  return `https://kiansheik.io/nhe-enga/?q=${query}`;
+  return `https://kiansheik.io/nhe-enga/?query=${query}`;
 }
