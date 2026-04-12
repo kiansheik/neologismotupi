@@ -24,6 +24,7 @@ export function InlineReferenceLink({ token }: InlineReferenceLinkProps) {
   const [expanded, setExpanded] = useState(false);
   const triggerRef = useRef<HTMLSpanElement | null>(null);
   const panelRef = useRef<HTMLDivElement | null>(null);
+  const closeTimeoutRef = useRef<number | null>(null);
 
   const navarroQuery = useQuery({
     queryKey: ["navarro", "entry", token.id],
@@ -91,12 +92,36 @@ export function InlineReferenceLink({ token }: InlineReferenceLinkProps) {
       : entryDetail?.short_definition ?? t("inlineRef.loading");
   const canToggleDefinition = definitionText.length > 160;
 
+  const clearCloseTimeout = () => {
+    if (closeTimeoutRef.current) {
+      window.clearTimeout(closeTimeoutRef.current);
+      closeTimeoutRef.current = null;
+    }
+  };
+
+  const scheduleClose = () => {
+    clearCloseTimeout();
+    closeTimeoutRef.current = window.setTimeout(() => {
+      setIsOpen(false);
+      closeTimeoutRef.current = null;
+    }, 220);
+  };
+
+  useEffect(() => {
+    return () => {
+      clearCloseTimeout();
+    };
+  }, []);
+
   return (
     <span
       ref={triggerRef}
       className="relative inline-block"
-      onMouseEnter={() => setIsOpen(true)}
-      onMouseLeave={() => setIsOpen(false)}
+      onMouseEnter={() => {
+        clearCloseTimeout();
+        setIsOpen(true);
+      }}
+      onMouseLeave={scheduleClose}
     >
       <button
         type="button"
@@ -112,6 +137,8 @@ export function InlineReferenceLink({ token }: InlineReferenceLinkProps) {
         <div
           ref={panelRef}
           className={`absolute z-20 mt-2 w-72 max-w-[calc(100vw-2rem)] rounded-md border border-line-strong bg-surface-input p-3 text-sm shadow-lg ${panelAlignClass}`}
+          onMouseEnter={clearCloseTimeout}
+          onMouseLeave={scheduleClose}
         >
           {token.type === "dta" ? (
             <>
