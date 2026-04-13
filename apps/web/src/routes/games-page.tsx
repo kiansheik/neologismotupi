@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 
 import { Card } from "@/components/ui/card";
 import { useCurrentUser } from "@/features/auth/hooks";
+import { FlashcardLeaderboard } from "@/features/flashcards/components/flashcard-leaderboard";
 import { useFlashcardStats } from "@/features/flashcards/hooks";
 import { useI18n } from "@/i18n";
 import { trackEvent } from "@/lib/analytics";
@@ -165,6 +166,11 @@ export function GamesPage() {
           <p className="text-lg font-semibold text-brand-900">{t("games.comingSoon.title")}</p>
           <p className="mt-2 text-sm text-ink-muted">{t("games.comingSoon.body")}</p>
         </Card>
+        {user ? (
+          <div className="md:col-span-2">
+            <FlashcardLeaderboard enabled />
+          </div>
+        ) : null}
       </div>
     </div>
   );
