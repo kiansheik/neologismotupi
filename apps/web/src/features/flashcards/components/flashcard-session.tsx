@@ -226,6 +226,20 @@ export function FlashcardSession({
   const [responseMs, setResponseMs] = useState<number | null>(null);
   const [audioSubmitted, setAudioSubmitted] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+  const cardRef = useRef<HTMLDivElement>(null);
+
+  const alignCardForPrompt = () => {
+    const card = cardRef.current;
+    if (!card) return;
+    const rect = card.getBoundingClientRect();
+    const viewportHeight = window.innerHeight || document.documentElement.clientHeight;
+    const margin = 16;
+    const fitsViewport = rect.height + margin * 2 <= viewportHeight;
+    const desiredTop = fitsViewport ? margin : Math.max(margin, viewportHeight - margin - rect.height);
+    const targetScrollY = window.scrollY + rect.top - desiredTop;
+    if (!Number.isFinite(targetScrollY)) return;
+    window.scrollTo({ top: Math.max(0, targetScrollY), behavior: "smooth" });
+  };
 
   useEffect(() => {
     if (!card) {
@@ -245,7 +259,15 @@ export function FlashcardSession({
     setShownAt(Date.now());
     setAudioSubmitted(false);
     setAudioReplayKey(0);
-    setTimeout(() => inputRef.current?.focus(), 50);
+    const timer = window.setTimeout(() => {
+      try {
+        inputRef.current?.focus({ preventScroll: true });
+      } catch {
+        inputRef.current?.focus();
+      }
+      alignCardForPrompt();
+    }, 50);
+    return () => window.clearTimeout(timer);
   }, [card?.entry_id, card?.direction]);
 
   const expected = useMemo(() => {
@@ -402,7 +424,8 @@ export function FlashcardSession({
   const percentMatch = gradeResult ? Math.round(gradeResult.ratio * 100) : 0;
 
   return (
-    <Card>
+    <div ref={cardRef}>
+      <Card>
       {/* Header */}
       <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="text-xs font-semibold uppercase tracking-wide text-brand-800">{queueLabel}</p>
@@ -579,6 +602,7 @@ export function FlashcardSession({
           {/* Continue button */}
         </div>
       )}
-    </Card>
+      </Card>
+    </div>
   );
 }
