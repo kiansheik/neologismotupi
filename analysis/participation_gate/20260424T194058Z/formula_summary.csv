@@ -1,0 +1,7 @@
+formula,users_total,users_with_score_gt_0,users_unlimited_now,users_allowed_0_now,users_allowed_1_now,users_allowed_2_now,median_score,p90_score,high_rep_users_blocked_now,historical_submissions_evaluated,historical_submissions_blocked,historical_submission_block_rate,unique_users_with_blocked_historical_submission,approved_submission_block_rate,high_volume_low_review_users,high_volume_low_review_blocked_now
+A_simple_7d_entry_example_1x_threshold_0_3_6,22,8,7,0,15,0,0.0,31.5,0,611,78,0.1277,9,0.1576,1,0
+B_weighted_7d_entry_1_example_075_comment_1_threshold_0_3_6,22,8,7,0,15,0,0.0,42.5,0,611,78,0.1277,9,0.1606,1,0
+C_pr17_current_4d_weighted_threshold_3_5_6,22,7,7,15,0,0,0.0,48.5,1,611,76,0.1244,13,0.1606,1,1
+D_pr17_scaled_4d_weighted_threshold_0_9_18,22,7,5,0,16,1,0.0,48.5,0,611,88,0.144,9,0.1879,1,0
+E_pr17_scaled_7d_weighted_threshold_0_9_18,22,8,7,0,15,0,0.0,111.0,0,611,79,0.1293,9,0.1606,1,0
+F_entry_only_7d_threshold_0_3_6,22,8,7,0,15,0,0.0,31.5,0,611,79,0.1293,9,0.1606,1,0

@@ -76,16 +76,16 @@ def enable_entry_participation_gate(monkeypatch) -> None:
     monkeypatch.setenv("ENTRY_PARTICIPATION_STEP1_POSTS", "1")
     monkeypatch.setenv("ENTRY_PARTICIPATION_STEP2_ACTIONS", "3")
     monkeypatch.setenv("ENTRY_PARTICIPATION_STEP2_POSTS", "2")
-    monkeypatch.setenv("ENTRY_PARTICIPATION_STEP3_ACTIONS", "6")
-    monkeypatch.setenv("ENTRY_PARTICIPATION_STEP3_UNLIMITED", "true")
-    monkeypatch.setenv("ENTRY_PARTICIPATION_UNLIMITED_DAILY_CAP", "")
+    monkeypatch.setenv("ENTRY_PARTICIPATION_STEP3_ACTIONS", "12")
+    monkeypatch.setenv("ENTRY_PARTICIPATION_STEP3_UNLIMITED", "false")
+    monkeypatch.setenv("ENTRY_PARTICIPATION_UNLIMITED_DAILY_CAP", "20")
     monkeypatch.setenv("ENTRY_PARTICIPATION_EXEMPT_STAFF", "false")
     # Pin weights to 1.0 so each vote == 1 point — keeps count-based assertions valid
     monkeypatch.setenv("ENTRY_PARTICIPATION_ENTRY_VOTE_WEIGHT", "1.0")
     monkeypatch.setenv("ENTRY_PARTICIPATION_EXAMPLE_VOTE_WEIGHT", "1.0")
-    monkeypatch.setenv("ENTRY_PARTICIPATION_COMMENT_VOTE_WEIGHT", "1.0")
-    monkeypatch.setenv("ENTRY_PARTICIPATION_PAGE_EXCELLENT_WEIGHT", "1.0")
-    monkeypatch.setenv("ENTRY_PARTICIPATION_PAGE_FAIR_WEIGHT", "0.5")
+    monkeypatch.setenv("ENTRY_PARTICIPATION_COMMENT_VOTE_WEIGHT", "0.0")
+    monkeypatch.setenv("ENTRY_PARTICIPATION_PAGE_EXCELLENT_WEIGHT", "0.0")
+    monkeypatch.setenv("ENTRY_PARTICIPATION_PAGE_FAIR_WEIGHT", "0.0")
     monkeypatch.setenv("ENTRY_PARTICIPATION_PAGE_POOR_WEIGHT", "0.0")
     get_settings.cache_clear()
 
@@ -313,18 +313,18 @@ async def test_entry_participation_gate_three_actions_are_not_consumed(client, m
 
 
 @pytest.mark.asyncio
-async def test_entry_participation_gate_six_actions_unlocks_unlimited(client, monkeypatch):
-    await register_user(client, "participation-six-seed@example.com", "Participation Six Seed")
+async def test_entry_participation_gate_twelve_actions_gives_daily_cap(client, monkeypatch):
+    await register_user(client, "participation-twelve-seed@example.com", "Participation Twelve Seed")
     seed_entries = [
-        await create_entry(client, f"participation-six-seed-{suffix}")
-        for suffix in ("a", "b", "c", "d", "e", "f")
+        await create_entry(client, f"participation-twelve-seed-{i}")
+        for i in range(12)
     ]
 
     await client.post("/api/auth/logout")
     await register_user(
         client,
-        "participation-six-reviewer@example.com",
-        "Participation Six Reviewer",
+        "participation-twelve-reviewer@example.com",
+        "Participation Twelve Reviewer",
     )
     enable_entry_participation_gate(monkeypatch)
 
@@ -335,18 +335,20 @@ async def test_entry_participation_gate_six_actions_unlocks_unlimited(client, mo
     gate_response = await client.get("/api/entries/submit-gate")
     assert gate_response.status_code == 200, gate_response.text
     gate = gate_response.json()
-    assert gate["review_actions"] == 6
-    assert gate["unlimited"] is True
-    assert gate["remaining_posts"] is None
+    assert gate["review_actions"] == 12
+    assert gate["unlimited"] is False
+    assert gate["allowed_posts"] == 20
+    assert gate["remaining_posts"] == 20
 
-    for suffix in ("a", "b", "c", "d"):
-        created = await create_entry(client, f"participation-six-created-{suffix}")
-        assert created["headword"] == f"participation-six-created-{suffix}"
+    for i in range(4):
+        created = await create_entry(client, f"participation-twelve-created-{i}")
+        assert created["headword"] == f"participation-twelve-created-{i}"
 
     gate_response = await client.get("/api/entries/submit-gate")
     gate = gate_response.json()
-    assert gate["review_actions"] == 6
-    assert gate["unlimited"] is True
+    assert gate["review_actions"] == 12
+    assert gate["unlimited"] is False
+    assert gate["remaining_posts"] == 16
 
 
 @pytest.mark.asyncio

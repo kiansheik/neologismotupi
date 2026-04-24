@@ -28,6 +28,7 @@ class EntryParticipationGate:
     window_start: datetime
     window_end: datetime
     participation_score: float
+    review_actions: int
     entries_today: int
     allowed_posts: int | None
     remaining_posts: int | None
@@ -35,10 +36,6 @@ class EntryParticipationGate:
     next_score_required: float
     score_required_for_unlimited: float
     votes_are_consumed: bool
-
-    @property
-    def review_actions(self) -> int:
-        return int(self.participation_score)
 
 
 def _as_utc(value: datetime) -> datetime:
@@ -166,8 +163,36 @@ async def compute_participation_score(
     return max(0.0, score)
 
 
+async def compute_review_actions_count(
+    db: AsyncSession,
+    user_id: uuid.UUID,
+    *,
+    window_start: datetime,
+    window_end: datetime,
+) -> int:
+    """Count of distinct qualifying participation events in the rolling window."""
+    action_types = _enabled_review_action_types()
+    if not action_types:
+        return 0
+
+    count = (
+        await db.execute(
+            select(func.count()).where(
+                and_(
+                    ReviewParticipationEvent.user_id == user_id,
+                    ReviewParticipationEvent.action_type.in_(action_types),
+                    ReviewParticipationEvent.created_at >= _as_utc(window_start),
+                    ReviewParticipationEvent.created_at <= _as_utc(window_end),
+                )
+            )
+        )
+    ).scalar_one()
+    return int(count)
+
+
 def compute_entry_participation_gate(
     participation_score: float,
+    review_actions: int,
     entries_today: int,
     *,
     window_start: datetime | None = None,
@@ -197,6 +222,7 @@ def compute_entry_participation_gate(
             window_start=window_start,
             window_end=window_end,
             participation_score=score,
+            review_actions=review_actions,
             entries_today=entries,
             allowed_posts=None,
             remaining_posts=None,
@@ -237,6 +263,7 @@ def compute_entry_participation_gate(
         window_start=window_start,
         window_end=window_end,
         participation_score=score,
+        review_actions=review_actions,
         entries_today=entries,
         allowed_posts=allowed_posts,
         remaining_posts=remaining_posts,
@@ -258,8 +285,15 @@ async def get_entry_submission_participation_gate(
     day_start, day_end = _get_utc_day_window(now)
 
     participation_score = 0.0
+    review_actions = 0
     if settings.entry_participation_gate_enabled:
         participation_score = await compute_participation_score(
+            db,
+            user.id,
+            window_start=window_start,
+            window_end=window_end,
+        )
+        review_actions = await compute_review_actions_count(
             db,
             user.id,
             window_start=window_start,
@@ -273,6 +307,7 @@ async def get_entry_submission_participation_gate(
     )
     gate = compute_entry_participation_gate(
         participation_score,
+        review_actions,
         entries_today,
         window_start=window_start,
         window_end=window_end,
