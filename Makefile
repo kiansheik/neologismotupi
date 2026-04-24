@@ -17,12 +17,13 @@ DEPLOY_SMOKE_RETRIES ?= 60
 DEPLOY_SMOKE_SLEEP_SECONDS ?= 2
 DEPLOY_DB_USER ?= nheenga
 DEPLOY_DB_NAME ?= nheenga_prod
+PARTICIPATION_BACKFILL_WINDOW_DAYS ?= 7
 
 API_DIR := apps/api
 WEB_DIR := apps/web
 API_ENV_FILE ?= .env
 
-.PHONY: help bootstrap-macos bootstrap-linux install dev dev-web dev-api web-build prod-check prod-migrate db-create db-migrate db-reset db-rebuild seed test-email newsletter-word-of-day newsletter-word-of-day-prod db-backup db-backup-prod db-dump-docker db-restore-dump db-restore-docker db-psql-docker migrate-legacy-entry-source deploy-migrate-legacy-entry-source deploy-full deploy-daily deploy-reset deploy-smoke deploy-ssh-all deploy-email-test deploy-smtp-logs deploy-api-logs deploy-api-logs-follow deploy-db-psql bootstrap-admin change-user-password test test-web test-api test-e2e lint format
+.PHONY: help bootstrap-macos bootstrap-linux install dev dev-web dev-api web-build prod-check prod-migrate db-create db-migrate db-reset db-rebuild seed test-email newsletter-word-of-day newsletter-word-of-day-prod db-backup db-backup-prod db-dump-docker db-restore-dump db-restore-docker db-psql-docker migrate-legacy-entry-source deploy-migrate-legacy-entry-source participation-backfill deploy-participation-backfill deploy-full deploy-daily deploy-reset deploy-smoke deploy-ssh-all deploy-email-test deploy-smtp-logs deploy-api-logs deploy-api-logs-follow deploy-db-psql bootstrap-admin change-user-password test test-web test-api test-e2e lint format
 
 help:
 	@echo "Available targets:"
@@ -30,8 +31,8 @@ help:
 	@echo "  make bootstrap-linux   # Install local dependencies for Debian/Ubuntu"
 	@echo "  make install           # Install API + web dependencies"
 	@echo "  make dev              # Run API and web together"
-	@echo "  make dev-api          # Run FastAPI only"
-	@echo "  make dev-web          # Run Vite app only"
+	@echo "  make dev-api          # FastAPI only"
+	@echo "  make dev-web          # Vite only"
 	@echo "  make web-build        # Build static frontend assets"
 	@echo "  make prod-check       # Validate production API config from .env.production"
 	@echo "  make prod-migrate     # Run migrations using apps/api/.env.production"
@@ -51,6 +52,8 @@ help:
 	@echo "  make db-psql-docker   # Open psql REPL for local Docker postgres"
 	@echo "  make migrate-legacy-entry-source [APPLY=1] [ACTOR_EMAIL=...] [BEFORE_SLUG=mongaturondara] [BEFORE_DATE=YYYY-MM-DD] [LIMIT=100]"
 	@echo "  make deploy-migrate-legacy-entry-source [APPLY=1] [ACTOR_EMAIL=...] [BEFORE_SLUG=mongaturondara] [BEFORE_DATE=YYYY-MM-DD] [LIMIT=100]"
+	@echo "  make participation-backfill [APPLY=1] [PARTICIPATION_BACKFILL_WINDOW_DAYS=7]  # Backfill local participation events from apps/api/.env"
+	@echo "  make deploy-participation-backfill [APPLY=1] [PARTICIPATION_BACKFILL_WINDOW_DAYS=7] [DEPLOY_HOST=...]  # Backfill prod participation events over SSH"
 	@echo "  make deploy-daily     # Fast daily deploy: API build/migrate/restart + smoke checks (no seed/reset)"
 	@echo "  make deploy-full      # Full stack deploy: API+Postgres+Caddy + migrate + smoke checks"
 	@echo "  make deploy-reset DEPLOY_SEED_CSV=/abs/path/neologisms.csv  # Destructive reset + reseed"
@@ -193,6 +196,21 @@ deploy-migrate-legacy-entry-source:
 		$(if $(BEFORE_DATE),--before-date '$(BEFORE_DATE)',) \
 		$(if $(LIMIT),--limit '$(LIMIT)',) \
 		$(if $(filter 1,$(APPLY)),--apply,)"
+
+participation-backfill:
+	@cd $(API_DIR) && set -a; [ -f $(API_ENV_FILE) ] && . ./$(API_ENV_FILE); set +a; \
+	uv run alembic upgrade head && \
+	uv run python -m app.core.backfill_participation_events \
+		--window-days "$(PARTICIPATION_BACKFILL_WINDOW_DAYS)" \
+		$(if $(filter 1,$(APPLY)),--apply,)
+
+deploy-participation-backfill:
+	@ssh -i "$(SSH_IDENTITY)" -p "$(SSH_PORT)" "$(DEPLOY_USER)@$(DEPLOY_HOST)" \
+		"cd '$(DEPLOY_PATH)' && \
+		docker compose -f deploy/docker-compose.remote.yml --env-file deploy/env/stack.env exec -T api \
+		sh -lc 'uv run alembic upgrade head && uv run python -m app.core.backfill_participation_events \
+		--window-days \"$(PARTICIPATION_BACKFILL_WINDOW_DAYS)\" \
+		$(if $(filter 1,$(APPLY)),--apply,)'"
 
 deploy-ssh-all:
 	@bash scripts/deploy-ssh-all.sh
