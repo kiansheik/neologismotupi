@@ -12,6 +12,7 @@ from app.schemas.audio import AudioVoteOut
 from app.schemas.entries import VoteRequest
 from app.services.audio import refresh_audio_vote_caches
 from app.services.entries import can_downvote
+from app.services.participation import AUDIO_VOTE_ACTION, record_review_participation_event
 
 router = APIRouter(prefix="/audio", tags=["audio"])
 
@@ -32,7 +33,9 @@ async def vote_audio(
             message="New users cannot downvote until account age is at least 72 hours",
         )
 
-    audio = (await db.execute(select(AudioSample).where(AudioSample.id == audio_id))).scalar_one_or_none()
+    audio = (
+        await db.execute(select(AudioSample).where(AudioSample.id == audio_id))
+    ).scalar_one_or_none()
     if not audio:
         raise_api_error(status_code=404, code="audio_not_found", message="Audio sample not found")
 
@@ -55,6 +58,14 @@ async def vote_audio(
         vote = AudioVote(audio_id=audio_id, user_id=user.id, value=payload.value)
         db.add(vote)
 
+    await record_review_participation_event(
+        db,
+        user_id=user.id,
+        action_type=AUDIO_VOTE_ACTION,
+        target_type="audio",
+        target_id=audio_id,
+    )
+
     await refresh_audio_vote_caches(db, audio)
     await db.commit()
 
@@ -72,7 +83,9 @@ async def delete_audio_vote(
     db: SessionDep,
     user: Annotated[User, Depends(get_current_user)],
 ) -> None:
-    audio = (await db.execute(select(AudioSample).where(AudioSample.id == audio_id))).scalar_one_or_none()
+    audio = (
+        await db.execute(select(AudioSample).where(AudioSample.id == audio_id))
+    ).scalar_one_or_none()
     if not audio:
         raise_api_error(status_code=404, code="audio_not_found", message="Audio sample not found")
 
@@ -93,7 +106,9 @@ async def delete_audio_sample(
     db: SessionDep,
     user: Annotated[User, Depends(get_current_user)],
 ) -> None:
-    audio = (await db.execute(select(AudioSample).where(AudioSample.id == audio_id))).scalar_one_or_none()
+    audio = (
+        await db.execute(select(AudioSample).where(AudioSample.id == audio_id))
+    ).scalar_one_or_none()
     if not audio:
         raise_api_error(status_code=404, code="audio_not_found", message="Audio sample not found")
     if audio.user_id != user.id and not user.is_superuser:

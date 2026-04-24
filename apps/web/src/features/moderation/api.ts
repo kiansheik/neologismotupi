@@ -1,5 +1,5 @@
 import { apiFetch, withQuery } from "@/lib/api";
-import type { ModerationDashboard, ModerationQueue, ModerationReport } from "@/lib/types";
+import type { ModerationDashboard, ModerationQueue, ModerationReport, ParticipationLeaderboard } from "@/lib/types";
 
 interface ModerationDecisionPayload {
   reason?: string;
@@ -8,6 +8,10 @@ interface ModerationDecisionPayload {
 
 export function getModerationQueue() {
   return apiFetch<ModerationQueue>("/mod/queue");
+}
+
+export function getParticipationLeaderboard() {
+  return apiFetch<ParticipationLeaderboard>("/mod/participation-leaderboard");
 }
 
 export function getModerationDashboard() {

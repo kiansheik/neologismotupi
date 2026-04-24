@@ -24,6 +24,7 @@ People already use, study, and document Tupi in classrooms, communities, archive
 
 ## Docs
 - Flashcards module: `docs/flashcards.md`.
+- Entry participation gate: `docs/participation-gate.md`.
 
 ## Tech stack
 - Frontend: Vite + React + TypeScript + React Router + TanStack Query + React Hook Form + Zod + Tailwind.

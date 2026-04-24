@@ -20,6 +20,7 @@ async def reset_database(tmp_path, monkeypatch) -> AsyncGenerator[None, None]:
     monkeypatch.setenv("TURNSTILE_ENABLED", "false")
     monkeypatch.setenv("ENTRY_VOTE_COST", "0")
     monkeypatch.setenv("ENTRY_VOTE_DAILY_STEP1_VOTES", "0")
+    monkeypatch.setenv("ENTRY_PARTICIPATION_GATE_ENABLED", "false")
     monkeypatch.setenv("DOWNVOTE_REQUIRES_COMMENT", "false")
 
     get_settings.cache_clear()

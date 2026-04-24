@@ -22,8 +22,8 @@ test.describe("MVP flow", () => {
   test("signup, submit, moderate, vote, example, report", async ({ page }) => {
     const uniqueHeadword = `flow-${Date.now()}`;
 
-    const earnVoteBalance = async (neededVotes: number) => {
-      for (let index = 0; index < neededVotes; index += 1) {
+    const addRecentReviews = async (neededReviews: number) => {
+      for (let index = 0; index < neededReviews; index += 1) {
         await page.goto("/entries?unseen=1");
         const firstEntry = page.getByTestId("entry-list").getByRole("link").first();
         await firstEntry.click();
@@ -63,20 +63,21 @@ test.describe("MVP flow", () => {
         label.textContent?.includes("Verbete"),
       );
       const hasCta = Array.from(document.querySelectorAll("a")).some((link) =>
-        link.textContent?.includes("Ver verbetes não vistos por mim"),
+        link.textContent?.includes("Ver verbetes não avaliados por mim"),
       );
-      const hasError = document.body.textContent?.includes("Não foi possível carregar seu saldo de votos");
+      const hasError = document.body.textContent?.includes("Não foi possível carregar sua participação ativa");
       return hasLabel || hasCta || hasError;
     });
 
     if ((await page.getByLabel("Verbete").count()) === 0) {
-      const voteCta = page.getByRole("link", { name: "Ver verbetes não vistos por mim" });
+      const voteCta = page.getByRole("link", { name: "Ver verbetes não avaliados por mim" });
       if ((await voteCta.count()) > 0) {
-        const gateText = (await page.getByText("Para enviar um verbete").first().innerText().catch(() => "")) ?? "";
+        const gateText =
+          (await page.getByText("avaliações recentes").first().innerText().catch(() => "")) ?? "";
         const match = gateText.match(/faltam\s+(\d+)/i);
-        const neededVotes = match ? Number(match[1]) : 3;
+        const neededReviews = match ? Number(match[1]) : 3;
         await voteCta.click();
-        await earnVoteBalance(neededVotes);
+        await addRecentReviews(neededReviews);
         await page.goto("/submit");
       }
     }

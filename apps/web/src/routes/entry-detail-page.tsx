@@ -2,6 +2,12 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Controller, useForm } from "react-hook-form";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { KeyboardEvent, ReactNode } from "react";
+import {
+  consumePendingEngagement,
+  finalizeCurrentPage,
+  recordPageVote,
+  startPageTracking,
+} from "@/lib/page-engagement";
 import { Link, useParams } from "react-router-dom";
 import { z } from "zod";
 
@@ -468,15 +474,31 @@ export function EntryDetailPage() {
   const [audioVoteTargetId, setAudioVoteTargetId] = useState<string | null>(null);
   const [audioDeleteTargetId, setAudioDeleteTargetId] = useState<string | null>(null);
 
+  const [prevEngagement] = useState(() => consumePendingEngagement());
+
   const {
     data: entry,
     isLoading,
     error,
   } = useQuery({
     queryKey: ["entry", slug],
-    queryFn: () => getEntry(String(slug)),
+    queryFn: () => getEntry(String(slug), prevEngagement),
     enabled: Boolean(slug),
   });
+
+  useEffect(() => {
+    if (!entry || !currentUser) return;
+    startPageTracking(entry.id, {
+      entries: entry.proposer_user_id !== currentUser.id && entry.current_user_vote == null ? 1 : 0,
+      examples: entry.examples.filter(
+        (e) => e.current_user_vote == null && e.user_id !== currentUser.id,
+      ).length,
+      comments: entry.comments.filter(
+        (c) => c.current_user_vote == null && c.user_id !== currentUser.id,
+      ).length,
+    });
+    return () => finalizeCurrentPage();
+  }, [entry?.id, currentUser?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const displayHeadword = entry ? apply(entry.headword) : "";
   const entryPageTitle = entry
@@ -511,8 +533,10 @@ export function EntryDetailPage() {
     onSuccess: (_, value) => {
       setCachedVote(currentUser?.id, "entry", String(entry?.id ?? ""), value);
       trackEvent("entry_voted", { direction: value === 1 ? "up" : "down" });
+      recordPageVote("entry");
       queryClient.invalidateQueries({ queryKey: ["entry", slug] });
       queryClient.invalidateQueries({ queryKey: ["entries"] });
+      queryClient.invalidateQueries({ queryKey: ["entry-submission-gate"] });
     },
     onError: (error, value) => {
       trackEvent("entry_vote_failed", {
@@ -550,8 +574,10 @@ export function EntryDetailPage() {
     onSuccess: (_, params) => {
       setCachedVote(currentUser?.id, "example", params.exampleId, params.value);
       trackEvent("example_voted", { direction: params.value === 1 ? "up" : "down" });
+      recordPageVote("example");
       queryClient.invalidateQueries({ queryKey: ["entry", slug] });
       queryClient.invalidateQueries({ queryKey: ["entries"] });
+      queryClient.invalidateQueries({ queryKey: ["entry-submission-gate"] });
     },
     onError: (error, params) => {
       trackEvent("example_vote_failed", {
@@ -595,6 +621,7 @@ export function EntryDetailPage() {
       setCachedVote(currentUser?.id, "audio", params.audioId, params.value);
       trackEvent("audio_voted", { direction: params.value === 1 ? "up" : "down" });
       queryClient.invalidateQueries({ queryKey: ["entry", slug] });
+      queryClient.invalidateQueries({ queryKey: ["entry-submission-gate"] });
     },
     onError: (error, params) => {
       trackEvent("audio_vote_failed", {
@@ -990,6 +1017,7 @@ export function EntryDetailPage() {
       commentLastValueRef.current = "";
       queryClient.invalidateQueries({ queryKey: ["entry", slug] });
       queryClient.invalidateQueries({ queryKey: ["entries"] });
+      queryClient.invalidateQueries({ queryKey: ["entry-submission-gate"] });
       queryClient.invalidateQueries({ queryKey: ["notifications"] });
       queryClient.invalidateQueries({ queryKey: ["notifications", "unread"] });
     },
@@ -1029,8 +1057,10 @@ export function EntryDetailPage() {
     onSuccess: (_, params) => {
       setCachedVote(currentUser?.id, "comment", params.commentId, params.value);
       trackEvent("comment_voted", { direction: params.value === 1 ? "up" : "down" });
+      recordPageVote("comment");
       queryClient.invalidateQueries({ queryKey: ["entry", slug] });
       queryClient.invalidateQueries({ queryKey: ["entries"] });
+      queryClient.invalidateQueries({ queryKey: ["entry-submission-gate"] });
     },
     onError: (error, params) => {
       trackEvent("comment_vote_failed", {

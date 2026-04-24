@@ -89,3 +89,21 @@ class ReportOut(BaseModel):
 class ReportReviewRequest(BaseModel):
     status: ReportStatus = ReportStatus.resolved
     notes: str | None = Field(default=None, max_length=1000)
+
+
+class UserParticipationRow(BaseModel):
+    user_id: uuid.UUID
+    display_name: str
+    participation_score: float
+    tier: int
+    is_unlimited: bool
+    entry_votes_needed_for_unlimited: int
+
+
+class ParticipationLeaderboardOut(BaseModel):
+    rows: list[UserParticipationRow]
+    window_days: int
+    step1_threshold: float
+    step2_threshold: float
+    step3_threshold: float
+    entry_vote_weight: float

@@ -1,9 +1,9 @@
-import uuid
 import logging
+import uuid
 from datetime import UTC, datetime
 from typing import Annotated, Literal
 
-from fastapi import APIRouter, Depends, Query, Request, Response, status, UploadFile, File
+from fastapi import APIRouter, Depends, File, Query, Request, Response, UploadFile, status
 from sqlalchemy import and_, exists, func, or_, select
 from sqlalchemy.orm import selectinload
 
@@ -13,50 +13,58 @@ from app.core.deps import SessionDep, get_current_user, get_current_user_optiona
 from app.core.enums import EntryStatus, ExampleStatus, ReportStatus, ReportTargetType
 from app.core.errors import raise_api_error
 from app.core.permissions import can_edit_entry, can_edit_example, is_moderator
-from app.core.utils import collapse_whitespace, normalize_search_query, normalize_text, slugify
-from app.models.discussion import CommentVote, EntryComment, EntryCommentVersion
+from app.core.utils import collapse_whitespace, normalize_search_query, slugify
 from app.models.audio import AudioSample, AudioVote
-from app.models.entry import Entry, EntryTag, EntryVersion, Example, ExampleVersion, ExampleVote, Tag, Vote
+from app.models.discussion import CommentVote, EntryComment, EntryCommentVersion
+from app.models.entry import (
+    Entry,
+    EntryTag,
+    EntryVersion,
+    Example,
+    ExampleVersion,
+    ExampleVote,
+    Tag,
+    Vote,
+)
 from app.models.moderation import ModerationAction, Report
 from app.models.source import SourceEdition, SourceWork
 from app.models.user import Profile, User
+from app.schemas.audio import AudioSampleOut
 from app.schemas.entries import (
     CommentCreate,
     CommentUpdate,
-    CommentVoteOut,
     CommentVersionOut,
+    CommentVoteOut,
     DuplicateHintOut,
-    EntryCreate,
     EntryCommentOut,
+    EntryConstraintsOut,
+    EntryCreate,
     EntryDetailOut,
     EntryHistoryEventOut,
-    EntryConstraintsOut,
-    EntrySubmissionGateOut,
     EntryListOut,
+    EntrySubmissionGateOut,
     EntryUpdate,
     EntryVersionOut,
     ExampleCreate,
     ExampleListItemOut,
     ExampleListOut,
     ExampleOut,
-    ExampleVoteOut,
     ExampleUpdate,
     ExampleVersionOut,
+    ExampleVoteOut,
     ReportCreate,
     SourceInput,
     VoteOut,
     VoteRequest,
 )
-from app.schemas.audio import AudioSampleOut
+from app.services.audio import save_audio_upload
+from app.services.email_delivery import send_comment_notification_email, send_entry_moderation_email
 from app.services.entries import (
     build_entry_status_for_submission,
     build_example_status_for_submission,
     can_downvote,
-    compute_entry_vote_daily_gate,
     count_user_entries,
-    count_user_entry_votes,
     count_user_examples,
-    get_entry_vote_daily_window,
     create_entry_version,
     create_example_version,
     ensure_unique_slug,
@@ -70,8 +78,6 @@ from app.services.entries import (
     refresh_vote_and_example_caches,
     set_entry_tags,
 )
-from app.services.audio import save_audio_upload
-from app.services.email_delivery import send_comment_notification_email, send_entry_moderation_email
 from app.services.moderation import record_moderation_action
 from app.services.notifications import (
     create_notification,
@@ -80,8 +86,19 @@ from app.services.notifications import (
     normalize_mention_key,
     truncate_for_notification,
 )
-from app.services.reputation import recompute_user_reputation
+from app.services.participation import (
+    COMMENT_VOTE_ACTION,
+    ENTRY_VOTE_ACTION,
+    EXAMPLE_VOTE_ACTION,
+    PAGE_ENGAGEMENT_TIERS,
+    enforce_entry_submission_participation_gate,
+    get_entry_submission_participation_gate,
+    record_entry_comment_participation,
+    record_page_engagement_event,
+    record_review_participation_event,
+)
 from app.services.rate_limit import enforce_rate_limit
+from app.services.reputation import recompute_user_reputation
 from app.services.serializers import (
     serialize_audio_sample,
     serialize_entry_comment,
@@ -113,9 +130,15 @@ ENTRY_HISTORY_ACTION_TYPES = {
 async def get_entry_constraints() -> EntryConstraintsOut:
     settings = get_settings()
     return EntryConstraintsOut(
-        entry_vote_cost=settings.entry_vote_cost,
         downvote_requires_comment=settings.downvote_requires_comment,
         downvote_comment_min_length=settings.downvote_comment_min_length,
+        entry_participation_gate_enabled=settings.entry_participation_gate_enabled,
+        entry_participation_window_days=settings.entry_participation_window_days,
+        entry_participation_step2_actions=settings.entry_participation_step2_actions,
+        entry_participation_step2_posts=settings.entry_participation_step2_posts,
+        entry_participation_step3_actions=settings.entry_participation_step3_actions,
+        entry_participation_step3_unlimited=settings.entry_participation_step3_unlimited,
+        votes_are_consumed=False,
     )
 
 
@@ -123,50 +146,55 @@ async def get_entry_constraints() -> EntryConstraintsOut:
 async def get_entry_submission_gate(
     db: SessionDep,
     user: Annotated[User, Depends(get_current_user)],
+    prev_page_id: uuid.UUID | None = Query(default=None),
+    prev_page_tier: str | None = Query(default=None),
 ) -> EntrySubmissionGateOut:
     settings = get_settings()
-    window_start, window_end, gate_active = get_entry_vote_daily_window()
-    exempt = user.is_superuser and settings.entry_vote_cost_exempt_staff
 
-    votes_today = 0
-    entries_today = 0
-    if gate_active and not exempt and settings.entry_vote_daily_step1_votes > 0:
-        votes_today = await count_user_entry_votes(
-            db,
-            user.id,
-            created_after=window_start,
-            created_before=window_end,
-        )
-        entries_today = await count_user_entries(
-            db,
-            user.id,
-            created_after=window_start,
-            created_before=window_end,
-        )
+    if prev_page_id is not None and prev_page_tier in PAGE_ENGAGEMENT_TIERS:
+        await record_page_engagement_event(db, user_id=user.id, entry_id=prev_page_id, tier=prev_page_tier)
 
-    gate = compute_entry_vote_daily_gate(votes_today, entries_today)
-
-    unlimited = gate.unlimited or not gate_active or exempt
-    unlocked_posts = None if unlimited else gate.unlocked_posts
-    remaining_posts = None if unlimited else gate.remaining_posts
-    next_votes_required = 0 if unlimited else gate.next_votes_required
+    gate = await get_entry_submission_participation_gate(db, user)
 
     return EntrySubmissionGateOut(
-        window_start=window_start,
-        window_end=window_end,
-        votes_today=votes_today,
-        entries_today=entries_today,
-        unlocked_posts=unlocked_posts,
-        remaining_posts=remaining_posts,
-        unlimited=unlimited,
-        next_votes_required=next_votes_required,
-        votes_required_for_unlimited=gate.votes_required_for_unlimited,
-        step1_votes=gate.step1_votes,
-        step1_posts=gate.step1_posts,
-        step2_votes=gate.step2_votes,
-        step2_posts=gate.step2_posts,
-        step3_votes=gate.step3_votes,
+        window_start=gate.window_start,
+        window_end=gate.window_end,
+        participation_score=gate.participation_score,
+        review_actions=gate.review_actions,
+        entries_today=gate.entries_today,
+        allowed_posts=gate.allowed_posts,
+        remaining_posts=gate.remaining_posts,
+        unlimited=gate.unlimited,
+        next_score_required=gate.next_score_required,
+        next_review_actions_required=int(gate.next_score_required),
+        actions_required_for_unlimited=int(gate.score_required_for_unlimited),
+        score_required_for_unlimited=gate.score_required_for_unlimited,
+        votes_are_consumed=False,
+        participation_window_days=settings.entry_participation_window_days,
+        step1_actions=settings.entry_participation_step1_actions,
+        step1_posts=settings.entry_participation_step1_posts,
+        step2_actions=settings.entry_participation_step2_actions,
+        step2_posts=settings.entry_participation_step2_posts,
+        step3_actions=settings.entry_participation_step3_actions,
+        active_participation_label=None,
+        votes_today=gate.review_actions,
+        unlocked_posts=gate.allowed_posts,
+        next_votes_required=int(gate.next_score_required),
+        votes_required_for_unlimited=int(gate.score_required_for_unlimited),
     )
+
+
+@router.post("/{entry_id}/engagement", status_code=status.HTTP_204_NO_CONTENT)
+async def record_entry_engagement(
+    entry_id: uuid.UUID,
+    db: SessionDep,
+    user: Annotated[User, Depends(get_current_user)],
+    tier: str = Query(default="excellent"),
+) -> None:
+    """Record an immediate page engagement event — used for card votes outside the entry detail page."""
+    if tier not in PAGE_ENGAGEMENT_TIERS:
+        tier = "excellent"
+    await record_page_engagement_event(db, user_id=user.id, entry_id=entry_id, tier=tier)
 
 
 async def _load_entry_with_relations(db: SessionDep, entry_id: uuid.UUID) -> Entry | None:
@@ -641,6 +669,7 @@ async def list_entries(
         conditions.append(
             ~exists().where(and_(Vote.entry_id == Entry.id, Vote.user_id == user.id))
         )
+        conditions.append(Entry.proposer_user_id != user.id)
 
     if topic or region:
         stmt = stmt.join(EntryTag, EntryTag.entry_id == Entry.id).join(Tag, Tag.id == EntryTag.tag_id)
@@ -733,6 +762,8 @@ async def get_entry(
     slug: str,
     db: SessionDep,
     user: Annotated[User | None, Depends(get_current_user_optional)],
+    prev_page_id: uuid.UUID | None = Query(default=None),
+    prev_page_tier: str | None = Query(default=None),
 ) -> EntryDetailOut:
     stmt = (
         select(Entry)
@@ -758,6 +789,9 @@ async def get_entry(
     entry = (await db.execute(stmt)).scalar_one_or_none()
     if not entry:
         raise_api_error(status_code=404, code="entry_not_found", message="Entry not found")
+
+    if user and prev_page_id is not None and prev_page_tier in PAGE_ENGAGEMENT_TIERS:
+        await record_page_engagement_event(db, user_id=user.id, entry_id=prev_page_id, tier=prev_page_tier)
 
     can_view_all_examples = bool(user and (is_moderator(user) or entry.proposer_user_id == user.id))
     if can_view_all_examples:
@@ -873,46 +907,6 @@ async def create_entry(
         else collapse_whitespace(payload.gloss_pt)
     )
 
-    user_entry_count = await count_user_entries(db, user.id)
-    if settings.entry_vote_daily_step1_votes > 0 and not (
-        user.is_superuser and settings.entry_vote_cost_exempt_staff
-    ):
-        window_start, window_end, gate_active = get_entry_vote_daily_window()
-        if gate_active:
-            votes_today = await count_user_entry_votes(
-                db,
-                user.id,
-                created_after=window_start,
-                created_before=window_end,
-            )
-            entries_today = await count_user_entries(
-                db,
-                user.id,
-                created_after=window_start,
-                created_before=window_end,
-            )
-            gate = compute_entry_vote_daily_gate(votes_today, entries_today)
-            if not gate.unlimited and entries_today >= (gate.unlocked_posts or 0):
-                raise_api_error(
-                    status_code=403,
-                    code="entry_vote_quota",
-                    message="Not enough entry votes to submit a new entry",
-                    details={
-                        "votes_today": votes_today,
-                        "entries_today": entries_today,
-                        "unlocked_posts": gate.unlocked_posts,
-                        "remaining_posts": gate.remaining_posts,
-                        "next_votes_required": gate.next_votes_required,
-                        "needed": gate.next_votes_required,
-                        "votes_required_for_unlimited": gate.votes_required_for_unlimited,
-                        "step1_votes": gate.step1_votes,
-                        "step1_posts": gate.step1_posts,
-                        "step2_votes": gate.step2_votes,
-                        "step2_posts": gate.step2_posts,
-                        "step3_votes": gate.step3_votes,
-                    },
-                )
-
     normalized_headword = normalize_headword(payload.headword)
     normalized_gloss_pt = normalize_search_query(payload.gloss_pt) if payload.gloss_pt else None
     normalized_gloss_en = normalize_search_query(payload.gloss_en) if payload.gloss_en else None
@@ -939,6 +933,8 @@ async def create_entry(
             details={"duplicates": duplicate_payload},
         )
 
+    await enforce_entry_submission_participation_gate(db, user)
+    user_entry_count = await count_user_entries(db, user.id)
     status_value = build_entry_status_for_submission(user, user_entry_count)
 
     base_slug = slugify(payload.headword)
@@ -1278,6 +1274,14 @@ async def vote_entry(
         vote = Vote(entry_id=entry_id, user_id=user.id, value=payload.value)
         db.add(vote)
 
+    await record_review_participation_event(
+        db,
+        user_id=user.id,
+        action_type=ENTRY_VOTE_ACTION,
+        target_type="entry",
+        target_id=entry_id,
+    )
+
     was_verified_by_vote = False
 
     await db.flush()
@@ -1544,6 +1548,12 @@ async def create_comment(
     )
     db.add(comment)
     await db.flush()
+    await record_entry_comment_participation(
+        db,
+        user_id=user.id,
+        entry=entry,
+        comment_id=comment.id,
+    )
 
     mention_keys = extract_mention_keys(comment.body)
     mentioned_user_ids = await _resolve_mentioned_user_ids(db, mention_keys=mention_keys)
@@ -1983,6 +1993,14 @@ async def vote_example(
         vote = ExampleVote(example_id=example_id, user_id=user.id, value=payload.value)
         db.add(vote)
 
+    await record_review_participation_event(
+        db,
+        user_id=user.id,
+        action_type=EXAMPLE_VOTE_ACTION,
+        target_type="example",
+        target_id=example_id,
+    )
+
     await db.flush()
     await refresh_example_vote_caches(db, example)
     if user.is_superuser and payload.value == 1 and example.status != ExampleStatus.approved:
@@ -2126,6 +2144,14 @@ async def vote_comment(
     else:
         vote = CommentVote(comment_id=comment_id, user_id=user.id, value=payload.value)
         db.add(vote)
+
+    await record_review_participation_event(
+        db,
+        user_id=user.id,
+        action_type=COMMENT_VOTE_ACTION,
+        target_type="comment",
+        target_id=comment_id,
+    )
 
     await db.flush()
     await refresh_comment_vote_caches(db, comment)

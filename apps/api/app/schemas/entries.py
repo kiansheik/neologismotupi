@@ -5,8 +5,8 @@ from typing import Literal
 from pydantic import BaseModel, Field, model_validator
 
 from app.core.enums import EntryStatus, ExampleStatus, ReportReasonCode, TagType
-from app.schemas.badges import UserBadgeKind
 from app.schemas.audio import AudioSampleOut
+from app.schemas.badges import UserBadgeKind
 
 
 class TagOut(BaseModel):
@@ -233,26 +233,42 @@ class ExampleListOut(BaseModel):
 
 
 class EntryConstraintsOut(BaseModel):
-    entry_vote_cost: int
     downvote_requires_comment: bool
     downvote_comment_min_length: int
+    entry_participation_gate_enabled: bool
+    entry_participation_window_days: int
+    entry_participation_step2_actions: int
+    entry_participation_step2_posts: int
+    entry_participation_step3_actions: int
+    entry_participation_step3_unlimited: bool
+    votes_are_consumed: bool = False
 
 
 class EntrySubmissionGateOut(BaseModel):
     window_start: datetime
     window_end: datetime
-    votes_today: int
+    participation_score: float
+    review_actions: int
     entries_today: int
-    unlocked_posts: int | None
+    allowed_posts: int | None
     remaining_posts: int | None
     unlimited: bool
-    next_votes_required: int
-    votes_required_for_unlimited: int
-    step1_votes: int
+    next_score_required: float
+    next_review_actions_required: int
+    actions_required_for_unlimited: int
+    score_required_for_unlimited: float
+    votes_are_consumed: bool = False
+    participation_window_days: int
+    step1_actions: int
     step1_posts: int
-    step2_votes: int
+    step2_actions: int
     step2_posts: int
-    step3_votes: int
+    step3_actions: int
+    active_participation_label: str | None = None
+    votes_today: int | None = None
+    unlocked_posts: int | None = None
+    next_votes_required: int | None = None
+    votes_required_for_unlimited: int | None = None
 
 
 class EntryCreate(BaseModel):

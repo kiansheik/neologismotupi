@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { UserBadge } from "@/components/user-badge";
 import { useCurrentUser } from "@/features/auth/hooks";
-import { getEntryConstraints, listEntries, voteEntry } from "@/features/entries/api";
+import { getEntryConstraints, listEntries, reportCardEngagement, voteEntry } from "@/features/entries/api";
 import { createComment } from "@/features/comments/api";
 import { partOfSpeechLabel, statusToKey } from "@/i18n/formatters";
 import { useI18n } from "@/i18n";
@@ -196,7 +196,9 @@ export function EntryBrowser({
         direction: params.value === 1 ? "up" : "down",
         context: analyticsContext ?? "entry_list",
       });
+      reportCardEngagement(params.entryId, "excellent").catch(() => {});
       queryClient.invalidateQueries({ queryKey: ["entry-browser"] });
+      queryClient.invalidateQueries({ queryKey: ["entry-submission-gate"] });
     },
     onError: (error, params) => {
       trackEvent("entry_vote_failed", {
@@ -224,7 +226,9 @@ export function EntryBrowser({
         direction: "down",
         context: analyticsContext ?? "entry_list",
       });
+      reportCardEngagement(params.entryId, "excellent").catch(() => {});
       queryClient.invalidateQueries({ queryKey: ["entry-browser"] });
+      queryClient.invalidateQueries({ queryKey: ["entry-submission-gate"] });
       setDownvoteOpen((current) => ({ ...current, [params.entryId]: false }));
       setDownvoteDrafts((current) => ({ ...current, [params.entryId]: "" }));
       setDownvoteErrors((current) => ({ ...current, [params.entryId]: "" }));
