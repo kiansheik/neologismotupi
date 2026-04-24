@@ -1,3 +1,0 @@
-posting_day,user_days,days_at_3_votes,days_at_5_votes,days_at_6_votes,days_at_any_old_threshold,median_entry_votes,mean_entry_votes,median_entries_submitted,pct_at_any_old_threshold
-False,49,1,4,3,8,2.0,3.5510204081632653,0.0,0.1633
-True,130,4,4,26,34,6.0,5.007692307692308,4.0,0.2615
