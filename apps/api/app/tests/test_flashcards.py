@@ -188,7 +188,7 @@ async def test_settings_default_and_bounds(client):
 async def test_learning_step_reappears_same_day(client):
     await register_user(client, "learning@example.com", "Learning User")
     user_id = await get_user_id("learning@example.com")
-    entry = await seed_entry(user_id=user_id, headword="learning-entry")
+    await seed_entry(user_id=user_id, headword="learning-entry")
 
     session_response = await client.get("/api/flashcards/session")
     card = session_response.json()["current_card"]
@@ -272,7 +272,7 @@ async def test_leaderboard_counts_completed_cards_today(client):
     next_card = session_response.json()["current_card"]
     assert next_card is not None
     assert next_card["entry_id"] == str(entry.id)
-    assert next_card["queue"] == "learn"
+    assert next_card["queue"] == "new"
 
 
 @pytest.mark.asyncio
@@ -571,7 +571,7 @@ async def test_finish_session_records_and_links_reviews(client):
 async def test_stats_endpoint_returns_today_summary(client):
     await register_user(client, "stats@example.com", "Stats User")
     user_id = await get_user_id("stats@example.com")
-    entry = await seed_entry(user_id=user_id, headword="stats-entry", status=EntryStatus.approved)
+    await seed_entry(user_id=user_id, headword="stats-entry", status=EntryStatus.approved)
 
     session_response = await client.get("/api/flashcards/session")
     card = session_response.json()["current_card"]

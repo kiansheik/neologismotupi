@@ -2,15 +2,13 @@ from __future__ import annotations
 
 import html
 import secrets
-from datetime import date
 from urllib.parse import parse_qsl, urlencode, urlparse, urlunparse
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.newsletter import NewsletterSubscription
-
 from app.config import get_settings
+from app.models.newsletter import NewsletterSubscription
 
 NEWSLETTER_WORD_OF_DAY = "palavra_do_dia"
 DEFAULT_LOCALE = "pt-BR"

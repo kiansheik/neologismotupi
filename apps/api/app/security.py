@@ -27,7 +27,7 @@ def generate_session_token() -> str:
 
 def hash_session_token(token: str) -> str:
     secret_key = get_settings().secret_key
-    return hashlib.sha256(f"{token}:{secret_key}".encode("utf-8")).hexdigest()
+    return hashlib.sha256(f"{token}:{secret_key}".encode()).hexdigest()
 
 
 def generate_email_action_token() -> str:
@@ -36,7 +36,7 @@ def generate_email_action_token() -> str:
 
 def hash_email_action_token(token: str) -> str:
     secret_key = get_settings().secret_key
-    return hashlib.sha256(f"email:{token}:{secret_key}".encode("utf-8")).hexdigest()
+    return hashlib.sha256(f"email:{token}:{secret_key}".encode()).hexdigest()
 
 
 async def create_session(db: AsyncSession, user_id) -> str:

@@ -36,7 +36,11 @@ from app.services.auth_tokens import (
     create_email_action_token,
 )
 from app.services.email_delivery import send_email_verification_email, send_password_reset_email
-from app.services.newsletters import NEWSLETTER_WORD_OF_DAY, get_or_create_subscription, normalize_locale
+from app.services.newsletters import (
+    NEWSLETTER_WORD_OF_DAY,
+    get_or_create_subscription,
+    normalize_locale,
+)
 from app.services.rate_limit import enforce_rate_limit
 from app.services.user_badges import get_user_badge_leaders, resolve_user_badges
 

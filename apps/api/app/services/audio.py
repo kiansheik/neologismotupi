@@ -1,12 +1,11 @@
 from __future__ import annotations
 
-import uuid
-from pathlib import Path
 import asyncio
+import logging
 import subprocess
 import tempfile
-
-import logging
+import uuid
+from pathlib import Path
 
 from fastapi import UploadFile
 from sqlalchemy import func, select
@@ -101,8 +100,7 @@ def _process_audio_file(path: Path) -> None:
                 str(temp_path),
             ],
             check=True,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
+            capture_output=True,
             text=True,
             timeout=settings.audio_processing_timeout_seconds,
         )
@@ -148,7 +146,7 @@ async def save_audio_upload(
     target_path.write_bytes(payload)
     try:
         await asyncio.to_thread(_process_audio_file, target_path)
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         details = None
         if isinstance(exc, subprocess.CalledProcessError):
             details = exc.stderr or exc.stdout

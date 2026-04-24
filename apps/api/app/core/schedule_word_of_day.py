@@ -69,7 +69,7 @@ async def main() -> None:
                 await _send_for_date(now.date())
                 last_sent_date = now.date()
                 print("[newsletter] send complete")
-            except Exception as exc:  # noqa: BLE001
+            except Exception as exc:
                 print(f"[newsletter] send failed: {exc}")
                 await asyncio.sleep(max(retry_seconds, 30))
                 continue

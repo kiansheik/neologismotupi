@@ -3,7 +3,6 @@ import asyncio
 from datetime import UTC, date, datetime
 
 from sqlalchemy import func, select
-from sqlalchemy.orm import selectinload
 
 from app.core.enums import EntryStatus, ExampleStatus
 from app.db import AsyncSessionLocal
@@ -171,7 +170,7 @@ async def _send_word_of_day(
             await send_email(
                 to_email=user.email, subject=subject, body=text_body, html_body=html_body
             )
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             status = "failed"
             error_message = str(exc)[:500]
 

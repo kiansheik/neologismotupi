@@ -1,10 +1,9 @@
-import math
-import uuid
 import logging
+import math
 import shutil
+import uuid
 from collections import defaultdict
-from datetime import UTC, datetime
-from datetime import timedelta
+from datetime import UTC, datetime, timedelta
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Query
@@ -602,7 +601,7 @@ async def participation_leaderboard(
     now = _as_utc(datetime.now(UTC))
     window_start, window_end = get_entry_participation_window(now)
 
-    enabled_actions = _enabled_review_action_types() + [PAGE_ENGAGEMENT_ACTION]
+    enabled_actions = [*_enabled_review_action_types(), PAGE_ENGAGEMENT_ACTION]
 
     # Fetch all users with profiles in one query
     users = (

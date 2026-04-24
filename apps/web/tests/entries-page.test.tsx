@@ -3,7 +3,22 @@ import { screen } from "@testing-library/react";
 import { EntriesPage } from "@/routes/entries-page";
 import { renderWithProviders } from "./test-utils";
 
+vi.mock("@/features/auth/hooks", () => ({
+  useCurrentUser: () => ({ data: null, isLoading: false }),
+}));
+
 vi.mock("@/features/entries/api", () => ({
+  getEntryConstraints: vi.fn().mockResolvedValue({
+    downvote_requires_comment: true,
+    downvote_comment_min_length: 5,
+    entry_participation_gate_enabled: true,
+    entry_participation_window_days: 7,
+    entry_participation_step2_actions: 3,
+    entry_participation_step2_posts: 2,
+    entry_participation_step3_actions: 12,
+    entry_participation_step3_unlimited: false,
+    votes_are_consumed: false,
+  }),
   listEntries: vi.fn().mockResolvedValue({
     items: [
       {

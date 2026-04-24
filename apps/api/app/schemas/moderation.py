@@ -3,7 +3,13 @@ from datetime import datetime
 
 from pydantic import BaseModel, Field
 
-from app.core.enums import EntryStatus, ExampleStatus, ReportReasonCode, ReportStatus, ReportTargetType
+from app.core.enums import (
+    EntryStatus,
+    ExampleStatus,
+    ReportReasonCode,
+    ReportStatus,
+    ReportTargetType,
+)
 
 
 class ModerationEntryOut(BaseModel):

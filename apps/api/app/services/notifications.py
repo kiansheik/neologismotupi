@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 import re
-import uuid
 import unicodedata
+import uuid
 from dataclasses import dataclass
 
 from sqlalchemy import select

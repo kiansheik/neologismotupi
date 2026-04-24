@@ -1,7 +1,7 @@
-from enum import Enum
+from enum import StrEnum
 
 
-class EntryStatus(str, Enum):
+class EntryStatus(StrEnum):
     pending = "pending"
     approved = "approved"
     disputed = "disputed"
@@ -9,20 +9,20 @@ class EntryStatus(str, Enum):
     archived = "archived"
 
 
-class ExampleStatus(str, Enum):
+class ExampleStatus(StrEnum):
     pending = "pending"
     approved = "approved"
     hidden = "hidden"
     rejected = "rejected"
 
 
-class ReportTargetType(str, Enum):
+class ReportTargetType(StrEnum):
     entry = "entry"
     example = "example"
     profile = "profile"
 
 
-class ReportReasonCode(str, Enum):
+class ReportReasonCode(StrEnum):
     spam = "spam"
     harassment = "harassment"
     bad_faith = "bad_faith"
@@ -32,14 +32,14 @@ class ReportReasonCode(str, Enum):
     other = "other"
 
 
-class ReportStatus(str, Enum):
+class ReportStatus(StrEnum):
     open = "open"
     reviewed = "reviewed"
     resolved = "resolved"
     dismissed = "dismissed"
 
 
-class TagType(str, Enum):
+class TagType(StrEnum):
     domain = "domain"
     region = "region"
     community = "community"
@@ -58,19 +58,19 @@ PARTS_OF_SPEECH = [
 ]
 
 
-class FlashcardDirection(str, Enum):
+class FlashcardDirection(StrEnum):
     headword_to_gloss = "headword_to_gloss"
     gloss_to_headword = "gloss_to_headword"
 
 
-class FlashcardCardType(str, Enum):
+class FlashcardCardType(StrEnum):
     new = "new"
     learn = "learn"
     review = "review"
     relearn = "relearn"
 
 
-class FlashcardQueue(str, Enum):
+class FlashcardQueue(StrEnum):
     new = "new"
     learn = "learn"
     review = "review"
@@ -79,7 +79,7 @@ class FlashcardQueue(str, Enum):
     suspended = "suspended"
 
 
-class FlashcardGrade(str, Enum):
+class FlashcardGrade(StrEnum):
     again = "again"
     hard = "hard"
     good = "good"

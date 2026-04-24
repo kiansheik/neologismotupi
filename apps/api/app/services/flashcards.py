@@ -4,15 +4,6 @@ from datetime import UTC, date, datetime, time, timedelta, timezone
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from sqlalchemy import and_, case, func, or_, select
-
-
-def _to_date(val) -> "date":
-    """Normalize DB date result to a Python date (works for SQLite strings and PG date/datetime)."""
-    if isinstance(val, datetime):
-        return val.date()
-    if isinstance(val, date):
-        return val
-    return date.fromisoformat(str(val))
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import aliased
 
@@ -25,7 +16,6 @@ from app.core.enums import (
 )
 from app.models.audio import AudioSample
 from app.models.entry import Entry
-from app.models.user import Profile, User
 from app.models.flashcards import (
     FlashcardListItem,
     FlashcardProgress,
@@ -35,6 +25,7 @@ from app.models.flashcards import (
     FlashcardSettings,
     FlashcardStudySession,
 )
+from app.models.user import Profile, User
 from app.services.audio import build_audio_url
 from app.services.email_delivery import send_flashcard_reminder_email
 from app.services.flashcards_scheduler import (
@@ -45,6 +36,15 @@ from app.services.flashcards_scheduler import (
     grade_to_rating,
     next_interval_days,
 )
+
+
+def _to_date(val) -> "date":
+    """Normalize DB date result to a Python date (works for SQLite strings and PG date/datetime)."""
+    if isinstance(val, datetime):
+        return val.date()
+    if isinstance(val, date):
+        return val
+    return date.fromisoformat(str(val))
 
 NEW_CARD_MIN = 3
 NEW_CARD_SCAN_LIMIT = 400
@@ -331,7 +331,7 @@ def _as_utc(dt: datetime) -> datetime:
     """Return dt as UTC-aware, adding UTC tzinfo if it's naive (e.g. from SQLite)."""
     if dt.tzinfo is None:
         return dt.replace(tzinfo=UTC)
-    return dt
+    return dt.astimezone(UTC)
 
 
 def _sum_segment_seconds(segments: list[FlashcardSessionSegment], end_time: datetime) -> int:
@@ -609,7 +609,7 @@ def _graduate_to_review(
     memory_state: MemoryState,
 ) -> None:
     interval = next_interval_days(memory_state.stability, desired_retention, params)
-    interval_days = max(1, int(round(interval)))
+    interval_days = max(1, round(interval))
     progress.card_type = FlashcardCardType.review
     progress.queue = FlashcardQueue.review
     progress.scheduled_days = interval_days
@@ -1300,7 +1300,7 @@ async def send_due_flashcard_reminders(
                 to_email=user.email,
                 locale=user.preferred_locale,
             )
-        except Exception:  # noqa: BLE001
+        except Exception:
             # Skip marking sent so it can be retried on next run.
             continue
         reminder.sent_at = now
@@ -1386,12 +1386,12 @@ async def get_flashcard_stats(
     minutes_by_day: dict[date, int] = {}
     sessions_by_day: dict[date, int] = {}
     for session in sessions:
-        session_start = max(session.started_at, start_dt)
+        session_start = max(_as_utc(session.started_at), start_dt)
         sessions_by_day[session_start.date()] = sessions_by_day.get(session_start.date(), 0) + 1
 
     for segment in segments:
-        segment_start = max(segment.started_at, start_dt)
-        segment_end = min(segment.ended_at or now, end_dt)
+        segment_start = max(_as_utc(segment.started_at), start_dt)
+        segment_end = min(_as_utc(segment.ended_at) if segment.ended_at else now, end_dt)
         if segment_end <= segment_start:
             continue
         cursor = segment_start

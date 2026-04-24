@@ -43,7 +43,7 @@ def _parse_owner_id(raw: str | None, user: User | None) -> uuid.UUID | None:
         return user.id
     try:
         return uuid.UUID(raw)
-    except ValueError as exc:
+    except ValueError:
         raise_api_error(status_code=422, code="invalid_owner", message="Invalid owner id")
 
 

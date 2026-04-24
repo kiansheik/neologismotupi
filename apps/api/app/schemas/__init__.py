@@ -1,3 +1,9 @@
+from app.schemas.audio import (
+    AudioSampleOut,
+    AudioSubmissionListOut,
+    AudioSubmissionOut,
+    AudioVoteOut,
+)
 from app.schemas.auth import (
     ActionAcceptedResponse,
     EmailVerificationConfirmRequest,
@@ -8,7 +14,6 @@ from app.schemas.auth import (
     RegisterRequest,
     UserOut,
 )
-from app.schemas.audio import AudioSampleOut, AudioSubmissionListOut, AudioSubmissionOut, AudioVoteOut
 from app.schemas.entries import (
     DuplicateHintOut,
     EntryCreate,
