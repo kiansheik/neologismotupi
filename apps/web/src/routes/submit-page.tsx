@@ -126,15 +126,27 @@ export function SubmitPage() {
   const scoreRequiredForUnlimited =
     gateQuery.data?.score_required_for_unlimited ?? actionsRequiredForUnlimited ?? 0;
   const participationWindowDays = gateQuery.data?.participation_window_days ?? 7;
-  const unlockHintKey =
-    nextReviewActionsRequired === null ? "submit.dailyUnlockScoreHint" : "submit.dailyUnlockHint";
-  const unlockHintNeeded =
-    nextReviewActionsRequired === null ? Math.ceil(nextScoreRequired) : nextReviewActionsRequired;
+  const allowedPosts = gateQuery.data?.allowed_posts ?? null;
+  const entriesPostedToday = gateQuery.data?.entries_today ?? 0;
+  const isTopTier = isUnlimited || nextScoreRequired <= 0;
+  const isHighCap = !isUnlimited && allowedPosts !== null && nextScoreRequired <= 0;
+  const isMiddleTier = !isTopTier && (allowedPosts ?? 0) >= 2;
+  const nextNeeded =
+    nextReviewActionsRequired !== null && nextReviewActionsRequired > 0
+      ? nextReviewActionsRequired
+      : nextScoreRequired > 0
+        ? Math.ceil(nextScoreRequired)
+        : 0;
   const participationProgress = isUnlimited
     ? 100
     : scoreRequiredForUnlimited > 0
       ? Math.min(100, (participationScore / scoreRequiredForUnlimited) * 100)
       : 100;
+
+  const nEntries = (n: number) =>
+    locale === "en-US"
+      ? n === 1 ? "1 entry" : `${n} entries`
+      : n === 1 ? "1 verbete" : `${n} verbetes`;
 
   const sourceSuggestionsQuery = useQuery({
     queryKey: ["source-suggestions", sourceLookupQuery],
@@ -392,12 +404,19 @@ export function SubmitPage() {
   }
 
   if (!isUnlimited && remainingPosts <= 0) {
+    const blockedHeadline = isHighCap
+      ? t("submit.highCapReachedToday")
+      : t("submit.dailyLimitReached");
+    const nextStepMessage =
+      isHighCap ? null
+      : isMiddleTier ? t("submit.reviewsToReachHighestTier", { needed: nextNeeded })
+      : nextNeeded > 0 ? t("submit.dailyUnlockHint", { needed: nextNeeded })
+      : null;
+
     return (
       <Card>
         <h1 className="text-xl font-semibold text-brand-900">{t("submit.title")}</h1>
-        <p className="mt-2 text-sm text-slate-700">
-          {t("submit.voteGateBody")}
-        </p>
+        <p className="mt-2 text-sm text-slate-700">{blockedHeadline}</p>
         <div className="mt-3 rounded-md border border-brand-200 bg-brand-50/70 p-4">
           <div className="flex flex-wrap items-center justify-between gap-4">
             <div>
@@ -414,11 +433,16 @@ export function SubmitPage() {
                 {t("submit.dailyPostsLabel")}
               </p>
               <p className="mt-1 text-lg font-semibold text-slate-800">
-                {t("submit.dailyPostsRemaining", { remaining: remainingPosts })}
+                {allowedPosts !== null ? nEntries(allowedPosts) : "—"}
               </p>
-              <p className="mt-1 text-amber-700">
-                {t(unlockHintKey, { needed: unlockHintNeeded })}
-              </p>
+              {entriesPostedToday > 0 ? (
+                <p className="mt-0.5 text-xs text-slate-500">
+                  {t("submit.alreadyPostedToday", { count: nEntries(entriesPostedToday) })}
+                </p>
+              ) : null}
+              {nextStepMessage ? (
+                <p className="mt-1 text-amber-700">{nextStepMessage}</p>
+              ) : null}
             </div>
           </div>
           <div className="mt-3 h-2 rounded-full bg-brand-100">
@@ -428,7 +452,9 @@ export function SubmitPage() {
             />
           </div>
         </div>
-        <p className="mt-3 text-sm text-slate-700">{t("submit.voteGateHint")}</p>
+        <p className="mt-3 text-sm text-slate-600">
+          {t("submit.votesNeverSpent")} {t("submit.participationUnlocksPosting")}
+        </p>
         <div className="mt-3">
           <Link
             className="inline-flex items-center rounded-md bg-accent px-4 py-2 text-sm text-accent-contrast hover:bg-accent-strong"
@@ -477,16 +503,29 @@ export function SubmitPage() {
               <p className="text-sm font-semibold text-slate-800">
                 {isUnlimited
                   ? t("submit.dailyPostsUnlimited")
-                  : t("submit.dailyPostsRemaining", { remaining: remainingPosts })}
+                  : allowedPosts !== null
+                    ? nEntries(allowedPosts)
+                    : "—"}
               </p>
+              {entriesPostedToday > 0 ? (
+                <p className="text-[11px] text-slate-500">
+                  {t("submit.alreadyPostedToday", { count: nEntries(entriesPostedToday) })}
+                </p>
+              ) : null}
             </div>
-            {!isUnlimited ? (
-              <p className="text-[11px] text-amber-700">
-                {t(unlockHintKey, { needed: unlockHintNeeded })}
+            {isTopTier ? (
+              <p className="text-[11px] text-emerald-700">
+                {isUnlimited
+                  ? t("submit.dailyUnlockAll")
+                  : t("submit.highTierReached")}
               </p>
-            ) : (
-              <p className="text-[11px] text-emerald-700">{t("submit.dailyUnlockAll")}</p>
-            )}
+            ) : nextNeeded > 0 ? (
+              <p className="text-[11px] text-amber-700">
+                {isMiddleTier
+                  ? t("submit.reviewsToReachHighestTier", { needed: nextNeeded })
+                  : t("submit.dailyUnlockHint", { needed: nextNeeded })}
+              </p>
+            ) : null}
           </div>
           <div className="mt-2 h-1.5 rounded-full bg-brand-100">
             <div
@@ -494,7 +533,9 @@ export function SubmitPage() {
               style={{ width: `${participationProgress}%` }}
             />
           </div>
-          <p className="mt-2 text-[11px] text-slate-600">{t("submit.voteGateHint")}</p>
+          <p className="mt-2 text-[11px] text-slate-600">
+            {t("submit.votesNeverSpent")} {t("submit.participationUnlocksPosting")}
+          </p>
         </div>
         <form
           className="mt-4 space-y-3"
