@@ -120,10 +120,16 @@ export function SubmitPage() {
   const reviewActions = gateQuery.data?.review_actions ?? 0;
   const remainingPosts = gateQuery.data?.remaining_posts ?? 0;
   const isUnlimited = gateQuery.data?.unlimited ?? false;
-  const nextReviewActionsRequired = gateQuery.data?.next_review_actions_required ?? 0;
-  const actionsRequiredForUnlimited = gateQuery.data?.actions_required_for_unlimited ?? 0;
-  const scoreRequiredForUnlimited = gateQuery.data?.score_required_for_unlimited ?? actionsRequiredForUnlimited;
-  const participationWindowDays = gateQuery.data?.participation_window_days ?? 4;
+  const nextScoreRequired = gateQuery.data?.next_score_required ?? 0;
+  const nextReviewActionsRequired = gateQuery.data?.next_review_actions_required ?? null;
+  const actionsRequiredForUnlimited = gateQuery.data?.actions_required_for_unlimited ?? null;
+  const scoreRequiredForUnlimited =
+    gateQuery.data?.score_required_for_unlimited ?? actionsRequiredForUnlimited ?? 0;
+  const participationWindowDays = gateQuery.data?.participation_window_days ?? 7;
+  const unlockHintKey =
+    nextReviewActionsRequired === null ? "submit.dailyUnlockScoreHint" : "submit.dailyUnlockHint";
+  const unlockHintNeeded =
+    nextReviewActionsRequired === null ? Math.ceil(nextScoreRequired) : nextReviewActionsRequired;
   const participationProgress = isUnlimited
     ? 100
     : scoreRequiredForUnlimited > 0
@@ -411,7 +417,7 @@ export function SubmitPage() {
                 {t("submit.dailyPostsRemaining", { remaining: remainingPosts })}
               </p>
               <p className="mt-1 text-amber-700">
-                {t("submit.dailyUnlockHint", { needed: nextReviewActionsRequired })}
+                {t(unlockHintKey, { needed: unlockHintNeeded })}
               </p>
             </div>
           </div>
@@ -476,7 +482,7 @@ export function SubmitPage() {
             </div>
             {!isUnlimited ? (
               <p className="text-[11px] text-amber-700">
-                {t("submit.dailyUnlockHint", { needed: nextReviewActionsRequired })}
+                {t(unlockHintKey, { needed: unlockHintNeeded })}
               </p>
             ) : (
               <p className="text-[11px] text-emerald-700">{t("submit.dailyUnlockAll")}</p>

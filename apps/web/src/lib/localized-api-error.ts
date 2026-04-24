@@ -38,14 +38,19 @@ export function getLocalizedApiErrorMessage(error: ApiError, t: TranslateFn): st
     const details = error.details as
       | {
           needed?: number;
-          next_review_actions_required?: number;
+          needed_score?: number;
+          next_score_required?: number;
+          next_review_actions_required?: number | null;
           next_votes_required?: number;
         }
       | undefined;
-    const needed =
-      details?.needed ?? details?.next_review_actions_required ?? details?.next_votes_required;
-    if (typeof needed === "number") {
-      return t("api.entry_participation_gate", { needed });
+    const reviewActionsNeeded = details?.next_review_actions_required ?? details?.next_votes_required;
+    if (typeof reviewActionsNeeded === "number") {
+      return t("api.entry_participation_gate", { needed: reviewActionsNeeded });
+    }
+    const scoreNeeded = details?.next_score_required ?? details?.needed_score ?? details?.needed;
+    if (typeof scoreNeeded === "number") {
+      return t("api.entry_participation_gate_score", { needed: Math.ceil(scoreNeeded) });
     }
     return t("api.entry_participation_gate");
   }

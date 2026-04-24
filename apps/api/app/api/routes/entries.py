@@ -96,6 +96,7 @@ from app.services.participation import (
     record_entry_comment_participation,
     record_page_engagement_event,
     record_review_participation_event,
+    review_action_requirement_or_none,
 )
 from app.services.rate_limit import enforce_rate_limit
 from app.services.reputation import recompute_user_reputation
@@ -152,9 +153,20 @@ async def get_entry_submission_gate(
     settings = get_settings()
 
     if prev_page_id is not None and prev_page_tier in PAGE_ENGAGEMENT_TIERS:
-        await record_page_engagement_event(db, user_id=user.id, entry_id=prev_page_id, tier=prev_page_tier)
+        recorded = await record_page_engagement_event(
+            db,
+            user_id=user.id,
+            entry_id=prev_page_id,
+            tier=prev_page_tier,
+        )
+        if recorded:
+            await db.commit()
 
     gate = await get_entry_submission_participation_gate(db, user)
+    next_review_actions_required = review_action_requirement_or_none(gate.next_score_required)
+    actions_required_for_unlimited = review_action_requirement_or_none(
+        gate.score_required_for_unlimited
+    )
 
     return EntrySubmissionGateOut(
         window_start=gate.window_start,
@@ -166,8 +178,8 @@ async def get_entry_submission_gate(
         remaining_posts=gate.remaining_posts,
         unlimited=gate.unlimited,
         next_score_required=gate.next_score_required,
-        next_review_actions_required=int(gate.next_score_required),
-        actions_required_for_unlimited=int(gate.score_required_for_unlimited),
+        next_review_actions_required=next_review_actions_required,
+        actions_required_for_unlimited=actions_required_for_unlimited,
         score_required_for_unlimited=gate.score_required_for_unlimited,
         votes_are_consumed=False,
         participation_window_days=settings.entry_participation_window_days,
@@ -179,8 +191,8 @@ async def get_entry_submission_gate(
         active_participation_label=None,
         votes_today=gate.review_actions,
         unlocked_posts=gate.allowed_posts,
-        next_votes_required=int(gate.next_score_required),
-        votes_required_for_unlimited=int(gate.score_required_for_unlimited),
+        next_votes_required=next_review_actions_required,
+        votes_required_for_unlimited=actions_required_for_unlimited,
     )
 
 
@@ -191,10 +203,12 @@ async def record_entry_engagement(
     user: Annotated[User, Depends(get_current_user)],
     tier: str = Query(default="excellent"),
 ) -> None:
-    """Record an immediate page engagement event — used for card votes outside the entry detail page."""
+    """Record an immediate page engagement event for votes outside the entry detail page."""
     if tier not in PAGE_ENGAGEMENT_TIERS:
         tier = "excellent"
-    await record_page_engagement_event(db, user_id=user.id, entry_id=entry_id, tier=tier)
+    recorded = await record_page_engagement_event(db, user_id=user.id, entry_id=entry_id, tier=tier)
+    if recorded:
+        await db.commit()
 
 
 async def _load_entry_with_relations(db: SessionDep, entry_id: uuid.UUID) -> Entry | None:
@@ -791,7 +805,14 @@ async def get_entry(
         raise_api_error(status_code=404, code="entry_not_found", message="Entry not found")
 
     if user and prev_page_id is not None and prev_page_tier in PAGE_ENGAGEMENT_TIERS:
-        await record_page_engagement_event(db, user_id=user.id, entry_id=prev_page_id, tier=prev_page_tier)
+        recorded = await record_page_engagement_event(
+            db,
+            user_id=user.id,
+            entry_id=prev_page_id,
+            tier=prev_page_tier,
+        )
+        if recorded:
+            await db.commit()
 
     can_view_all_examples = bool(user and (is_moderator(user) or entry.proposer_user_id == user.id))
     if can_view_all_examples:

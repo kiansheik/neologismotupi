@@ -1,6 +1,7 @@
 import uuid
 from dataclasses import dataclass, replace
 from datetime import UTC, datetime, timedelta
+from math import ceil
 from typing import Any
 
 from sqlalchemy import and_, func, select
@@ -73,6 +74,40 @@ def _enabled_review_action_types() -> list[str]:
     return action_types
 
 
+def participation_score_uses_unit_review_actions() -> bool:
+    """Whether score thresholds can be shown as whole review-action counts."""
+    settings = get_settings()
+    if settings.entry_participation_page_excellent_weight != 0:
+        return False
+    if settings.entry_participation_page_fair_weight != 0:
+        return False
+    if settings.entry_participation_page_poor_weight != 0:
+        return False
+    if (
+        settings.entry_participation_count_entry_votes
+        and settings.entry_participation_entry_vote_weight != 1
+    ):
+        return False
+    if (
+        settings.entry_participation_count_example_votes
+        and settings.entry_participation_example_vote_weight != 1
+    ):
+        return False
+    if (
+        settings.entry_participation_count_audio_votes
+        or settings.entry_participation_count_comment_votes
+        or settings.entry_participation_count_comments
+    ) and settings.entry_participation_comment_vote_weight != 1:
+        return False
+    return True
+
+
+def review_action_requirement_or_none(score_required: float) -> int | None:
+    if not participation_score_uses_unit_review_actions():
+        return None
+    return max(0, ceil(score_required))
+
+
 async def record_review_participation_event(
     db: AsyncSession,
     *,
@@ -82,6 +117,7 @@ async def record_review_participation_event(
     target_id: uuid.UUID,
     source_key: str | None = None,
     metadata_json: dict[str, Any] | None = None,
+    occurred_at: datetime | None = None,
 ) -> ReviewParticipationEvent | None:
     source_key = source_key or f"{action_type}:{target_id}"
     existing_id = (
@@ -97,14 +133,20 @@ async def record_review_participation_event(
     if existing_id is not None:
         return None
 
-    event = ReviewParticipationEvent(
-        user_id=user_id,
-        action_type=action_type,
-        target_type=target_type,
-        target_id=target_id,
-        source_key=source_key,
-        metadata_json=metadata_json,
-    )
+    event_data: dict[str, Any] = {
+        "user_id": user_id,
+        "action_type": action_type,
+        "target_type": target_type,
+        "target_id": target_id,
+        "source_key": source_key,
+        "metadata_json": metadata_json,
+    }
+    if occurred_at is not None:
+        timestamp = _as_utc(occurred_at)
+        event_data["created_at"] = timestamp
+        event_data["updated_at"] = timestamp
+
+    event = ReviewParticipationEvent(**event_data)
     db.add(event)
     await db.flush()
     return event
@@ -123,7 +165,7 @@ async def compute_participation_score(
     tier-based bonus or small penalty. The total is floored at zero.
     """
     settings = get_settings()
-    action_types = _enabled_review_action_types() + [PAGE_ENGAGEMENT_ACTION]
+    action_types = [*_enabled_review_action_types(), PAGE_ENGAGEMENT_ACTION]
     if not action_types:
         return 0.0
 
@@ -325,6 +367,10 @@ async def get_entry_submission_participation_gate(
 
 
 def entry_participation_gate_error_details(gate: EntryParticipationGate) -> dict[str, Any]:
+    next_review_actions_required = review_action_requirement_or_none(gate.next_score_required)
+    actions_required_for_unlimited = review_action_requirement_or_none(
+        gate.score_required_for_unlimited
+    )
     return {
         "participation_score": gate.participation_score,
         "review_actions": gate.review_actions,
@@ -334,6 +380,9 @@ def entry_participation_gate_error_details(gate: EntryParticipationGate) -> dict
         "allowed_posts": gate.allowed_posts,
         "remaining_posts": gate.remaining_posts,
         "next_score_required": gate.next_score_required,
+        "needed_score": gate.next_score_required,
+        "next_review_actions_required": next_review_actions_required,
+        "actions_required_for_unlimited": actions_required_for_unlimited,
         "needed": gate.next_score_required,
         "score_required_for_unlimited": gate.score_required_for_unlimited,
         "votes_are_consumed": False,
@@ -363,11 +412,11 @@ async def record_page_engagement_event(
     entry_id: uuid.UUID,
     tier: str,
     now: datetime | None = None,
-) -> None:
+) -> bool:
     if tier not in PAGE_ENGAGEMENT_TIERS:
-        return
+        return False
     day = _as_utc(now or datetime.now(UTC)).date().isoformat()
-    await record_review_participation_event(
+    event = await record_review_participation_event(
         db,
         user_id=user_id,
         action_type=PAGE_ENGAGEMENT_ACTION,
@@ -376,6 +425,7 @@ async def record_page_engagement_event(
         source_key=f"{PAGE_ENGAGEMENT_ACTION}:{entry_id}:{day}",
         metadata_json={"tier": tier},
     )
+    return event is not None
 
 
 async def record_entry_comment_participation(

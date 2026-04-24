@@ -33,6 +33,10 @@ class Settings(BaseSettings):
     downvote_requires_comment: bool = True
     downvote_comment_min_length: int = 5
     downvote_comment_exempt_staff: bool = False
+
+    # Legacy vote-cost submission gate settings. Kept only so old env vars do not
+    # break startup; the active entry gate below uses entry_participation_* and
+    # never consumes votes.
     entry_vote_cost: int = 3
     entry_vote_cost_exempt_staff: bool = False
     entry_vote_cost_start_at: datetime | None = None

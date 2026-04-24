@@ -80,6 +80,7 @@ async def backfill(*, window_days: int, apply_changes: bool) -> None:
                     action_type=ENTRY_VOTE_ACTION,
                     target_type="entry",
                     target_id=vote.entry_id,
+                    occurred_at=vote.created_at,
                 )
                 if event is not None:
                     inserted += 1
@@ -88,7 +89,7 @@ async def backfill(*, window_days: int, apply_changes: bool) -> None:
             else:
                 inserted += 1
 
-        for ev, _author_id, entry_id in example_vote_rows:
+        for ev, _author_id, _entry_id in example_vote_rows:
             if apply_changes:
                 event = await record_review_participation_event(
                     db,
@@ -96,6 +97,7 @@ async def backfill(*, window_days: int, apply_changes: bool) -> None:
                     action_type=EXAMPLE_VOTE_ACTION,
                     target_type="example",
                     target_id=ev.example_id,
+                    occurred_at=ev.created_at,
                 )
                 if event is not None:
                     inserted += 1

@@ -254,8 +254,8 @@ class EntrySubmissionGateOut(BaseModel):
     remaining_posts: int | None
     unlimited: bool
     next_score_required: float
-    next_review_actions_required: int
-    actions_required_for_unlimited: int
+    next_review_actions_required: int | None
+    actions_required_for_unlimited: int | None
     score_required_for_unlimited: float
     votes_are_consumed: bool = False
     participation_window_days: int

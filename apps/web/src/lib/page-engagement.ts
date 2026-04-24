@@ -14,11 +14,11 @@ export interface PendingEngagement {
   tier: EngagementTier;
 }
 
-// Weights mirror the backend config defaults.
+// Page engagement is analytics-only by default; this only buckets client-side activity.
 export const VOTE_WEIGHTS = {
-  entry: 3,
-  example: 2,
-  comment: 1,
+  entry: 1,
+  example: 1,
+  comment: 0,
 } as const;
 
 export function startPageTracking(

@@ -314,10 +314,15 @@ async def test_entry_participation_gate_three_actions_are_not_consumed(client, m
 
 @pytest.mark.asyncio
 async def test_entry_participation_gate_twelve_actions_gives_daily_cap(client, monkeypatch):
-    await register_user(client, "participation-twelve-seed@example.com", "Participation Twelve Seed")
+    await register_user(
+        client,
+        "participation-twelve-seed@example.com",
+        "Participation Twelve Seed",
+    )
+    suffixes = [chr(ord("a") + i) for i in range(12)]
     seed_entries = [
-        await create_entry(client, f"participation-twelve-seed-{i}")
-        for i in range(12)
+        await create_entry(client, f"participation-twelve-seed-{suffix}")
+        for suffix in suffixes
     ]
 
     await client.post("/api/auth/logout")
@@ -329,7 +334,10 @@ async def test_entry_participation_gate_twelve_actions_gives_daily_cap(client, m
     enable_entry_participation_gate(monkeypatch)
 
     for entry in seed_entries:
-        vote_response = await client.post(f"/api/entries/{entry['id']}/vote", json={"value": 1})
+        vote_response = await client.post(
+            f"/api/entries/{entry['id']}/vote",
+            json={"value": 1},
+        )
         assert vote_response.status_code == 200, vote_response.text
 
     gate_response = await client.get("/api/entries/submit-gate")
@@ -341,8 +349,9 @@ async def test_entry_participation_gate_twelve_actions_gives_daily_cap(client, m
     assert gate["remaining_posts"] == 20
 
     for i in range(4):
-        created = await create_entry(client, f"participation-twelve-created-{i}")
-        assert created["headword"] == f"participation-twelve-created-{i}"
+        suffix = chr(ord("a") + i)
+        created = await create_entry(client, f"participation-twelve-created-{suffix}")
+        assert created["headword"] == f"participation-twelve-created-{suffix}"
 
     gate_response = await client.get("/api/entries/submit-gate")
     gate = gate_response.json()
@@ -389,6 +398,60 @@ async def test_entry_participation_events_prevent_revote_farming_and_wilt(client
     gate_response = await client.get("/api/entries/submit-gate")
     assert gate_response.status_code == 200, gate_response.text
     assert gate_response.json()["review_actions"] == 0
+
+
+@pytest.mark.asyncio
+async def test_page_engagement_endpoint_persists_event(client):
+    await register_user(client, "engagement-seed@example.com", "Engagement Seed")
+    entry = await create_entry(client, "participation-engagement-seed")
+
+    await client.post("/api/auth/logout")
+    await register_user(client, "engagement-reviewer@example.com", "Engagement Reviewer")
+
+    response = await client.post(
+        f"/api/entries/{entry['id']}/engagement?tier=excellent"
+    )
+    assert response.status_code == 204, response.text
+
+    async with db_module.AsyncSessionLocal() as db:
+        count = (
+            await db.execute(
+                select(func.count()).where(
+                    ReviewParticipationEvent.action_type == "page_engagement",
+                    ReviewParticipationEvent.target_id == uuid.UUID(entry["id"]),
+                )
+            )
+        ).scalar_one()
+    assert count == 1
+
+
+@pytest.mark.asyncio
+async def test_submit_gate_uses_score_hints_when_weights_are_not_unit(client, monkeypatch):
+    await register_user(client, "weighted-seed@example.com", "Weighted Seed")
+    entry = await create_entry(client, "participation-weighted-seed")
+
+    await client.post("/api/auth/logout")
+    await register_user(client, "weighted-reviewer@example.com", "Weighted Reviewer")
+    enable_entry_participation_gate(monkeypatch)
+    monkeypatch.setenv("ENTRY_PARTICIPATION_ENTRY_VOTE_WEIGHT", "0.5")
+    monkeypatch.setenv("ENTRY_PARTICIPATION_STEP2_ACTIONS", "1")
+    monkeypatch.setenv("ENTRY_PARTICIPATION_STEP3_ACTIONS", "2")
+    get_settings.cache_clear()
+
+    vote_response = await client.post(
+        f"/api/entries/{entry['id']}/vote",
+        json={"value": 1},
+    )
+    assert vote_response.status_code == 200, vote_response.text
+
+    gate_response = await client.get("/api/entries/submit-gate")
+    assert gate_response.status_code == 200, gate_response.text
+    gate = gate_response.json()
+    assert gate["review_actions"] == 1
+    assert gate["participation_score"] == 0.5
+    assert gate["next_score_required"] == 0.5
+    assert gate["next_review_actions_required"] is None
+    assert gate["actions_required_for_unlimited"] is None
 
 
 @pytest.mark.asyncio

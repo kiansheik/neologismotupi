@@ -86,12 +86,13 @@ React 19 + Vite + TypeScript. TanStack Query for server state, React Hook Form +
 
 ### Participation gate
 
-Entry submission is gated on a participation score computed from recent review actions (votes on other users' content) over a rolling window. Key files:
+Entry submission is gated on a participation score from recent review actions over a rolling window. Key files:
 - `apps/api/app/services/participation.py` — score computation, event recording
 - `apps/api/app/config.py` — all gate thresholds and weights are env-var configurable
-- `apps/web/src/lib/page-engagement.ts` — client-side sessionStorage tracker that measures per-page voting engagement and flushes it on navigation
+- `apps/web/src/lib/page-engagement.ts` — client-side sessionStorage tracker that measures per-page voting engagement; card votes flush via `POST /entries/{id}/engagement`, while detail-page navigation may piggyback the previous page onto the next entry/submit-gate fetch
+- `docs/participation-gate.md` — full design doc with defaults, config reference, backfill instructions
 
-Score is weighted: entry vote = 3 pts, example vote = 2 pts, comment vote = 1 pt, plus per-page engagement bonuses. Default 4-day rolling window. Tier thresholds: ≥3 → 1 post/day, ≥5 → 2 posts/day, ≥6 → unlimited.
+Default weights: entry vote = 1.0, example vote = 1.0; page engagement = 0.0 (analytics-only). 7-day rolling window. Tiers: 0 actions → 1 post/day (base), ≥3 → 2/day, ≥12 → 20/day cap. `participation_score` is canonical; `next_review_actions_required` is only populated when enabled weights make one review action equal one point. `entry_vote_cost` / `entry_vote_daily_step*` in `config.py` are legacy from a previous system; the active gate uses only `entry_participation_*` keys.
 
 ### Key conventions
 

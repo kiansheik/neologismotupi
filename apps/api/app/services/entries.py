@@ -1,16 +1,25 @@
-import uuid
 import unicodedata
+import uuid
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 
 from sqlalchemy import and_, delete, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.discussion import CommentVote, EntryComment
 from app.config import get_settings
 from app.core.enums import EntryStatus, ExampleStatus
 from app.core.utils import collapse_whitespace, normalize_text
-from app.models.entry import Entry, EntryTag, EntryVersion, Example, ExampleVersion, ExampleVote, Tag, Vote
+from app.models.discussion import CommentVote, EntryComment
+from app.models.entry import (
+    Entry,
+    EntryTag,
+    EntryVersion,
+    Example,
+    ExampleVersion,
+    ExampleVote,
+    Tag,
+    Vote,
+)
 from app.models.user import User
 
 
@@ -255,6 +264,8 @@ async def count_user_entries(
     return int((await db.execute(stmt)).scalar_one())
 
 
+# Legacy vote-cost profile/stat helpers. The active entry submission gate lives in
+# app.services.participation and never consumes votes.
 def get_entry_vote_cost_start_at() -> datetime | None:
     start_at = get_settings().entry_vote_cost_start_at
     if start_at is None:

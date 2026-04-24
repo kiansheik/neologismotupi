@@ -307,8 +307,8 @@ export interface EntrySubmissionGate {
   remaining_posts: number | null;
   unlimited: boolean;
   next_score_required: number;
-  next_review_actions_required: number;
-  actions_required_for_unlimited: number;
+  next_review_actions_required: number | null;
+  actions_required_for_unlimited: number | null;
   score_required_for_unlimited: number;
   votes_are_consumed: false;
   participation_window_days: number;

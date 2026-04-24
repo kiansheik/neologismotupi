@@ -39,7 +39,7 @@ deploy/env/*.env
 backups/
 
 # Local analysis output
-analysis/
+analysis/participation_gate/
 
 # Media uploads
 apps/api/media/
