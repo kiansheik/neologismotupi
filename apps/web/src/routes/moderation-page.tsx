@@ -14,6 +14,7 @@ import {
   getModerationDashboard,
   getModerationQueue,
   getModerationReports,
+  getParticipationLeaderboard,
   rejectEntry,
   rejectExample,
   resolveReport,
@@ -50,6 +51,13 @@ export function ModerationPage() {
     queryKey: ["mod-reports", "open"],
     queryFn: () => getModerationReports("open"),
     enabled: Boolean(currentUser?.is_superuser),
+  });
+
+  const leaderboardQuery = useQuery({
+    queryKey: ["mod-participation-leaderboard"],
+    queryFn: getParticipationLeaderboard,
+    enabled: Boolean(currentUser?.is_superuser),
+    staleTime: 60_000,
   });
 
   const refreshModeration = async () => {
@@ -459,6 +467,66 @@ export function ModerationPage() {
               ))}
             </div>
           </>
+        ) : null}
+      </Card>
+
+      <Card>
+        <div className="flex items-baseline justify-between gap-4">
+          <h2 className="text-lg font-semibold text-brand-900">Participation Leaderboard</h2>
+          {leaderboardQuery.data ? (
+            <p className="text-xs text-slate-500">
+              {leaderboardQuery.data.window_days}-day window · unlimited at score ≥{" "}
+              {leaderboardQuery.data.step3_threshold} · entry vote = +{leaderboardQuery.data.entry_vote_weight} pts
+            </p>
+          ) : null}
+        </div>
+
+        {leaderboardQuery.isLoading ? (
+          <p className="mt-3 text-sm text-slate-600">Loading…</p>
+        ) : leaderboardQuery.error ? (
+          <p className="mt-3 text-sm text-red-700">Failed to load participation data.</p>
+        ) : leaderboardQuery.data ? (
+          <div className="mt-3 overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-brand-100 text-left text-xs font-medium uppercase tracking-wide text-slate-500">
+                  <th className="pb-2 pr-4">User</th>
+                  <th className="pb-2 pr-4">Score</th>
+                  <th className="pb-2 pr-4">Tier</th>
+                  <th className="pb-2">Votes needed for unlimited</th>
+                </tr>
+              </thead>
+              <tbody>
+                {leaderboardQuery.data.rows.map((row) => {
+                  const tierLabel =
+                    row.tier === 3 ? "unlimited" :
+                    row.tier === 2 ? "tier 2" :
+                    row.tier === 1 ? "tier 1" : "locked";
+                  const tierClass =
+                    row.tier === 3 ? "text-emerald-700 font-medium" :
+                    row.tier === 2 ? "text-brand-700" :
+                    row.tier === 1 ? "text-amber-700" : "text-red-600";
+                  return (
+                    <tr key={row.user_id} className="border-b border-brand-50 last:border-0">
+                      <td className="py-2 pr-4 font-medium text-brand-900">{row.display_name}</td>
+                      <td className="py-2 pr-4 tabular-nums text-slate-700">{row.participation_score.toFixed(1)}</td>
+                      <td className={`py-2 pr-4 ${tierClass}`}>{tierLabel}</td>
+                      <td className="py-2 tabular-nums text-slate-700">
+                        {row.is_unlimited ? (
+                          <span className="text-emerald-700">—</span>
+                        ) : (
+                          row.entry_votes_needed_for_unlimited
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+            {leaderboardQuery.data.rows.length === 0 ? (
+              <p className="mt-2 text-sm text-slate-500">No users found.</p>
+            ) : null}
+          </div>
         ) : null}
       </Card>
     </section>

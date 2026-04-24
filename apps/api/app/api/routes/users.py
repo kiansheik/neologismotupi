@@ -6,15 +6,16 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy import and_, func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import selectinload, aliased
+from sqlalchemy.orm import aliased, selectinload
 
 from app.core.deps import SessionDep, get_current_user
 from app.core.errors import raise_api_error
+from app.models.audio import AudioSample
 from app.models.discussion import EntryComment, Notification, NotificationPreference
 from app.models.entry import Entry, Example, Vote
-from app.models.audio import AudioSample
 from app.models.newsletter import NewsletterSubscription
 from app.models.user import Profile, Session, User
+from app.schemas.audio import AudioSubmissionListOut, AudioSubmissionOut
 from app.schemas.notifications import (
     NotificationListOut,
     NotificationOut,
@@ -33,15 +34,14 @@ from app.schemas.users import (
     UserPreferencesOut,
     UserPreferencesUpdate,
 )
-from app.schemas.audio import AudioSubmissionListOut, AudioSubmissionOut
+from app.services.audio import build_audio_url
+from app.services.entries import count_user_entry_votes, get_entry_vote_cost_start_at
+from app.services.newsletters import normalize_locale
 from app.services.notifications import (
     get_or_create_notification_preferences,
     normalize_mention_key,
 )
-from app.services.audio import build_audio_url
-from app.services.newsletters import normalize_locale
 from app.services.user_badges import get_user_badge_leaders, resolve_user_badges
-from app.services.entries import get_entry_vote_cost_start_at, count_user_entry_votes
 
 router = APIRouter(prefix="/users", tags=["users"])
 

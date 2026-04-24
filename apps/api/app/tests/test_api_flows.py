@@ -12,6 +12,7 @@ from app.core.enums import TagType
 from app.models.discussion import CommentVote, Notification, NotificationPreference
 from app.models.entry import Entry, Example, ExampleVote, Tag, Vote
 from app.models.moderation import Report
+from app.models.participation import ReviewParticipationEvent
 from app.models.source import SourceEdition, SourceWork
 from app.models.user import Profile, User
 from app.security import hash_password
@@ -62,6 +63,31 @@ async def create_entry(client, headword: str = "test-word"):
     )
     assert response.status_code == 201, response.text
     return response.json()
+
+
+def enable_entry_participation_gate(monkeypatch) -> None:
+    monkeypatch.setenv("ENTRY_PARTICIPATION_GATE_ENABLED", "true")
+    monkeypatch.setenv("ENTRY_PARTICIPATION_COUNT_ENTRY_VOTES", "true")
+    monkeypatch.setenv("ENTRY_PARTICIPATION_COUNT_EXAMPLE_VOTES", "false")
+    monkeypatch.setenv("ENTRY_PARTICIPATION_COUNT_AUDIO_VOTES", "false")
+    monkeypatch.setenv("ENTRY_PARTICIPATION_COUNT_COMMENT_VOTES", "false")
+    monkeypatch.setenv("ENTRY_PARTICIPATION_COUNT_COMMENTS", "false")
+    monkeypatch.setenv("ENTRY_PARTICIPATION_STEP1_ACTIONS", "0")
+    monkeypatch.setenv("ENTRY_PARTICIPATION_STEP1_POSTS", "1")
+    monkeypatch.setenv("ENTRY_PARTICIPATION_STEP2_ACTIONS", "3")
+    monkeypatch.setenv("ENTRY_PARTICIPATION_STEP2_POSTS", "2")
+    monkeypatch.setenv("ENTRY_PARTICIPATION_STEP3_ACTIONS", "12")
+    monkeypatch.setenv("ENTRY_PARTICIPATION_STEP3_UNLIMITED", "false")
+    monkeypatch.setenv("ENTRY_PARTICIPATION_UNLIMITED_DAILY_CAP", "20")
+    monkeypatch.setenv("ENTRY_PARTICIPATION_EXEMPT_STAFF", "false")
+    # Pin weights to 1.0 so each vote == 1 point — keeps count-based assertions valid
+    monkeypatch.setenv("ENTRY_PARTICIPATION_ENTRY_VOTE_WEIGHT", "1.0")
+    monkeypatch.setenv("ENTRY_PARTICIPATION_EXAMPLE_VOTE_WEIGHT", "1.0")
+    monkeypatch.setenv("ENTRY_PARTICIPATION_COMMENT_VOTE_WEIGHT", "0.0")
+    monkeypatch.setenv("ENTRY_PARTICIPATION_PAGE_EXCELLENT_WEIGHT", "0.0")
+    monkeypatch.setenv("ENTRY_PARTICIPATION_PAGE_FAIR_WEIGHT", "0.0")
+    monkeypatch.setenv("ENTRY_PARTICIPATION_PAGE_POOR_WEIGHT", "0.0")
+    get_settings.cache_clear()
 
 
 @pytest.mark.asyncio
@@ -204,98 +230,268 @@ async def test_invalid_headword_rejected(client):
 
 
 @pytest.mark.asyncio
-async def test_entry_vote_quota_requires_votes(client, monkeypatch):
-    await register_user(client, "seed-entries@example.com", "Seed Entries")
-    entry_a = await create_entry(client, "seed-entry-a")
-    entry_b = await create_entry(client, "seed-entry-b")
-    entry_c = await create_entry(client, "seed-entry-c")
-    entry_d = await create_entry(client, "seed-entry-d")
-    entry_e = await create_entry(client, "seed-entry-e")
+async def test_entry_participation_gate_base_allowance(client, monkeypatch):
+    await register_user(client, "base-allowance@example.com", "Base Allowance")
+    enable_entry_participation_gate(monkeypatch)
+
+    first = await create_entry(client, "participation-base-first")
+    assert first["headword"] == "participation-base-first"
+
+    response = await client.post(
+        "/api/entries",
+        json={
+            "headword": "participation-base-second",
+            "gloss_pt": "teste",
+            "gloss_en": "test",
+            "part_of_speech": "noun",
+            "short_definition": "Base allowance second entry.",
+            "morphology_notes": "seed note",
+            "force_submit": True,
+            "tag_ids": [],
+        },
+    )
+    assert response.status_code == 403, response.text
+    payload = response.json()["error"]
+    assert payload["code"] == "entry_participation_gate"
+    assert payload["details"]["review_actions"] == 0
+    assert payload["details"]["entries_today"] == 1
+    assert payload["details"]["remaining_posts"] == 0
+    assert payload["details"]["votes_are_consumed"] is False
+
+
+@pytest.mark.asyncio
+async def test_entry_participation_gate_three_actions_are_not_consumed(client, monkeypatch):
+    await register_user(client, "participation-seed@example.com", "Participation Seed")
+    seed_entries = [
+        await create_entry(client, f"participation-seed-{suffix}")
+        for suffix in ("a", "b", "c")
+    ]
 
     await client.post("/api/auth/logout")
-    await register_user(client, "quota-user@example.com", "Quota User")
+    await register_user(client, "participation-reviewer@example.com", "Participation Reviewer")
+    enable_entry_participation_gate(monkeypatch)
 
-    monkeypatch.setenv("ENTRY_VOTE_DAILY_STEP1_VOTES", "3")
-    monkeypatch.setenv("ENTRY_VOTE_DAILY_STEP1_POSTS", "1")
-    monkeypatch.setenv("ENTRY_VOTE_DAILY_STEP2_VOTES", "2")
-    monkeypatch.setenv("ENTRY_VOTE_DAILY_STEP2_POSTS", "3")
-    monkeypatch.setenv("ENTRY_VOTE_DAILY_STEP3_VOTES", "1")
+    for entry in seed_entries:
+        vote_response = await client.post(f"/api/entries/{entry['id']}/vote", json={"value": 1})
+        assert vote_response.status_code == 200, vote_response.text
+
+    gate_response = await client.get("/api/entries/submit-gate")
+    assert gate_response.status_code == 200, gate_response.text
+    gate = gate_response.json()
+    assert gate["review_actions"] == 3
+    assert gate["allowed_posts"] == 2
+    assert gate["remaining_posts"] == 2
+    assert gate["votes_are_consumed"] is False
+
+    await create_entry(client, "participation-reviewer-first")
+    gate_response = await client.get("/api/entries/submit-gate")
+    gate = gate_response.json()
+    assert gate["review_actions"] == 3
+    assert gate["remaining_posts"] == 1
+
+    await create_entry(client, "participation-reviewer-second")
+    gate_response = await client.get("/api/entries/submit-gate")
+    gate = gate_response.json()
+    assert gate["review_actions"] == 3
+    assert gate["remaining_posts"] == 0
+
+    blocked = await client.post(
+        "/api/entries",
+        json={
+            "headword": "participation-reviewer-third",
+            "gloss_pt": "teste",
+            "gloss_en": "test",
+            "part_of_speech": "noun",
+            "short_definition": "Third gated entry.",
+            "morphology_notes": "seed note",
+            "force_submit": True,
+            "tag_ids": [],
+        },
+    )
+    assert blocked.status_code == 403, blocked.text
+    assert blocked.json()["error"]["code"] == "entry_participation_gate"
+
+
+@pytest.mark.asyncio
+async def test_entry_participation_gate_twelve_actions_gives_daily_cap(client, monkeypatch):
+    await register_user(
+        client,
+        "participation-twelve-seed@example.com",
+        "Participation Twelve Seed",
+    )
+    suffixes = [chr(ord("a") + i) for i in range(12)]
+    seed_entries = [
+        await create_entry(client, f"participation-twelve-seed-{suffix}")
+        for suffix in suffixes
+    ]
+
+    await client.post("/api/auth/logout")
+    await register_user(
+        client,
+        "participation-twelve-reviewer@example.com",
+        "Participation Twelve Reviewer",
+    )
+    enable_entry_participation_gate(monkeypatch)
+
+    for entry in seed_entries:
+        vote_response = await client.post(
+            f"/api/entries/{entry['id']}/vote",
+            json={"value": 1},
+        )
+        assert vote_response.status_code == 200, vote_response.text
+
+    gate_response = await client.get("/api/entries/submit-gate")
+    assert gate_response.status_code == 200, gate_response.text
+    gate = gate_response.json()
+    assert gate["review_actions"] == 12
+    assert gate["unlimited"] is False
+    assert gate["allowed_posts"] == 20
+    assert gate["remaining_posts"] == 20
+
+    for i in range(4):
+        suffix = chr(ord("a") + i)
+        created = await create_entry(client, f"participation-twelve-created-{suffix}")
+        assert created["headword"] == f"participation-twelve-created-{suffix}"
+
+    gate_response = await client.get("/api/entries/submit-gate")
+    gate = gate_response.json()
+    assert gate["review_actions"] == 12
+    assert gate["unlimited"] is False
+    assert gate["remaining_posts"] == 16
+
+
+@pytest.mark.asyncio
+async def test_entry_participation_events_prevent_revote_farming_and_wilt(client, monkeypatch):
+    await register_user(client, "participation-farm-seed@example.com", "Participation Farm Seed")
+    seed_entry = await create_entry(client, "participation-farm-seed")
+
+    await client.post("/api/auth/logout")
+    await register_user(
+        client,
+        "participation-farm-reviewer@example.com",
+        "Participation Farm Reviewer",
+    )
+    enable_entry_participation_gate(monkeypatch)
+
+    vote_response = await client.post(f"/api/entries/{seed_entry['id']}/vote", json={"value": 1})
+    assert vote_response.status_code == 200, vote_response.text
+    delete_response = await client.delete(f"/api/entries/{seed_entry['id']}/vote")
+    assert delete_response.status_code == 204, delete_response.text
+    revote_response = await client.post(f"/api/entries/{seed_entry['id']}/vote", json={"value": 1})
+    assert revote_response.status_code == 200, revote_response.text
+
+    gate_response = await client.get("/api/entries/submit-gate")
+    assert gate_response.status_code == 200, gate_response.text
+    assert gate_response.json()["review_actions"] == 1
+
+    async with db_module.AsyncSessionLocal() as session:
+        event = (
+            await session.execute(
+                select(ReviewParticipationEvent).where(
+                    ReviewParticipationEvent.action_type == "entry_vote"
+                )
+            )
+        ).scalar_one()
+        event.created_at = datetime.now(UTC) - timedelta(days=8)
+        await session.commit()
+
+    gate_response = await client.get("/api/entries/submit-gate")
+    assert gate_response.status_code == 200, gate_response.text
+    assert gate_response.json()["review_actions"] == 0
+
+
+@pytest.mark.asyncio
+async def test_page_engagement_endpoint_persists_event(client):
+    await register_user(client, "engagement-seed@example.com", "Engagement Seed")
+    entry = await create_entry(client, "participation-engagement-seed")
+
+    await client.post("/api/auth/logout")
+    await register_user(client, "engagement-reviewer@example.com", "Engagement Reviewer")
+
+    response = await client.post(
+        f"/api/entries/{entry['id']}/engagement?tier=excellent"
+    )
+    assert response.status_code == 204, response.text
+
+    async with db_module.AsyncSessionLocal() as db:
+        count = (
+            await db.execute(
+                select(func.count()).where(
+                    ReviewParticipationEvent.action_type == "page_engagement",
+                    ReviewParticipationEvent.target_id == uuid.UUID(entry["id"]),
+                )
+            )
+        ).scalar_one()
+    assert count == 1
+
+
+@pytest.mark.asyncio
+async def test_submit_gate_uses_score_hints_when_weights_are_not_unit(client, monkeypatch):
+    await register_user(client, "weighted-seed@example.com", "Weighted Seed")
+    entry = await create_entry(client, "participation-weighted-seed")
+
+    await client.post("/api/auth/logout")
+    await register_user(client, "weighted-reviewer@example.com", "Weighted Reviewer")
+    enable_entry_participation_gate(monkeypatch)
+    monkeypatch.setenv("ENTRY_PARTICIPATION_ENTRY_VOTE_WEIGHT", "0.5")
+    monkeypatch.setenv("ENTRY_PARTICIPATION_STEP2_ACTIONS", "1")
+    monkeypatch.setenv("ENTRY_PARTICIPATION_STEP3_ACTIONS", "2")
     get_settings.cache_clear()
 
+    vote_response = await client.post(
+        f"/api/entries/{entry['id']}/vote",
+        json={"value": 1},
+    )
+    assert vote_response.status_code == 200, vote_response.text
+
+    gate_response = await client.get("/api/entries/submit-gate")
+    assert gate_response.status_code == 200, gate_response.text
+    gate = gate_response.json()
+    assert gate["review_actions"] == 1
+    assert gate["participation_score"] == 0.5
+    assert gate["next_score_required"] == 0.5
+    assert gate["next_review_actions_required"] is None
+    assert gate["actions_required_for_unlimited"] is None
+
+
+@pytest.mark.asyncio
+async def test_entry_participation_staff_exemption_is_configurable(client, monkeypatch):
+    user_payload = await register_user(
+        client,
+        "participation-staff@example.com",
+        "Participation Staff",
+    )
+    async with db_module.AsyncSessionLocal() as session:
+        staff_user = (
+            await session.execute(select(User).where(User.id == uuid.UUID(user_payload["id"])))
+        ).scalar_one()
+        staff_user.is_superuser = True
+        await session.commit()
+
+    enable_entry_participation_gate(monkeypatch)
+    monkeypatch.setenv("ENTRY_PARTICIPATION_EXEMPT_STAFF", "true")
+    get_settings.cache_clear()
+
+    await create_entry(client, "participation-staff-first")
+    await create_entry(client, "participation-staff-second")
+
+    monkeypatch.setenv("ENTRY_PARTICIPATION_EXEMPT_STAFF", "false")
+    get_settings.cache_clear()
     response = await client.post(
         "/api/entries",
         json={
-            "headword": "quota-entry",
+            "headword": "participation-staff-third",
             "gloss_pt": "teste",
             "gloss_en": "test",
             "part_of_speech": "noun",
-            "short_definition": "Quota gated entry.",
+            "short_definition": "Staff gate entry.",
             "morphology_notes": "seed note",
             "force_submit": True,
             "tag_ids": [],
         },
     )
     assert response.status_code == 403, response.text
-    assert response.json()["error"]["code"] == "entry_vote_quota"
-
-    for entry in (entry_a, entry_b, entry_c):
-        vote_response = await client.post(
-            f"/api/entries/{entry['id']}/vote",
-            json={"value": 1},
-        )
-        assert vote_response.status_code == 200, vote_response.text
-
-    response = await client.post(
-        "/api/entries",
-        json={
-            "headword": "quota-entry",
-            "gloss_pt": "teste",
-            "gloss_en": "test",
-            "part_of_speech": "noun",
-            "short_definition": "Quota gated entry.",
-            "morphology_notes": "seed note",
-            "force_submit": True,
-            "tag_ids": [],
-        },
-    )
-    assert response.status_code == 201, response.text
-
-    response = await client.post(
-        "/api/entries",
-        json={
-            "headword": "quota-entry-b",
-            "gloss_pt": "teste",
-            "gloss_en": "test",
-            "part_of_speech": "noun",
-            "short_definition": "Quota gated entry second.",
-            "morphology_notes": "seed note",
-            "force_submit": True,
-            "tag_ids": [],
-        },
-    )
-    assert response.status_code == 403, response.text
-
-    for entry in (entry_d, entry_e):
-        vote_response = await client.post(
-            f"/api/entries/{entry['id']}/vote",
-            json={"value": 1},
-        )
-        assert vote_response.status_code == 200, vote_response.text
-
-    response = await client.post(
-        "/api/entries",
-        json={
-            "headword": "quota-entry-c",
-            "gloss_pt": "teste",
-            "gloss_en": "test",
-            "part_of_speech": "noun",
-            "short_definition": "Quota gated entry third.",
-            "morphology_notes": "seed note",
-            "force_submit": True,
-            "tag_ids": [],
-        },
-    )
-    assert response.status_code == 201, response.text
+    assert response.json()["error"]["code"] == "entry_participation_gate"
 
 
 @pytest.mark.asyncio

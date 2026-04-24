@@ -38,6 +38,9 @@ deploy/env/*.env
 # Local backups
 backups/
 
+# Local analysis output
+analysis/participation_gate/
+
 # Media uploads
 apps/api/media/
 

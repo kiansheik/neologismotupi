@@ -1,8 +1,8 @@
 from fastapi import APIRouter, Query
 from sqlalchemy import select
 
-from app.core.enums import EntryStatus, ExampleStatus, PARTS_OF_SPEECH, TagType
 from app.core.deps import SessionDep
+from app.core.enums import PARTS_OF_SPEECH, EntryStatus, ExampleStatus, TagType
 from app.models.entry import Tag
 from app.schemas.entries import TagOut
 

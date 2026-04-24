@@ -1,12 +1,14 @@
-import uuid
 import logging
+import math
 import shutil
-from datetime import UTC, datetime
-from datetime import timedelta
+import uuid
+from collections import defaultdict
+from datetime import UTC, datetime, timedelta
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy import func, select, union_all
+from sqlalchemy.orm import selectinload
 
 from app.config import get_settings
 from app.core.deps import SessionDep, require_moderator
@@ -14,6 +16,7 @@ from app.core.enums import EntryStatus, ExampleStatus, ReportStatus, ReportTarge
 from app.core.errors import raise_api_error
 from app.models.entry import Entry, Example, ExampleVote, Vote
 from app.models.moderation import Report
+from app.models.participation import ReviewParticipationEvent
 from app.models.user import Profile, User
 from app.schemas.moderation import (
     HostDiskUsageOut,
@@ -22,12 +25,25 @@ from app.schemas.moderation import (
     ModerationEntryOut,
     ModerationExampleOut,
     ModerationQueueOut,
+    ParticipationLeaderboardOut,
     PeriodCountOut,
     ReportOut,
     ReportReviewRequest,
+    UserParticipationRow,
 )
 from app.services.email_delivery import send_entry_moderation_email
 from app.services.moderation import record_moderation_action
+from app.services.participation import (
+    AUDIO_VOTE_ACTION,
+    COMMENT_VOTE_ACTION,
+    ENTRY_COMMENT_ACTION,
+    ENTRY_VOTE_ACTION,
+    EXAMPLE_VOTE_ACTION,
+    PAGE_ENGAGEMENT_ACTION,
+    _as_utc,
+    _enabled_review_action_types,
+    get_entry_participation_window,
+)
 
 router = APIRouter(prefix="/mod", tags=["moderation"])
 logger = logging.getLogger(__name__)
@@ -573,3 +589,107 @@ async def resolve_report(
     await db.commit()
 
     return {"ok": True, "report_id": str(report.id), "status": report.status.value}
+
+
+@router.get("/participation-leaderboard", response_model=ParticipationLeaderboardOut)
+async def participation_leaderboard(
+    db: SessionDep,
+    moderator: Annotated[User, Depends(require_moderator)],
+) -> ParticipationLeaderboardOut:
+    """All users ranked by current participation score, showing how many entry votes each needs to reach unlimited."""
+    settings = get_settings()
+    now = _as_utc(datetime.now(UTC))
+    window_start, window_end = get_entry_participation_window(now)
+
+    enabled_actions = [*_enabled_review_action_types(), PAGE_ENGAGEMENT_ACTION]
+
+    # Fetch all users with profiles in one query
+    users = (
+        await db.execute(
+            select(User).options(selectinload(User.profile)).order_by(User.created_at)
+        )
+    ).scalars().all()
+
+    # Fetch all participation events in the window across all users in one query
+    events = (
+        await db.execute(
+            select(
+                ReviewParticipationEvent.user_id,
+                ReviewParticipationEvent.action_type,
+                ReviewParticipationEvent.metadata_json,
+            ).where(
+                ReviewParticipationEvent.action_type.in_(enabled_actions),
+                ReviewParticipationEvent.created_at >= window_start,
+                ReviewParticipationEvent.created_at <= window_end,
+            )
+        )
+    ).all()
+
+    # Group events by user
+    events_by_user: dict[uuid.UUID, list[tuple[str, dict]]] = defaultdict(list)
+    for user_id, action_type, metadata in events:
+        events_by_user[user_id].append((action_type, metadata or {}))
+
+    entry_weight = settings.entry_participation_entry_vote_weight
+    example_weight = settings.entry_participation_example_vote_weight
+    comment_weight = settings.entry_participation_comment_vote_weight
+    page_excellent = settings.entry_participation_page_excellent_weight
+    page_fair = settings.entry_participation_page_fair_weight
+    page_poor = settings.entry_participation_page_poor_weight
+    step1 = float(settings.entry_participation_step1_actions)
+    step2 = float(max(settings.entry_participation_step1_actions, settings.entry_participation_step2_actions))
+    step3 = float(max(step2, settings.entry_participation_step3_actions))
+
+    rows: list[UserParticipationRow] = []
+    for user in users:
+        score = 0.0
+        for action_type, metadata in events_by_user.get(user.id, []):
+            if action_type == ENTRY_VOTE_ACTION:
+                score += entry_weight
+            elif action_type == EXAMPLE_VOTE_ACTION:
+                score += example_weight
+            elif action_type in (COMMENT_VOTE_ACTION, ENTRY_COMMENT_ACTION, AUDIO_VOTE_ACTION):
+                score += comment_weight
+            elif action_type == PAGE_ENGAGEMENT_ACTION:
+                tier = metadata.get("tier", "poor")
+                if tier == "excellent":
+                    score += page_excellent
+                elif tier == "fair":
+                    score += page_fair
+                else:
+                    score += page_poor
+        score = max(0.0, score)
+
+        is_unlimited = score >= step3
+        score_gap = max(0.0, step3 - score)
+        votes_needed = math.ceil(score_gap / entry_weight) if entry_weight > 0 else (0 if is_unlimited else 999)
+
+        if score >= step3:
+            tier_level = 3
+        elif score >= step2:
+            tier_level = 2
+        elif score >= step1:
+            tier_level = 1
+        else:
+            tier_level = 0
+
+        display_name = user.profile.display_name if user.profile else str(user.id)[:8]
+        rows.append(UserParticipationRow(
+            user_id=user.id,
+            display_name=display_name,
+            participation_score=round(score, 2),
+            tier=tier_level,
+            is_unlimited=is_unlimited,
+            entry_votes_needed_for_unlimited=votes_needed,
+        ))
+
+    rows.sort(key=lambda r: r.participation_score, reverse=True)
+
+    return ParticipationLeaderboardOut(
+        rows=rows,
+        window_days=settings.entry_participation_window_days,
+        step1_threshold=step1,
+        step2_threshold=step2,
+        step3_threshold=step3,
+        entry_vote_weight=entry_weight,
+    )

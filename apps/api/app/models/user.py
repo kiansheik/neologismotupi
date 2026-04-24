@@ -2,15 +2,15 @@ import uuid
 from datetime import datetime
 from typing import TYPE_CHECKING
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, JSON, String, Uuid
+from sqlalchemy import JSON, Boolean, DateTime, ForeignKey, String, Uuid
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db import Base
 from app.models.mixins import TimestampMixin, UUIDPrimaryKeyMixin
 
 if TYPE_CHECKING:
-    from app.models.discussion import EntryComment, Notification, NotificationPreference
     from app.models.audio import AudioSample, AudioVote
+    from app.models.discussion import EntryComment, Notification, NotificationPreference
     from app.models.newsletter import NewsletterDelivery, NewsletterSubscription
 
 

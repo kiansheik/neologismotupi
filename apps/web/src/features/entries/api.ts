@@ -1,4 +1,5 @@
 import { apiFetch, withQuery } from "@/lib/api";
+import type { PendingEngagement } from "@/lib/page-engagement";
 import type {
   EntryConstraints,
   EntryDetail,
@@ -86,7 +87,15 @@ export function listEntries(
   return apiFetch<EntryListResponse>(withQuery("/entries", params));
 }
 
-export function getEntry(slug: string): Promise<EntryDetail> {
+export function getEntry(slug: string, prevEngagement?: PendingEngagement | null): Promise<EntryDetail> {
+  if (prevEngagement) {
+    return apiFetch<EntryDetail>(
+      withQuery(`/entries/${slug}`, {
+        prev_page_id: prevEngagement.pageId,
+        prev_page_tier: prevEngagement.tier,
+      }),
+    );
+  }
   return apiFetch<EntryDetail>(`/entries/${slug}`);
 }
 
@@ -94,12 +103,24 @@ export function getEntryConstraints(): Promise<EntryConstraints> {
   return apiFetch<EntryConstraints>("/entries/constraints");
 }
 
-export function getEntrySubmissionGate(): Promise<EntrySubmissionGate> {
+export function getEntrySubmissionGate(prevEngagement?: PendingEngagement | null): Promise<EntrySubmissionGate> {
+  if (prevEngagement) {
+    return apiFetch<EntrySubmissionGate>(
+      withQuery("/entries/submit-gate", {
+        prev_page_id: prevEngagement.pageId,
+        prev_page_tier: prevEngagement.tier,
+      }),
+    );
+  }
   return apiFetch<EntrySubmissionGate>("/entries/submit-gate");
 }
 
 export function createEntry(payload: CreateEntryPayload): Promise<EntryDetail> {
   return apiFetch<EntryDetail>("/entries", { method: "POST", body: payload });
+}
+
+export function reportCardEngagement(entryId: string, tier: "poor" | "fair" | "excellent" = "excellent"): Promise<void> {
+  return apiFetch<void>(`/entries/${entryId}/engagement?tier=${tier}`, { method: "POST" });
 }
 
 export function updateEntry(

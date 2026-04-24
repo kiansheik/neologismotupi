@@ -13,7 +13,6 @@ from app.services.navarro import (
     search_navarro_entries,
 )
 
-
 router = APIRouter(prefix="/navarro", tags=["navarro"])
 
 

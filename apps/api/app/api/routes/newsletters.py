@@ -12,7 +12,11 @@ from app.schemas.newsletters import (
     NewsletterSubscriptionUpdate,
     NewsletterUnsubscribeRequest,
 )
-from app.services.newsletters import NEWSLETTER_WORD_OF_DAY, get_or_create_subscription, normalize_locale
+from app.services.newsletters import (
+    NEWSLETTER_WORD_OF_DAY,
+    get_or_create_subscription,
+    normalize_locale,
+)
 
 router = APIRouter(prefix="/newsletters", tags=["newsletters"])
 

@@ -286,26 +286,42 @@ export interface ExampleListResponse {
 }
 
 export interface EntryConstraints {
-  entry_vote_cost: number;
   downvote_requires_comment: boolean;
   downvote_comment_min_length: number;
+  entry_participation_gate_enabled: boolean;
+  entry_participation_window_days: number;
+  entry_participation_step2_actions: number;
+  entry_participation_step2_posts: number;
+  entry_participation_step3_actions: number;
+  entry_participation_step3_unlimited: boolean;
+  votes_are_consumed: false;
 }
 
 export interface EntrySubmissionGate {
   window_start: string;
   window_end: string;
-  votes_today: number;
+  participation_score: number;
+  review_actions: number;
   entries_today: number;
-  unlocked_posts: number | null;
+  allowed_posts: number | null;
   remaining_posts: number | null;
   unlimited: boolean;
-  next_votes_required: number;
-  votes_required_for_unlimited: number;
-  step1_votes: number;
+  next_score_required: number;
+  next_review_actions_required: number | null;
+  actions_required_for_unlimited: number | null;
+  score_required_for_unlimited: number;
+  votes_are_consumed: false;
+  participation_window_days: number;
+  step1_actions: number;
   step1_posts: number;
-  step2_votes: number;
+  step2_actions: number;
   step2_posts: number;
-  step3_votes: number;
+  step3_actions: number;
+  active_participation_label: string | null;
+  votes_today: number | null;
+  unlocked_posts: number | null;
+  next_votes_required: number | null;
+  votes_required_for_unlimited: number | null;
 }
 
 export interface Profile {
@@ -478,6 +494,24 @@ export interface ModerationReport {
   created_at: string;
   reviewed_at: string | null;
   reviewed_by_user_id: string | null;
+}
+
+export interface UserParticipationRow {
+  user_id: string;
+  display_name: string;
+  participation_score: number;
+  tier: 0 | 1 | 2 | 3;
+  is_unlimited: boolean;
+  entry_votes_needed_for_unlimited: number;
+}
+
+export interface ParticipationLeaderboard {
+  rows: UserParticipationRow[];
+  window_days: number;
+  step1_threshold: number;
+  step2_threshold: number;
+  step3_threshold: number;
+  entry_vote_weight: number;
 }
 
 export interface NotificationPreferences {

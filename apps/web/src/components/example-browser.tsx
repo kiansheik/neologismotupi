@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { SourceCitation } from "@/components/source-citation";
 import { useCurrentUser } from "@/features/auth/hooks";
 import { listExamples, voteExample } from "@/features/examples/api";
+import { reportCardEngagement } from "@/features/entries/api";
 import { CompactAudioPlayer } from "@/features/audio/components";
 import { useI18n } from "@/i18n";
 import { formatDate, statusToKey } from "@/i18n/formatters";
@@ -141,7 +142,7 @@ export function ExampleBrowser({
   const items = useMemo(() => data?.pages.flatMap((page) => page.items) ?? [], [data]);
 
   const voteMutation = useMutation({
-    mutationFn: (params: { exampleId: string; value: -1 | 1 }) =>
+    mutationFn: (params: { exampleId: string; entryId: string; value: -1 | 1 }) =>
       voteExample(params.exampleId, { value: params.value }),
     onMutate: (params) => {
       setVoteTargetId(params.exampleId);
@@ -152,7 +153,9 @@ export function ExampleBrowser({
         direction: params.value === 1 ? "up" : "down",
         context: analyticsContext ?? "example_list",
       });
+      reportCardEngagement(params.entryId, "excellent").catch(() => {});
       queryClient.invalidateQueries({ queryKey: ["example-browser"] });
+      queryClient.invalidateQueries({ queryKey: ["entry-submission-gate"] });
     },
     onError: (error, params) => {
       trackEvent("example_vote_failed", {
@@ -303,7 +306,7 @@ export function ExampleBrowser({
                         ? "border-vote-up-border bg-vote-up text-vote-up-text"
                         : "hover:border-brand-500 hover:bg-brand-50"
                     }`}
-                    onClick={() => voteMutation.mutate({ exampleId: example.id, value: 1 })}
+                    onClick={() => voteMutation.mutate({ exampleId: example.id, entryId: example.entry_id, value: 1 })}
                     disabled={!currentUser || isVotingExample}
                     title={t("entry.upvote")}
                     aria-label={t("entry.upvote")}
@@ -319,7 +322,7 @@ export function ExampleBrowser({
                         ? "border-vote-down-border bg-vote-down text-vote-down-text"
                         : "hover:border-red-500 hover:bg-red-100"
                     }`}
-                    onClick={() => voteMutation.mutate({ exampleId: example.id, value: -1 })}
+                    onClick={() => voteMutation.mutate({ exampleId: example.id, entryId: example.entry_id, value: -1 })}
                     disabled={!currentUser || isVotingExample}
                     title={t("entry.downvote")}
                     aria-label={t("entry.downvote")}

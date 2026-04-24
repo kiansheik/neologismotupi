@@ -14,11 +14,11 @@ from app.schemas.flashcards import (
     FlashcardActiveSessionOut,
     FlashcardCardOut,
     FlashcardDailyStatsOut,
+    FlashcardFinishSessionRequest,
     FlashcardLeaderboardEntry,
     FlashcardLeaderboardOut,
     FlashcardReviewRequest,
     FlashcardReviewResponse,
-    FlashcardFinishSessionRequest,
     FlashcardSessionOut,
     FlashcardSessionPresenceRequest,
     FlashcardSessionSummary,
@@ -31,8 +31,8 @@ from app.services.flashcards import (
     build_flashcard_session,
     finish_flashcard_session,
     get_flashcard_leaderboard,
-    get_or_create_flashcard_settings,
     get_flashcard_stats,
+    get_or_create_flashcard_settings,
     schedule_flashcard_reminder,
     update_flashcard_presence,
 )
@@ -135,7 +135,7 @@ async def review_flashcard(
     await db.commit()
     await db.refresh(progress)
 
-    settings, summary, card, active_session = await build_flashcard_session(
+    _settings, summary, card, active_session = await build_flashcard_session(
         db, user.id, list_id=payload.list_id
     )
     return FlashcardReviewResponse(

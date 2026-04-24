@@ -1,6 +1,6 @@
 import asyncio
 import os
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from app.db import AsyncSessionLocal
 from app.services.flashcards import send_due_flashcard_reminders
@@ -28,12 +28,12 @@ async def main() -> None:
     print("[flashcards] reminder scheduler started")
 
     while True:
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         try:
             sent = await _send_due()
             if sent:
                 print(f"[flashcards] sent {sent} reminder(s) at {now.isoformat()}")
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             print(f"[flashcards] reminder send failed: {exc}")
         await asyncio.sleep(max(poll_seconds, 30))
 

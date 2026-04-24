@@ -22,6 +22,7 @@ const codeToTranslation: Partial<Record<string, TranslationKey>> = {
   self_vote_forbidden: "api.self_vote_forbidden",
   downvote_comment_required: "api.downvote_comment_required",
   entry_vote_quota: "api.entry_vote_quota",
+  entry_participation_gate: "api.entry_participation_gate",
   invalid_headword_format: "api.invalid_headword_format",
 };
 
@@ -33,13 +34,25 @@ export function getLocalizedApiErrorMessage(error: ApiError, t: TranslateFn): st
     }
     return t("api.downvote_comment_required");
   }
-  if (error.code === "entry_vote_quota") {
-    const details = error.details as { needed?: number; next_votes_required?: number } | undefined;
-    const needed = details?.needed ?? details?.next_votes_required;
-    if (typeof needed === "number") {
-      return t("api.entry_vote_quota", { needed });
+  if (error.code === "entry_participation_gate" || error.code === "entry_vote_quota") {
+    const details = error.details as
+      | {
+          needed?: number;
+          needed_score?: number;
+          next_score_required?: number;
+          next_review_actions_required?: number | null;
+          next_votes_required?: number;
+        }
+      | undefined;
+    const reviewActionsNeeded = details?.next_review_actions_required ?? details?.next_votes_required;
+    if (typeof reviewActionsNeeded === "number") {
+      return t("api.entry_participation_gate", { needed: reviewActionsNeeded });
     }
-    return t("api.entry_vote_quota");
+    const scoreNeeded = details?.next_score_required ?? details?.needed_score ?? details?.needed;
+    if (typeof scoreNeeded === "number") {
+      return t("api.entry_participation_gate_score", { needed: Math.ceil(scoreNeeded) });
+    }
+    return t("api.entry_participation_gate");
   }
   const key = codeToTranslation[error.code];
   if (!key) {

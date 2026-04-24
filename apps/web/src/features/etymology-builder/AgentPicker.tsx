@@ -1,7 +1,5 @@
 import { useMemo, useState } from "react";
 
-import { Button } from "@/components/ui/button";
-
 import type { RootEntry } from "./builder-types";
 import { RootPicker } from "./RootPicker";
 import { PRONOUN_GROUPS } from "./pydicate-pronouns";

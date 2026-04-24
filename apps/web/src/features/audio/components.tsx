@@ -281,7 +281,7 @@ export function AudioCapture({
       };
       recorder.start();
       setIsRecording(true);
-    } catch (error) {
+    } catch {
       setErrorMessage(t("audio.recordPermissionDenied"));
     }
   };

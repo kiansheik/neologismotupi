@@ -6,9 +6,10 @@ from sqlalchemy import inspect
 from app.models.audio import AudioSample
 from app.models.discussion import EntryComment
 from app.models.entry import Entry, EntryTag, EntryVersion, Example, Tag
+from app.schemas.audio import AudioSampleOut
 from app.schemas.entries import (
-    EntryCommentOut,
     EntryAuthorOut,
+    EntryCommentOut,
     EntryDetailOut,
     EntryHistoryEventOut,
     EntrySourceOut,
@@ -17,7 +18,6 @@ from app.schemas.entries import (
     ExampleOut,
     TagOut,
 )
-from app.schemas.audio import AudioSampleOut
 from app.services.audio import build_audio_url
 from app.services.sources import build_source_citation
 from app.services.user_badges import UserBadgeLeaders, resolve_user_badges

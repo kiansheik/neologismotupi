@@ -1,4 +1,4 @@
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Controller, useForm } from "react-hook-form";
 import { Link, useNavigate } from "react-router-dom";
@@ -20,6 +20,7 @@ import { useCurrentUser } from "@/features/auth/hooks";
 import { AudioCapture, AudioQueueList } from "@/features/audio/components";
 import { uploadEntryAudio } from "@/features/audio/api";
 import { createEntry, getEntrySubmissionGate, listEntries } from "@/features/entries/api";
+import { consumePendingEngagement } from "@/lib/page-engagement";
 import {
   InlineReferenceTextarea,
   type InlineReferenceTextareaHandle,
@@ -60,7 +61,9 @@ export function SubmitPage() {
   const { t, locale } = useI18n();
   const { apply } = useOrthography();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const { data: currentUser } = useCurrentUser();
+  const [prevEngagement] = useState(() => consumePendingEngagement());
   const [possibleDuplicates, setPossibleDuplicates] = useState<DuplicateHint[]>([]);
   const [queuedAudio, setQueuedAudio] = useState<File[]>([]);
   const [isUploadingAudio, setIsUploadingAudio] = useState(false);
@@ -109,19 +112,28 @@ export function SubmitPage() {
 
   const gateQuery = useQuery({
     queryKey: ["entry-submission-gate", currentUser?.id],
-    queryFn: getEntrySubmissionGate,
+    queryFn: () => getEntrySubmissionGate(prevEngagement),
     enabled: Boolean(currentUser?.id),
   });
 
-  const votesToday = gateQuery.data?.votes_today ?? 0;
+  const participationScore = gateQuery.data?.participation_score ?? 0;
+  const reviewActions = gateQuery.data?.review_actions ?? 0;
   const remainingPosts = gateQuery.data?.remaining_posts ?? 0;
   const isUnlimited = gateQuery.data?.unlimited ?? false;
-  const nextVotesRequired = gateQuery.data?.next_votes_required ?? 0;
-  const votesRequiredForUnlimited = gateQuery.data?.votes_required_for_unlimited ?? 0;
-  const voteProgress = isUnlimited
+  const nextScoreRequired = gateQuery.data?.next_score_required ?? 0;
+  const nextReviewActionsRequired = gateQuery.data?.next_review_actions_required ?? null;
+  const actionsRequiredForUnlimited = gateQuery.data?.actions_required_for_unlimited ?? null;
+  const scoreRequiredForUnlimited =
+    gateQuery.data?.score_required_for_unlimited ?? actionsRequiredForUnlimited ?? 0;
+  const participationWindowDays = gateQuery.data?.participation_window_days ?? 7;
+  const unlockHintKey =
+    nextReviewActionsRequired === null ? "submit.dailyUnlockScoreHint" : "submit.dailyUnlockHint";
+  const unlockHintNeeded =
+    nextReviewActionsRequired === null ? Math.ceil(nextScoreRequired) : nextReviewActionsRequired;
+  const participationProgress = isUnlimited
     ? 100
-    : votesRequiredForUnlimited > 0
-      ? Math.min(100, (votesToday / votesRequiredForUnlimited) * 100)
+    : scoreRequiredForUnlimited > 0
+      ? Math.min(100, (participationScore / scoreRequiredForUnlimited) * 100)
       : 100;
 
   const sourceSuggestionsQuery = useQuery({
@@ -317,6 +329,9 @@ export function SubmitPage() {
         pydicate: normalizedPydicate.length ? normalizedPydicate : undefined,
         force_submit: parsed.data.force_submit,
       });
+      queryClient.invalidateQueries({ queryKey: ["entry-submission-gate"] });
+      queryClient.invalidateQueries({ queryKey: ["entries"] });
+      queryClient.invalidateQueries({ queryKey: ["me"] });
     } catch {
       return;
     }
@@ -389,8 +404,10 @@ export function SubmitPage() {
               <p className="text-xs font-semibold uppercase tracking-wide text-brand-800">
                 {t("submit.dailyVotesLabel")}
               </p>
-              <p className="text-3xl font-semibold text-brand-900">{votesToday}</p>
-              <p className="text-xs text-slate-600">{t("submit.dailyVotesUnits")}</p>
+              <p className="text-3xl font-semibold text-brand-900">{reviewActions}</p>
+              <p className="text-xs text-slate-600">
+                {t("submit.dailyVotesUnits", { days: participationWindowDays })}
+              </p>
             </div>
             <div className="min-w-[180px] text-sm text-slate-700">
               <p className="text-xs font-semibold uppercase tracking-wide text-brand-800">
@@ -400,14 +417,14 @@ export function SubmitPage() {
                 {t("submit.dailyPostsRemaining", { remaining: remainingPosts })}
               </p>
               <p className="mt-1 text-amber-700">
-                {t("submit.dailyUnlockHint", { needed: nextVotesRequired })}
+                {t(unlockHintKey, { needed: unlockHintNeeded })}
               </p>
             </div>
           </div>
           <div className="mt-3 h-2 rounded-full bg-brand-100">
             <div
               className="h-2 rounded-full bg-brand-600 transition-all"
-              style={{ width: `${voteProgress}%` }}
+              style={{ width: `${participationProgress}%` }}
             />
           </div>
         </div>
@@ -448,8 +465,10 @@ export function SubmitPage() {
               <p className="text-[11px] font-semibold uppercase tracking-wide text-brand-800">
                 {t("submit.dailyVotesLabel")}
               </p>
-              <p className="text-lg font-semibold text-brand-900">{votesToday}</p>
-              <p className="text-[11px] text-slate-600">{t("submit.dailyVotesUnits")}</p>
+              <p className="text-lg font-semibold text-brand-900">{reviewActions}</p>
+              <p className="text-[11px] text-slate-600">
+                {t("submit.dailyVotesUnits", { days: participationWindowDays })}
+              </p>
             </div>
             <div>
               <p className="text-[11px] font-semibold uppercase tracking-wide text-brand-800">
@@ -463,7 +482,7 @@ export function SubmitPage() {
             </div>
             {!isUnlimited ? (
               <p className="text-[11px] text-amber-700">
-                {t("submit.dailyUnlockHint", { needed: nextVotesRequired })}
+                {t(unlockHintKey, { needed: unlockHintNeeded })}
               </p>
             ) : (
               <p className="text-[11px] text-emerald-700">{t("submit.dailyUnlockAll")}</p>
@@ -472,9 +491,10 @@ export function SubmitPage() {
           <div className="mt-2 h-1.5 rounded-full bg-brand-100">
             <div
               className="h-1.5 rounded-full bg-brand-600 transition-all"
-              style={{ width: `${voteProgress}%` }}
+              style={{ width: `${participationProgress}%` }}
             />
           </div>
+          <p className="mt-2 text-[11px] text-slate-600">{t("submit.voteGateHint")}</p>
         </div>
         <form
           className="mt-4 space-y-3"
