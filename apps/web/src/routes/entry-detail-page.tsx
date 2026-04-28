@@ -8,7 +8,7 @@ import {
   recordPageVote,
   startPageTracking,
 } from "@/lib/page-engagement";
-import { Link, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import { z } from "zod";
 
 import { ApiError } from "@/lib/api";
@@ -34,7 +34,15 @@ import { AudioCapture, AudioQueueList, AudioSampleList } from "@/features/audio/
 import { deleteAudioSample, uploadEntryAudio, uploadExampleAudio, voteAudio } from "@/features/audio/api";
 import { createComment, listCommentVersions, updateComment, voteComment } from "@/features/comments/api";
 import { listExampleVersions, reportExample, updateExample, voteExample } from "@/features/examples/api";
-import { createExample, getEntry, listEntries, reportEntry, updateEntry, voteEntry } from "@/features/entries/api";
+import {
+  archiveEntry,
+  createExample,
+  getEntry,
+  listEntries,
+  reportEntry,
+  updateEntry,
+  voteEntry,
+} from "@/features/entries/api";
 import { InlineReferenceLink } from "@/features/inline-references/components/inline-reference-link";
 import {
   InlineReferenceSuggestions,
@@ -315,6 +323,8 @@ function historyActionLabel(actionType: string | null, t: TranslateFn): string {
   switch (actionType) {
     case "entry_approved":
       return t("entry.history.approved");
+    case "entry_archived":
+      return t("entry.history.archived");
     case "entry_rejected":
       return t("entry.history.rejected");
     case "entry_disputed":
@@ -462,6 +472,7 @@ function buildEntryMetaDescription(entry: {
 
 export function EntryDetailPage() {
   const { slug } = useParams();
+  const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { data: currentUser } = useCurrentUser();
   const { locale, t } = useI18n();
@@ -679,6 +690,21 @@ export function EntryDetailPage() {
       });
     },
   });
+  const archiveEntryMutation = useMutation({
+    mutationFn: () => archiveEntry(String(entry?.id)),
+    onSuccess: () => {
+      trackEvent("entry_archived");
+      queryClient.invalidateQueries({ queryKey: ["entry", slug] });
+      queryClient.invalidateQueries({ queryKey: ["entry-browser"] });
+      queryClient.invalidateQueries({ queryKey: ["entries"] });
+      navigate("/me");
+    },
+    onError: (error) => {
+      trackEvent("entry_archive_failed", {
+        error_code: error instanceof ApiError ? error.code : "unknown",
+      });
+    },
+  });
   const approveExampleMutation = useMutation({
     mutationFn: (exampleId: string) => approveExample(exampleId),
     onSuccess: () => {
@@ -817,6 +843,13 @@ export function EntryDetailPage() {
   const isModerator = Boolean(currentUser?.is_superuser);
   const canEditEntry = Boolean(
     currentUser && entry && (isModerator || currentUser.id === entry.proposer_user_id),
+  );
+  const canArchiveEntry = Boolean(
+    currentUser &&
+      entry &&
+      currentUser.id === entry.proposer_user_id &&
+      entry.status !== "archived" &&
+      entry.status !== "rejected",
   );
 
   const entrySourceSuggestionsQuery = useQuery({
@@ -1869,6 +1902,22 @@ export function EntryDetailPage() {
             >
               {t("entry.editButton")}
             </Button>
+            {canArchiveEntry ? (
+              <Button
+                type="button"
+                variant="danger"
+                className="px-2.5 py-1 text-xs"
+                onClick={() => {
+                  if (!window.confirm(t("entry.archiveConfirm"))) {
+                    return;
+                  }
+                  archiveEntryMutation.mutate();
+                }}
+                disabled={archiveEntryMutation.isPending}
+              >
+                {archiveEntryMutation.isPending ? t("entry.archiving") : t("entry.archiveButton")}
+              </Button>
+            ) : null}
           </div>
         ) : null}
 
@@ -2110,6 +2159,11 @@ export function EntryDetailPage() {
         {rejectEntryMutation.error instanceof ApiError ? (
           <p className="mt-2 text-sm text-red-700">
             {getLocalizedApiErrorMessage(rejectEntryMutation.error, t)}
+          </p>
+        ) : null}
+        {archiveEntryMutation.error instanceof ApiError ? (
+          <p className="mt-2 text-sm text-red-700">
+            {getLocalizedApiErrorMessage(archiveEntryMutation.error, t)}
           </p>
         ) : null}
         {updateEntryMutation.isSuccess ? (

@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import get_settings
 from app.core.enums import EntryStatus, ExampleStatus
+from app.core.permissions import entry_visibility_clause
 from app.core.utils import collapse_whitespace, normalize_text
 from app.models.discussion import CommentVote, EntryComment
 from app.models.entry import (
@@ -89,7 +90,7 @@ async def find_possible_duplicates(
                 Entry.gloss_en.ilike(pattern),
             )
         )
-        .where(Entry.status != EntryStatus.rejected)
+        .where(entry_visibility_clause(None))
         .order_by(Entry.created_at.desc())
         .limit(limit)
     )

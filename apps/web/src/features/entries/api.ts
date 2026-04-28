@@ -133,6 +133,12 @@ export function updateEntry(
   });
 }
 
+export function archiveEntry(entryId: string): Promise<{ ok: boolean; entry_id: string; status: "archived" }> {
+  return apiFetch<{ ok: boolean; entry_id: string; status: "archived" }>(`/entries/${entryId}/archive`, {
+    method: "POST",
+  });
+}
+
 export function voteEntry(
   entryId: string,
   payload: VotePayload,

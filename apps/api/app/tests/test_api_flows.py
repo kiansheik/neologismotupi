@@ -8,10 +8,10 @@ import app.api.routes.auth as auth_routes
 import app.api.routes.moderation as moderation_routes
 import app.db as db_module
 from app.config import get_settings
-from app.core.enums import TagType
+from app.core.enums import EntryStatus, TagType
 from app.models.discussion import CommentVote, Notification, NotificationPreference
 from app.models.entry import Entry, Example, ExampleVote, Tag, Vote
-from app.models.moderation import Report
+from app.models.moderation import ModerationAction, Report
 from app.models.participation import ReviewParticipationEvent
 from app.models.source import SourceEdition, SourceWork
 from app.models.user import Profile, User
@@ -741,6 +741,90 @@ async def test_rejected_entries_only_show_with_rejected_filter(client):
     assert proposer_rejected_response.status_code == 200, proposer_rejected_response.text
     proposer_rejected_ids = {item["id"] for item in proposer_rejected_response.json()["items"]}
     assert entry["id"] in proposer_rejected_ids
+
+
+@pytest.mark.asyncio
+async def test_owner_can_archive_entry_and_only_moderators_can_view_it(client):
+    await register_user(client, "archive-owner@example.com", "Archive Owner")
+    entry = await create_entry(client, "archive-owned-entry")
+
+    archive_response = await client.post(f"/api/entries/{entry['id']}/archive")
+    assert archive_response.status_code == 200, archive_response.text
+    assert archive_response.json()["status"] == "archived"
+
+    async with db_module.AsyncSessionLocal() as session:
+        archived_entry = (
+            await session.execute(select(Entry).where(Entry.id == uuid.UUID(entry["id"])))
+        ).scalar_one()
+        assert archived_entry.status == EntryStatus.archived
+        actions = (
+            await session.execute(
+                select(ModerationAction).where(
+                    ModerationAction.target_type == "entry",
+                    ModerationAction.target_id == archived_entry.id,
+                    ModerationAction.action_type == "entry_archived",
+                )
+            )
+        ).scalars().all()
+        assert len(actions) == 1
+        assert actions[0].metadata_json["reason"] == "withdrawn_by_proposer"
+
+    owner_detail = await client.get(f"/api/entries/{entry['slug']}")
+    assert owner_detail.status_code == 404, owner_detail.text
+
+    owner_default_list = await client.get("/api/entries", params={"mine": True})
+    assert owner_default_list.status_code == 200, owner_default_list.text
+    assert entry["id"] not in {item["id"] for item in owner_default_list.json()["items"]}
+
+    owner_archived_filter = await client.get("/api/entries", params={"status": "archived"})
+    assert owner_archived_filter.status_code == 200, owner_archived_filter.text
+    assert entry["id"] not in {item["id"] for item in owner_archived_filter.json()["items"]}
+
+    await client.post("/api/auth/logout")
+    await register_user(client, "archive-mod@example.com", "Archive Mod")
+
+    async with db_module.AsyncSessionLocal() as session:
+        moderator = (await session.execute(select(User).where(User.email == "archive-mod@example.com"))).scalar_one()
+        moderator.is_superuser = True
+        await session.commit()
+
+    moderator_filter = await client.get("/api/entries", params={"status": "archived"})
+    assert moderator_filter.status_code == 200, moderator_filter.text
+    assert entry["id"] in {item["id"] for item in moderator_filter.json()["items"]}
+
+    moderator_detail = await client.get(f"/api/entries/{entry['slug']}")
+    assert moderator_detail.status_code == 200, moderator_detail.text
+    history_actions = {event["action_type"] for event in moderator_detail.json()["history_events"]}
+    assert "entry_archived" in history_actions
+
+
+@pytest.mark.asyncio
+async def test_cannot_archive_another_users_entry_or_convert_rejection(client):
+    await register_user(client, "archive-a@example.com", "Archive A")
+    entry = await create_entry(client, "archive-permission-entry")
+
+    await client.post("/api/auth/logout")
+    await register_user(client, "archive-b@example.com", "Archive B")
+
+    forbidden_response = await client.post(f"/api/entries/{entry['id']}/archive")
+    assert forbidden_response.status_code == 403, forbidden_response.text
+
+    async with db_module.AsyncSessionLocal() as session:
+        user_b = (await session.execute(select(User).where(User.email == "archive-b@example.com"))).scalar_one()
+        user_b.is_superuser = True
+        await session.commit()
+
+    reject_response = await client.post(
+        f"/api/mod/entries/{entry['id']}/reject",
+        json={"reason": "Sem fonte suficiente."},
+    )
+    assert reject_response.status_code == 200, reject_response.text
+
+    await client.post("/api/auth/logout")
+    await login_user(client, "archive-a@example.com")
+
+    archive_rejected_response = await client.post(f"/api/entries/{entry['id']}/archive")
+    assert archive_rejected_response.status_code == 409, archive_rejected_response.text
 
 
 @pytest.mark.asyncio

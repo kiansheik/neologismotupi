@@ -12,7 +12,14 @@ from app.core.bot_protection import get_bot_verifier
 from app.core.deps import SessionDep, get_current_user, get_current_user_optional
 from app.core.enums import EntryStatus, ExampleStatus, ReportStatus, ReportTargetType
 from app.core.errors import raise_api_error
-from app.core.permissions import can_edit_entry, can_edit_example, is_moderator
+from app.core.permissions import (
+    can_edit_entry,
+    can_edit_example,
+    can_view_entry,
+    entry_visibility_clause,
+    filtered_entry_status_clause,
+    is_moderator,
+)
 from app.core.utils import collapse_whitespace, normalize_search_query, slugify
 from app.models.audio import AudioSample, AudioVote
 from app.models.discussion import CommentVote, EntryComment, EntryCommentVersion
@@ -121,6 +128,7 @@ type ModerationContext = tuple[str | None, str | None, datetime | None]
 
 ENTRY_HISTORY_ACTION_TYPES = {
     "entry_approved",
+    "entry_archived",
     "entry_rejected",
     "entry_disputed",
     "entry_verified_by_vote",
@@ -247,6 +255,32 @@ async def _load_audio_sample_with_uploader(
     return (await db.execute(stmt)).scalar_one_or_none()
 
 
+async def _load_parent_entry_for_example(db: SessionDep, example: Example) -> Entry | None:
+    return (await db.execute(select(Entry).where(Entry.id == example.entry_id))).scalar_one_or_none()
+
+
+async def _ensure_example_parent_entry_visible(
+    db: SessionDep,
+    user: User | None,
+    example: Example,
+) -> Entry:
+    entry = await _load_parent_entry_for_example(db, example)
+    if not entry or not can_view_entry(user, entry):
+        raise_api_error(status_code=404, code="example_not_found", message="Example not found")
+    return entry
+
+
+async def _ensure_comment_entry_visible(
+    db: SessionDep,
+    user: User | None,
+    comment: EntryComment,
+) -> Entry:
+    entry = (await db.execute(select(Entry).where(Entry.id == comment.entry_id))).scalar_one_or_none()
+    if not entry or not can_view_entry(user, entry):
+        raise_api_error(status_code=404, code="comment_not_found", message="Comment not found")
+    return entry
+
+
 async def _apply_entry_source_fields(
     db: SessionDep,
     *,
@@ -336,6 +370,8 @@ async def _load_entry_moderation_context(
     action_types: list[str] = []
     if entry.status == EntryStatus.rejected:
         action_types = ["entry_rejected"]
+    elif entry.status == EntryStatus.archived:
+        action_types = ["entry_archived"]
     elif entry.status == EntryStatus.disputed:
         action_types = ["entry_disputed"]
     elif entry.status == EntryStatus.approved:
@@ -654,10 +690,7 @@ async def list_entries(
     if sort == "unseen":
         unseen = True
 
-    if status_filter:
-        conditions.append(Entry.status == status_filter)
-    else:
-        conditions.append(Entry.status != EntryStatus.rejected)
+    conditions.append(filtered_entry_status_clause(user, status_filter))
 
     if part_of_speech:
         conditions.append(Entry.part_of_speech == part_of_speech)
@@ -801,7 +834,7 @@ async def get_entry(
         )
     )
     entry = (await db.execute(stmt)).scalar_one_or_none()
-    if not entry:
+    if not entry or not can_view_entry(user, entry):
         raise_api_error(status_code=404, code="entry_not_found", message="Entry not found")
 
     if user and prev_page_id is not None and prev_page_tier in PAGE_ENGAGEMENT_TIERS:
@@ -1019,7 +1052,7 @@ async def upload_entry_audio(
     file: UploadFile = File(...),
 ) -> AudioSampleOut:
     entry = await load_entry_for_update(db, entry_id)
-    if not entry:
+    if not entry or not can_view_entry(user, entry):
         raise_api_error(status_code=404, code="entry_not_found", message="Entry not found")
 
     sample = await save_audio_upload(
@@ -1043,7 +1076,7 @@ async def update_entry(
     user: Annotated[User, Depends(get_current_user)],
 ) -> EntryDetailOut:
     entry = await load_entry_for_update(db, entry_id)
-    if not entry:
+    if not entry or not can_view_entry(user, entry):
         raise_api_error(status_code=404, code="entry_not_found", message="Entry not found")
 
     if not can_edit_entry(user, entry):
@@ -1215,8 +1248,54 @@ async def update_entry(
     )
 
 
+@router.post("/{entry_id}/archive")
+async def archive_own_entry(
+    entry_id: uuid.UUID,
+    db: SessionDep,
+    user: Annotated[User, Depends(get_current_user)],
+) -> dict:
+    entry = await load_entry_for_update(db, entry_id)
+    if not entry:
+        raise_api_error(status_code=404, code="entry_not_found", message="Entry not found")
+
+    if entry.proposer_user_id != user.id:
+        raise_api_error(status_code=403, code="forbidden", message="Cannot archive another user's entry")
+
+    if entry.status == EntryStatus.rejected:
+        raise_api_error(
+            status_code=409,
+            code="entry_already_rejected",
+            message="Rejected entries cannot be converted into withdrawals",
+        )
+
+    if entry.status != EntryStatus.archived:
+        entry.status = EntryStatus.archived
+        entry.approved_at = None
+        entry.approved_by_user_id = None
+        await record_moderation_action(
+            db,
+            moderator_user_id=user.id,
+            action_type="entry_archived",
+            target_type="entry",
+            target_id=entry.id,
+            notes="Archived by original proposer",
+            metadata_json={"reason": "withdrawn_by_proposer", "status": entry.status.value},
+        )
+        await db.commit()
+
+    return {"ok": True, "entry_id": str(entry.id), "status": entry.status.value}
+
+
 @router.get("/{entry_id}/versions", response_model=list[EntryVersionOut])
-async def list_entry_versions(entry_id: uuid.UUID, db: SessionDep) -> list[EntryVersionOut]:
+async def list_entry_versions(
+    entry_id: uuid.UUID,
+    db: SessionDep,
+    user: Annotated[User | None, Depends(get_current_user_optional)],
+) -> list[EntryVersionOut]:
+    entry = (await db.execute(select(Entry).where(Entry.id == entry_id))).scalar_one_or_none()
+    if not entry or not can_view_entry(user, entry):
+        raise_api_error(status_code=404, code="entry_not_found", message="Entry not found")
+
     stmt = (
         select(EntryVersion)
         .where(EntryVersion.entry_id == entry_id)
@@ -1244,7 +1323,7 @@ async def vote_entry(
         )
 
     entry = (await db.execute(select(Entry).where(Entry.id == entry_id))).scalar_one_or_none()
-    if not entry:
+    if not entry or not can_view_entry(user, entry):
         raise_api_error(status_code=404, code="entry_not_found", message="Entry not found")
 
     if entry.proposer_user_id == user.id:
@@ -1353,7 +1432,7 @@ async def delete_vote(
     user: Annotated[User, Depends(get_current_user)],
 ) -> Response:
     entry = (await db.execute(select(Entry).where(Entry.id == entry_id))).scalar_one_or_none()
-    if not entry:
+    if not entry or not can_view_entry(user, entry):
         raise_api_error(status_code=404, code="entry_not_found", message="Entry not found")
 
     existing_vote = (
@@ -1394,7 +1473,7 @@ async def report_entry(
         raise_api_error(status_code=400, code="bot_check_failed", message="Bot verification failed")
 
     entry = (await db.execute(select(Entry).where(Entry.id == entry_id))).scalar_one_or_none()
-    if not entry:
+    if not entry or not can_view_entry(user, entry):
         raise_api_error(status_code=404, code="entry_not_found", message="Entry not found")
 
     report = Report(
@@ -1439,7 +1518,7 @@ async def create_example(
         raise_api_error(status_code=400, code="empty_submission", message="Sentence cannot be empty")
 
     entry = (await db.execute(select(Entry).where(Entry.id == entry_id))).scalar_one_or_none()
-    if not entry:
+    if not entry or not can_view_entry(user, entry):
         raise_api_error(status_code=404, code="entry_not_found", message="Entry not found")
 
     duplicate_stmt = select(Example).where(
@@ -1551,7 +1630,7 @@ async def create_comment(
         raise_api_error(status_code=400, code="empty_submission", message="Comment cannot be empty")
 
     entry = (await db.execute(select(Entry).where(Entry.id == entry_id))).scalar_one_or_none()
-    if not entry:
+    if not entry or not can_view_entry(user, entry):
         raise_api_error(status_code=404, code="entry_not_found", message="Entry not found")
 
     if payload.parent_comment_id:
@@ -1639,6 +1718,7 @@ async def update_comment(
     ).scalar_one_or_none()
     if not comment:
         raise_api_error(status_code=404, code="comment_not_found", message="Comment not found")
+    await _ensure_comment_entry_visible(db, user, comment)
 
     if comment.user_id != user.id and not is_moderator(user):
         raise_api_error(status_code=403, code="forbidden", message="Not allowed to edit comment")
@@ -1676,8 +1756,13 @@ async def update_comment(
 async def list_comment_versions(
     comment_id: uuid.UUID,
     db: SessionDep,
-    _user: Annotated[User | None, Depends(get_current_user_optional)],
+    user: Annotated[User | None, Depends(get_current_user_optional)],
 ) -> list[CommentVersionOut]:
+    comment = (await db.execute(select(EntryComment).where(EntryComment.id == comment_id))).scalar_one_or_none()
+    if not comment:
+        raise_api_error(status_code=404, code="comment_not_found", message="Comment not found")
+    await _ensure_comment_entry_visible(db, user, comment)
+
     stmt = (
         select(EntryCommentVersion)
         .where(EntryCommentVersion.comment_id == comment_id)
@@ -1754,8 +1839,7 @@ async def list_examples(
         else:
             conditions.append(Example.status == ExampleStatus.approved)
 
-    if not is_mod:
-        conditions.append(Entry.status != EntryStatus.rejected)
+    conditions.append(entry_visibility_clause(None))
 
     if conditions:
         stmt = stmt.where(and_(*conditions))
@@ -1808,10 +1892,12 @@ async def list_examples(
                     Example.sentence_original,
                     func.count(func.distinct(Example.entry_id)),
                 )
+                .join(Entry, Entry.id == Example.entry_id)
                 .where(
                     and_(
                         Example.sentence_original.in_(sentence_values),
                         Example.status == ExampleStatus.approved,
+                        entry_visibility_clause(None),
                     )
                 )
                 .group_by(Example.sentence_original)
@@ -1858,6 +1944,7 @@ async def update_example(
     example = (await db.execute(select(Example).where(Example.id == example_id))).scalar_one_or_none()
     if not example:
         raise_api_error(status_code=404, code="example_not_found", message="Example not found")
+    await _ensure_example_parent_entry_visible(db, user, example)
 
     if not can_edit_example(user, example):
         raise_api_error(status_code=403, code="forbidden", message="Cannot edit another user's example")
@@ -1946,6 +2033,7 @@ async def upload_example_audio(
     example = (await db.execute(select(Example).where(Example.id == example_id))).scalar_one_or_none()
     if not example:
         raise_api_error(status_code=404, code="example_not_found", message="Example not found")
+    await _ensure_example_parent_entry_visible(db, user, example)
 
     sample = await save_audio_upload(
         db,
@@ -1961,7 +2049,16 @@ async def upload_example_audio(
 
 
 @example_router.get("/{example_id}/versions", response_model=list[ExampleVersionOut])
-async def list_example_versions(example_id: uuid.UUID, db: SessionDep) -> list[ExampleVersionOut]:
+async def list_example_versions(
+    example_id: uuid.UUID,
+    db: SessionDep,
+    user: Annotated[User | None, Depends(get_current_user_optional)],
+) -> list[ExampleVersionOut]:
+    example = (await db.execute(select(Example).where(Example.id == example_id))).scalar_one_or_none()
+    if not example:
+        raise_api_error(status_code=404, code="example_not_found", message="Example not found")
+    await _ensure_example_parent_entry_visible(db, user, example)
+
     stmt = (
         select(ExampleVersion)
         .where(ExampleVersion.example_id == example_id)
@@ -1991,6 +2088,7 @@ async def vote_example(
     example = (await db.execute(select(Example).where(Example.id == example_id))).scalar_one_or_none()
     if not example:
         raise_api_error(status_code=404, code="example_not_found", message="Example not found")
+    await _ensure_example_parent_entry_visible(db, user, example)
 
     if example.user_id == user.id:
         raise_api_error(
@@ -2063,6 +2161,7 @@ async def delete_example_vote(
     example = (await db.execute(select(Example).where(Example.id == example_id))).scalar_one_or_none()
     if not example:
         raise_api_error(status_code=404, code="example_not_found", message="Example not found")
+    await _ensure_example_parent_entry_visible(db, user, example)
 
     existing_vote = (
         await db.execute(
@@ -2108,6 +2207,7 @@ async def report_example(
     example = (await db.execute(select(Example).where(Example.id == example_id))).scalar_one_or_none()
     if not example:
         raise_api_error(status_code=404, code="example_not_found", message="Example not found")
+    await _ensure_example_parent_entry_visible(db, user, example)
 
     report = Report(
         reporter_user_id=user.id,
@@ -2143,6 +2243,7 @@ async def vote_comment(
     comment = (await db.execute(select(EntryComment).where(EntryComment.id == comment_id))).scalar_one_or_none()
     if not comment:
         raise_api_error(status_code=404, code="comment_not_found", message="Comment not found")
+    await _ensure_comment_entry_visible(db, user, comment)
 
     if comment.user_id == user.id:
         raise_api_error(
@@ -2191,6 +2292,7 @@ async def delete_comment_vote(
     comment = (await db.execute(select(EntryComment).where(EntryComment.id == comment_id))).scalar_one_or_none()
     if not comment:
         raise_api_error(status_code=404, code="comment_not_found", message="Comment not found")
+    await _ensure_comment_entry_visible(db, user, comment)
 
     existing_vote = (
         await db.execute(

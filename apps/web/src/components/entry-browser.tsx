@@ -77,6 +77,7 @@ export function EntryBrowser({
   const loadMoreRef = useRef<HTMLDivElement | null>(null);
   const queryClient = useQueryClient();
   const { data: currentUser } = useCurrentUser();
+  const isModerator = Boolean(currentUser?.is_superuser);
   useVoteMemoryVersion();
   const [voteTargetId, setVoteTargetId] = useState<string | null>(null);
   const [downvoteDrafts, setDownvoteDrafts] = useState<Record<string, string>>({});
@@ -142,6 +143,12 @@ export function EntryBrowser({
       setSort("recent");
     }
   }, [allowUnseenFilter, sort]);
+
+  useEffect(() => {
+    if (!isModerator && (status === "rejected" || status === "archived")) {
+      setStatus("");
+    }
+  }, [isModerator, status]);
 
   const filters = useMemo(
     () => ({
@@ -305,8 +312,12 @@ export function EntryBrowser({
             <option value="pending">{t(statusToKey("pending"))}</option>
             <option value="approved">{t(statusToKey("approved"))}</option>
             <option value="disputed">{t(statusToKey("disputed"))}</option>
-            <option value="rejected">{t(statusToKey("rejected"))}</option>
-            <option value="archived">{t(statusToKey("archived"))}</option>
+            {isModerator ? (
+              <>
+                <option value="rejected">{t(statusToKey("rejected"))}</option>
+                <option value="archived">{t(statusToKey("archived"))}</option>
+              </>
+            ) : null}
           </select>
           <select
             className="rounded-md border border-brand-300 bg-surface-soft px-3 py-2 text-sm"

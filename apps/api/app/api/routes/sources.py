@@ -5,8 +5,9 @@ from fastapi import APIRouter, Query
 from sqlalchemy import and_, func, or_, select
 
 from app.core.deps import SessionDep
-from app.core.enums import EntryStatus, ExampleStatus
+from app.core.enums import ExampleStatus
 from app.core.errors import raise_api_error
+from app.core.permissions import entry_visibility_clause
 from app.models.entry import Entry, Example
 from app.models.source import SourceEdition, SourceLink, SourceWork
 from app.models.user import Profile
@@ -85,7 +86,7 @@ async def get_source_detail(
                 Entry,
                 and_(
                     Entry.source_edition_id == SourceEdition.id,
-                    Entry.status != EntryStatus.rejected,
+                    entry_visibility_clause(None),
                 ),
             )
             .outerjoin(
@@ -131,7 +132,7 @@ async def get_source_detail(
                 .join(SourceEdition, SourceEdition.id == Entry.source_edition_id)
                 .where(
                     SourceEdition.work_id == work_id,
-                    Entry.status != EntryStatus.rejected,
+                    entry_visibility_clause(None),
                 )
             )
         ).scalar_one()
@@ -146,7 +147,7 @@ async def get_source_detail(
                 .where(
                     SourceEdition.work_id == work_id,
                     Example.status.notin_(hidden_example_statuses),
-                    Entry.status != EntryStatus.rejected,
+                    entry_visibility_clause(None),
                 )
             )
         ).scalar_one()
@@ -175,7 +176,7 @@ async def get_source_detail(
             .outerjoin(Profile, Profile.user_id == Entry.proposer_user_id)
             .where(
                 SourceEdition.work_id == work_id,
-                Entry.status != EntryStatus.rejected,
+                entry_visibility_clause(None),
             )
             .order_by(Entry.created_at.desc())
             .limit(entry_limit)
@@ -198,7 +199,7 @@ async def get_source_detail(
             .where(
                 SourceEdition.work_id == work_id,
                 Example.status.notin_(hidden_example_statuses),
-                Entry.status != EntryStatus.rejected,
+                entry_visibility_clause(None),
             )
             .order_by(Example.created_at.desc())
             .limit(example_limit)

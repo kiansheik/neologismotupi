@@ -7,6 +7,7 @@ import { renderWithRoute } from "./test-utils";
 const {
   voteEntryMock,
   updateEntryMock,
+  archiveEntryMock,
   getEntryMock,
   createCommentMock,
   voteCommentMock,
@@ -18,6 +19,7 @@ const {
 } = vi.hoisted(() => ({
   voteEntryMock: vi.fn().mockResolvedValue({ score_cache: 1 }),
   updateEntryMock: vi.fn().mockResolvedValue({}),
+  archiveEntryMock: vi.fn().mockResolvedValue({ ok: true, entry_id: "entry-1", status: "archived" }),
   createCommentMock: vi.fn().mockResolvedValue({}),
   voteCommentMock: vi.fn().mockResolvedValue({ score_cache: 1 }),
   updateCommentMock: vi.fn().mockResolvedValue({}),
@@ -57,6 +59,7 @@ vi.mock("@/features/entries/api", () => ({
   getEntry: getEntryMock,
   voteEntry: voteEntryMock,
   updateEntry: updateEntryMock,
+  archiveEntry: archiveEntryMock,
   reportEntry: vi.fn(),
   createExample: vi.fn(),
 }));
@@ -80,6 +83,7 @@ vi.mock("@/features/users/api", () => ({
 
 describe("EntryDetailPage", () => {
   beforeEach(() => {
+    archiveEntryMock.mockClear();
     listMentionUsersMock.mockResolvedValue([]);
     resolveMentionUsersMock.mockResolvedValue([]);
     updateCommentMock.mockResolvedValue({});
@@ -145,6 +149,31 @@ describe("EntryDetailPage", () => {
         edit_summary: "Ajuste de revisão",
       }),
     );
+  });
+
+  it("lets the proposer withdraw their own entry", async () => {
+    authState.currentUser = {
+      id: "u1",
+      email: "u@example.com",
+      is_active: true,
+      is_verified: true,
+      is_superuser: false,
+      created_at: "2026-01-01T00:00:00Z",
+      updated_at: "2026-01-01T00:00:00Z",
+      profile: null,
+    };
+    const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(true);
+
+    const user = userEvent.setup();
+    renderWithRoute(<EntryDetailPage />, "/entries/:slug", "/entries/entry-one");
+
+    await user.click(await screen.findByRole("button", { name: "Retirar verbete" }));
+
+    expect(confirmSpy).toHaveBeenCalled();
+    await waitFor(() => {
+      expect(archiveEntryMock).toHaveBeenCalledWith("entry-1");
+    });
+    confirmSpy.mockRestore();
   });
 
   it("does not repeat gloss when gloss and definition are equivalent", async () => {
