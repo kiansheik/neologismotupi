@@ -13,3 +13,9 @@ This folder contains example production templates:
 - release-aware smoke checks via `scripts/smoke-api.sh` and deploy ID propagation (`APP_RELEASE`)
 
 Adjust paths, usernames, and domains before enabling in production.
+
+## Shared VPS Caddy mode
+
+On the shared Hetzner VPS, this stack does not need to publish its own Caddy on ports 80/443. The API joins the external Docker network `caddy_edge` as `neologismotupi-api`, so the shared xe-roka Caddy can proxy `api.academiatupi.com -> neologismotupi-api:8000`.
+
+`DEPLOY_STANDALONE_CADDY=0` is the default for shared mode. Set `DEPLOY_STANDALONE_CADDY=1` only if this repo is running on a separate server and should own its own Caddy container.

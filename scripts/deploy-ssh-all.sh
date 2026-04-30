@@ -18,6 +18,7 @@ DEPLOY_API_URL="${DEPLOY_API_URL:-https://api.academiatupi.com}"
 DEPLOY_SMOKE_RETRIES="${DEPLOY_SMOKE_RETRIES:-60}"
 DEPLOY_SMOKE_SLEEP_SECONDS="${DEPLOY_SMOKE_SLEEP_SECONDS:-2}"
 DEPLOY_SMOKE_ORIGIN="${DEPLOY_SMOKE_ORIGIN:-}"
+DEPLOY_STANDALONE_CADDY="${DEPLOY_STANDALONE_CADDY:-0}"
 
 if [[ -z "$DEPLOY_HOST" ]]; then
   echo "Missing DEPLOY_HOST."
@@ -52,6 +53,11 @@ fi
 
 if [[ "$DEPLOY_MODE" != "full" && "$DEPLOY_MODE" != "daily" ]]; then
   echo "DEPLOY_MODE must be either 'full' or 'daily' (got: $DEPLOY_MODE)"
+  exit 1
+fi
+
+if [[ "$DEPLOY_STANDALONE_CADDY" != "0" && "$DEPLOY_STANDALONE_CADDY" != "1" ]]; then
+  echo "DEPLOY_STANDALONE_CADDY must be 0 or 1"
   exit 1
 fi
 
@@ -196,7 +202,7 @@ if [[ -n "$DEPLOY_SEED_CSV" ]]; then
   scp -i "$SSH_IDENTITY" -P "$SSH_PORT" "$DEPLOY_SEED_CSV" "$REMOTE:$SEED_CSV_REMOTE_PATH"
 fi
 
-"${SSH_CMD[@]}" "DEPLOY_PATH='$DEPLOY_PATH' DEPLOY_DB_DUMP_REMOTE='$DB_DUMP_REMOTE_PATH' DEPLOY_SEED_CSV_REMOTE='$SEED_CSV_REMOTE_PATH' DEPLOY_RESET_STACK='$DEPLOY_RESET_STACK' DEPLOY_RESET_VOLUMES='$DEPLOY_RESET_VOLUMES' DEPLOY_MODE='$DEPLOY_MODE' DEPLOY_ID='$DEPLOY_ID' bash -s" <<'EOF'
+"${SSH_CMD[@]}" "DEPLOY_PATH='$DEPLOY_PATH' DEPLOY_DB_DUMP_REMOTE='$DB_DUMP_REMOTE_PATH' DEPLOY_SEED_CSV_REMOTE='$SEED_CSV_REMOTE_PATH' DEPLOY_RESET_STACK='$DEPLOY_RESET_STACK' DEPLOY_RESET_VOLUMES='$DEPLOY_RESET_VOLUMES' DEPLOY_MODE='$DEPLOY_MODE' DEPLOY_ID='$DEPLOY_ID' DEPLOY_STANDALONE_CADDY='$DEPLOY_STANDALONE_CADDY' bash -s" <<'EOF'
 set -euo pipefail
 
 cd "$DEPLOY_PATH"
@@ -229,6 +235,8 @@ if [[ "${DEPLOY_RESET_STACK:-0}" == "1" ]]; then
   fi
   "${DC[@]}" -f "$COMPOSE_FILE" --env-file "$ENV_FILE" "${DOWN_ARGS[@]}" || true
 fi
+
+docker network inspect caddy_edge >/dev/null 2>&1 || docker network create caddy_edge >/dev/null
 
 if [[ "${DEPLOY_MODE:-full}" == "daily" ]]; then
   "${DC[@]}" -f "$COMPOSE_FILE" --env-file "$ENV_FILE" build --pull api
@@ -271,11 +279,17 @@ fi
 
 "${DC[@]}" -f "$COMPOSE_FILE" --env-file "$ENV_FILE" run --rm api uv run alembic upgrade head </dev/null
 if [[ "${DEPLOY_MODE:-full}" == "daily" ]]; then
-  "${DC[@]}" -f "$COMPOSE_FILE" --env-file "$ENV_FILE" up -d caddy
   "${DC[@]}" -f "$COMPOSE_FILE" --env-file "$ENV_FILE" up -d --no-deps api
 else
-  "${DC[@]}" -f "$COMPOSE_FILE" --env-file "$ENV_FILE" up -d api caddy
+  "${DC[@]}" -f "$COMPOSE_FILE" --env-file "$ENV_FILE" up -d api
 fi
+
+if [[ "${DEPLOY_STANDALONE_CADDY:-0}" == "1" ]]; then
+  "${DC[@]}" -f "$COMPOSE_FILE" --env-file "$ENV_FILE" --profile standalone-caddy up -d caddy
+else
+  "${DC[@]}" -f "$COMPOSE_FILE" --env-file "$ENV_FILE" --profile standalone-caddy stop caddy >/dev/null 2>&1 || true
+fi
+
 "${DC[@]}" -f "$COMPOSE_FILE" --env-file "$ENV_FILE" up -d newsletter-scheduler
 
 if [[ -n "${DEPLOY_SEED_CSV_REMOTE:-}" && -f "${DEPLOY_SEED_CSV_REMOTE}" ]]; then

@@ -4,5 +4,5 @@
 
 {$API_DOMAIN} {
   encode gzip
-  reverse_proxy api:8000
+  reverse_proxy neologismotupi-api:8000
 }
