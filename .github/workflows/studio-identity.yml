@@ -18,8 +18,8 @@ jobs:
       - name: Install locked API dependencies
         run: uv sync --frozen
         working-directory: apps/api
-      - name: Verify first-party identity and existing authentication
-        run: uv run pytest app/tests/test_studio_identity.py app/tests/test_auth.py -q
+      - name: Verify first-party identity and existing API flows
+        run: uv run pytest app/tests/test_studio_identity.py app/tests/test_api_flows.py -q
         working-directory: apps/api
         env:
           APP_ENV: test
