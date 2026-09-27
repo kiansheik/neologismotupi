@@ -1,0 +1,30 @@
+name: Studio identity contract
+on:
+  pull_request:
+  push:
+    branches: [main, studio-identity-kian]
+permissions:
+  contents: read
+jobs:
+  identity:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - uses: astral-sh/setup-uv@v6
+      - name: Install locked API dependencies
+        run: uv sync --frozen
+        working-directory: apps/api
+      - name: Verify first-party identity and existing authentication
+        run: uv run pytest app/tests/test_studio_identity.py app/tests/test_auth.py -q
+        working-directory: apps/api
+        env:
+          APP_ENV: test
+          DATABASE_URL: sqlite+aiosqlite:////tmp/studio-identity-import.db
+      - name: Check migration has a single head
+        run: |
+          test "$(uv run alembic heads | wc -l)" -eq 1
+        working-directory: apps/api
