@@ -25,6 +25,7 @@ from app.api.routes import (
     sources_router,
     users_router,
 )
+from app.api.routes.studio_identity import router as studio_identity_router
 from app.config import get_settings
 from app.core.errors import http_exception_handler, validation_exception_handler
 from app.db import AsyncSessionLocal
@@ -71,7 +72,7 @@ def create_app() -> FastAPI:
         finally:
             client_host = request.client.host if request.client else "-"
             client_port = request.client.port if request.client else 0
-            query = f"?{request.url.query}" if request.url.query else ""
+            query = f"?{request.url.query}" if request.url.query and not request.url.path.startswith("/api/auth/studio/") else ""
             path_with_query = f"{request.url.path}{query}"
             user_email = getattr(request.state, "auth_user_email", None) or "-"
             duration_ms = (perf_counter() - started_at) * 1000
@@ -87,6 +88,7 @@ def create_app() -> FastAPI:
             )
 
     app.include_router(auth_router, prefix="/api")
+    app.include_router(studio_identity_router, prefix="/api")
     app.include_router(audio_router, prefix="/api")
     app.include_router(entries_router, prefix="/api")
     app.include_router(example_router, prefix="/api")
