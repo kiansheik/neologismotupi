@@ -9,6 +9,20 @@ jobs:
   identity:
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:17-bookworm
+        env:
+          POSTGRES_USER: studio_test
+          POSTGRES_PASSWORD: studio_test
+          POSTGRES_DB: studio_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U studio_test -d studio_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -28,3 +42,35 @@ jobs:
         run: |
           test "$(uv run alembic heads | wc -l)" -eq 1
         working-directory: apps/api
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - uses: pnpm/action-setup@v4
+        with:
+          version: '10'
+      - name: Install locked browser dependencies
+        run: pnpm install --frozen-lockfile --filter @nheenga/web
+      - name: Install Chromium
+        run: pnpm --filter @nheenga/web exec playwright install --with-deps chromium
+      - name: Check out the reviewed Studio contract fixture
+        uses: actions/checkout@v4
+        with:
+          repository: kiansheik/pydicate-studio
+          ref: ba527158595de7256f162ffbd2d7df027437551e
+          path: studio-contract
+          persist-credentials: false
+      - name: Install Studio server dependencies
+        run: npm --prefix studio-contract/server ci
+      - name: Verify real browser consent and the Studio callback
+        env:
+          COLLAB_TEST_DATABASE_URL: postgresql://studio_test:studio_test@127.0.0.1:5432/studio_test
+          COLLAB_IDENTITY_BROWSER: '1'
+          MEDIA_ROOT: ${{ runner.temp }}/neo-identity-media
+          COLLAB_PLAYWRIGHT_MODULE: ${{ github.workspace }}/apps/web/node_modules/@playwright/test
+          NEO_API_DIR: ${{ github.workspace }}/apps/api
+          NEO_PYTHON: ${{ github.workspace }}/apps/api/.venv/bin/python
+        run: |
+          test -x "$NEO_PYTHON"
+          test -f "$NEO_API_DIR/app/main.py"
+          test -f studio-contract/server/tests/identity-contract.test.cjs
+          node --test studio-contract/server/tests/identity-contract.test.cjs

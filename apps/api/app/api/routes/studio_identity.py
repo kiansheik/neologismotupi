@@ -71,8 +71,14 @@ def proof(params, nonce, session, settings, issued_at):
 def cookie_name(settings):
     return "__Host-neo-studio-consent" if settings.session_cookie_secure else "neo-dev-studio-consent"
 
-def page(body):
-    return HTMLResponse('<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Academia Tupi — entrar no Studio</title><style>body{max-width:38rem;margin:10vh auto;padding:1rem;font:18px/1.6 system-ui}button,a{font:inherit}button{padding:.6rem 1rem}</style></head><body><h1>Entrar no Pydicate Studio</h1>' + body + '</body></html>', headers=HEADERS)
+def page(body, settings):
+    # Browsers also apply form-action to the redirect after consent is posted.
+    # Only the callback validated by config() is allowed, never a request URL.
+    # Preserve the same-origin POST Origin header; cross-origin referrers stay omitted.
+    headers = {**HEADERS, "Referrer-Policy": "same-origin",
+        "Content-Security-Policy": HEADERS["Content-Security-Policy"].replace(
+        "form-action 'self';", f"form-action 'self' {settings.studio_sso_redirect_uri};")}
+    return HTMLResponse('<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Academia Tupi — entrar no Studio</title><style>body{max-width:38rem;margin:10vh auto;padding:1rem;font:18px/1.6 system-ui}button,a{font:inherit}button{padding:.6rem 1rem}</style></head><body><h1>Entrar no Pydicate Studio</h1>' + body + '</body></html>', headers=headers)
 
 @router.get("/authorize")
 async def authorize(request: Request, db: SessionDep):
@@ -85,13 +91,13 @@ async def authorize(request: Request, db: SessionDep):
         # No second password form and no password proxy. Existing login keeps Turnstile,
         # rate limits and email verification. This tab retains the authorization request.
         neo = html.escape(settings.app_public_url.rstrip("/") + "/login", quote=True)
-        return page(f'<p>Use sua conta do Neologismos/Academia Tupi. Sua senha fica somente no Neologismos.</p><p><a href="{neo}" target="_blank" rel="noopener noreferrer">Entrar ou criar minha conta no Neologismos (outra aba)</a></p><p>Depois de entrar e verificar seu e-mail, volte a esta aba.</p><form method="get">' + ''.join(f'<input type="hidden" name="{k}" value="{html.escape(v, quote=True)}">' for k,v in params.items()) + '<button>Já entrei — continuar</button></form>')
+        return page(f'<p>Use sua conta do Neologismos/Academia Tupi. Sua senha fica somente no Neologismos.</p><p><a href="{neo}" target="_blank" rel="noopener noreferrer">Entrar ou criar minha conta no Neologismos (outra aba)</a></p><p>Depois de entrar e verificar seu e-mail, volte a esta aba.</p><form method="get">' + ''.join(f'<input type="hidden" name="{k}" value="{html.escape(v, quote=True)}">' for k,v in params.items()) + '<button>Já entrei — continuar</button></form>', settings)
     nonce = secrets.token_urlsafe(32)
     binding = hash_session_token(request.cookies[settings.session_cookie_name])
     issued_at = str(int(time.time()))
     signature = proof(params, nonce, binding, settings, issued_at)
     fields = {**params, "nonce": nonce, "proof": signature, "issued_at": issued_at}
-    response = page('<p>Continuar como <strong>' + html.escape(user.email) + '</strong>?</p><p>O Studio receberá seu identificador, nome e e-mail verificado. O acesso ainda depende de convite; permissões de administrador não são compartilhadas.</p><form method="post">' + ''.join(f'<input type="hidden" name="{k}" value="{html.escape(v, quote=True)}">' for k,v in fields.items()) + '<button>Continuar no Studio</button></form>')
+    response = page('<p>Continuar como <strong>' + html.escape(user.email) + '</strong>?</p><p>O Studio receberá seu identificador, nome e e-mail verificado. O acesso ainda depende de convite; permissões de administrador não são compartilhadas.</p><form method="post">' + ''.join(f'<input type="hidden" name="{k}" value="{html.escape(v, quote=True)}">' for k,v in fields.items()) + '<button>Continuar no Studio</button></form>', settings)
     response.set_cookie(cookie_name(settings), nonce, max_age=600, httponly=True, secure=settings.session_cookie_secure, samesite="strict", path="/")
     await db.commit()
     return response

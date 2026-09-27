@@ -42,6 +42,19 @@ async def exchange(client,code,verifier,**overrides):
     return await client.post('/api/auth/studio/exchange',headers={'X-Studio-Client-Secret':'a'*64},json={
         'client_id':'pydicate-studio','redirect_uri':'http://localhost:8787/sso/callback','code':code,'code_verifier':verifier,**overrides})
 
+async def test_consent_policy_allows_only_configured_studio_callback(sso):
+    _, params = query()
+    response = await sso.get('/api/auth/studio/authorize', params=params)
+    assert response.status_code == 200
+    assert response.headers['referrer-policy'] == 'same-origin'
+    directives = dict(part.strip().split(None, 1) for part in response.headers['content-security-policy'].split(';'))
+    assert directives['form-action'].split() == ["'self'", 'http://localhost:8787/sso/callback']
+    assert directives['default-src'] == "'none'"
+    assert directives['base-uri'] == "'none'"
+    assert directives['frame-ancestors'] == "'none'"
+    _, invalid = query(redirect_uri='https://untrusted.example/sso/callback')
+    assert (await sso.get('/api/auth/studio/authorize', params=invalid)).status_code == 400
+
 async def test_disabled_by_default(client):
     assert (await client.get('/api/auth/studio/authorize')).status_code==404
 
@@ -50,6 +63,7 @@ async def test_existing_neo_session_yields_single_use_minimal_identity(sso):
     async with database.AsyncSessionLocal() as db:
         row=(await db.execute(select(StudioLoginCode))).scalar_one();assert row.code_hash!=code
     result=await exchange(sso,code,verifier);assert result.status_code==200,result.text
+    assert result.headers['referrer-policy'] == 'no-referrer'
     value=result.json();assert value['email']=='student@example.org';assert value['email_verified'] is True
     assert set(value)=={'iss','aud','sub','email','email_verified','name','auth_revision'}
     assert 'password' not in result.text and 'session' not in result.text
