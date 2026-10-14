@@ -20,6 +20,12 @@ class Settings(BaseSettings):
     turnstile_include_remote_ip: bool = False
     first_user_is_admin: bool = False
 
+    # First-party Studio identity bridge. Off until both deployments are configured.
+    studio_sso_enabled: bool = False
+    studio_sso_client_id: str = "pydicate-studio"
+    studio_sso_client_secret: str = ""
+    studio_sso_redirect_uri: str = "https://studio.academiatupi.com/sso/callback"
+
     require_verified_email: bool = False
     session_cookie_name: str = "nheenga_session"
     session_ttl_hours: int = 24 * 7

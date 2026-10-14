@@ -1,3 +1,4 @@
+from app.models.studio_identity import StudioLoginCode
 from app.models.audio import AudioSample, AudioVote
 from app.models.discussion import (
     CommentVote,
@@ -32,6 +33,7 @@ from app.models.source import SourceEdition, SourceLink, SourceWork
 from app.models.user import EmailActionToken, Profile, Session, User
 
 __all__ = [
+    "StudioLoginCode",
     "AudioSample",
     "AudioVote",
     "CommentVote",
