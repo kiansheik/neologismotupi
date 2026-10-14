@@ -18,6 +18,8 @@ import { ApiError } from "@/lib/api";
 import { useOrthography } from "@/lib/orthography";
 import { getCachedVote, resolveVote, setCachedVote, useVoteMemoryVersion } from "@/lib/vote-memory";
 import type { AudioSample, ExampleSummary } from "@/lib/types";
+import { readChoice, useBrowseUrl } from "@/lib/browse-url";
+import { useRestoreResultPages } from "@/lib/navigation-state";
 
 type ExampleSort = "recent" | "score";
 
@@ -68,9 +70,12 @@ export function ExampleBrowser({
   useVoteMemoryVersion();
   const [voteTargetId, setVoteTargetId] = useState<string | null>(null);
 
-  const [search, setSearch] = useState("");
-  const [status, setStatus] = useState("");
-  const [sort, setSort] = useState<ExampleSort>(initialSort);
+  const { params, search, setSearch, setParam } = useBrowseUrl();
+  const requestedStatus = readChoice(params, "status", ["", "pending", "approved", "hidden", "rejected"], "");
+  const status = currentUser?.is_superuser || requestedStatus === "approved" ? requestedStatus : "";
+  const sort = readChoice<ExampleSort>(params, "sort", ["recent", "score"], initialSort);
+  const setStatus = (value: string) => setParam("status", value);
+  const setSort = (value: ExampleSort) => setParam("sort", value, initialSort);
 
   const navarroSearchTerms = useMemo<string[]>(() => {
     const lowered = search.toLowerCase();
@@ -123,6 +128,8 @@ export function ExampleBrowser({
 
   const { data, isPending, isFetchingNextPage, hasNextPage, fetchNextPage } = useInfiniteQuery({
     queryKey: ["example-browser", queryKey, filters],
+    staleTime: 60_000,
+    gcTime: 30 * 60_000,
     initialPageParam: 1,
     queryFn: ({ pageParam }) =>
       listExamples({
@@ -138,6 +145,8 @@ export function ExampleBrowser({
       return loadedCount < lastPage.total ? lastPage.page + 1 : undefined;
     },
   });
+
+  useRestoreResultPages(`${queryKey}:${JSON.stringify(filters)}`, data?.pages.length ?? 0, hasNextPage, isFetchingNextPage, fetchNextPage);
 
   const items = useMemo(() => data?.pages.flatMap((page) => page.items) ?? [], [data]);
 
@@ -214,6 +223,7 @@ export function ExampleBrowser({
             <select
               className="rounded-md border border-brand-300 bg-surface-soft px-3 py-2 text-sm"
               value={status}
+              aria-label={t("examples.allStatuses")}
               onChange={(event) => setStatus(event.target.value)}
             >
               <option value="">{t("examples.allStatuses")}</option>
@@ -226,6 +236,7 @@ export function ExampleBrowser({
           <select
             className="rounded-md border border-brand-300 bg-surface-soft px-3 py-2 text-sm"
             value={sort}
+            aria-label={t("browse.sortLabel")}
             onChange={(event) => setSort(event.target.value as ExampleSort)}
           >
             <option value="recent">{t("examples.sort.recent")}</option>

@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from "react";
+import { useMemo, useRef } from "react";
 
 import { Input } from "@/components/ui/input";
 import { useCurrentUser } from "@/features/auth/hooks";
@@ -10,6 +10,7 @@ import {
 } from "@/features/flashcard-lists/hooks";
 import { resolveFlashcardListTitle } from "@/features/flashcard-lists/lib";
 import { useI18n } from "@/i18n";
+import { usePageState } from "@/lib/navigation-state";
 
 interface EntryListPickerProps {
   entryId: string;
@@ -18,8 +19,8 @@ interface EntryListPickerProps {
 export function EntryListPicker({ entryId }: EntryListPickerProps) {
   const { t, locale } = useI18n();
   const { data: currentUser } = useCurrentUser();
-  const [isOpen, setIsOpen] = useState(false);
-  const [newTitle, setNewTitle] = useState("");
+  const [isOpen, setIsOpen] = usePageState(`list-picker:${entryId}:${currentUser?.id ?? "guest"}`, false);
+  const [newTitle, setNewTitle] = usePageState(`list-picker-title:${entryId}:${currentUser?.id ?? "guest"}`, "");
   const detailsRef = useRef<HTMLDetailsElement | null>(null);
 
   const listsQuery = useFlashcardLists(
@@ -71,6 +72,7 @@ export function EntryListPicker({ entryId }: EntryListPickerProps) {
   return (
     <details
       ref={detailsRef}
+      open={isOpen}
       className="relative"
       onToggle={(event) => setIsOpen((event.target as HTMLDetailsElement).open)}
     >

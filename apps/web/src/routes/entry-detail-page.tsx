@@ -23,6 +23,7 @@ import { useOrthography } from "@/lib/orthography";
 import { formatDate, formatDateTime, formatRelativeOrDate } from "@/i18n/formatters";
 import { getLocalizedApiErrorMessage } from "@/lib/localized-api-error";
 import { getCachedVote, resolveVote, setCachedVote, useVoteMemoryVersion } from "@/lib/vote-memory";
+import { usePageState } from "@/lib/navigation-state";
 import { StatusBadge } from "@/components/status-badge";
 import { SourceCitation } from "@/components/source-citation";
 import { Card } from "@/components/ui/card";
@@ -83,6 +84,12 @@ type ExampleForm = {
 
 type CommentForm = {
   body: string;
+};
+
+const EMPTY_EXAMPLE_FORM: ExampleForm = {
+  sentence_original: "", translation_pt: "", has_source: false,
+  source_authors: "", source_title: "", source_publication_year: "",
+  source_edition_label: "", source_pages: "", source_url: "", source_citation: "",
 };
 
 type ReportForm = {
@@ -346,7 +353,7 @@ function ExampleVersionHistory({
   locale: Locale;
   t: TranslateFn;
 }) {
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = usePageState(`example-history:${exampleId}`, false);
   const versionsQuery = useQuery({
     queryKey: ["example-versions", exampleId],
     queryFn: () => listExampleVersions(exampleId),
@@ -357,6 +364,7 @@ function ExampleVersionHistory({
   return (
     <details
       className="mt-2"
+      open={open}
       onToggle={(event) => {
         setOpen(event.currentTarget.open);
       }}
@@ -402,7 +410,7 @@ function CommentVersionHistory({
   locale: Locale;
   t: TranslateFn;
 }) {
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = usePageState(`comment-history:${commentId}`, false);
   const versionsQuery = useQuery({
     queryKey: ["comment-versions", commentId],
     queryFn: () => listCommentVersions(commentId),
@@ -413,6 +421,7 @@ function CommentVersionHistory({
   return (
     <details
       className="mt-2"
+      open={open}
       onToggle={(event) => {
         setOpen(event.currentTarget.open);
       }}
@@ -480,6 +489,7 @@ export function EntryDetailPage() {
   const { apply } = useOrthography();
   useVoteMemoryVersion();
   const [showEntryReportForm, setShowEntryReportForm] = useState(false);
+  const [historyOpen, setHistoryOpen] = usePageState("entry-history", false);
   const [showEditForm, setShowEditForm] = useState(false);
   const [editingExampleId, setEditingExampleId] = useState<string | null>(null);
   const [newExampleAudioQueue, setNewExampleAudioQueue] = useState<File[]>([]);
@@ -736,20 +746,8 @@ export function EntryDetailPage() {
     },
   });
 
-  const exampleForm = useForm<ExampleForm>({
-    defaultValues: {
-      sentence_original: "",
-      translation_pt: "",
-      has_source: false,
-      source_authors: "",
-      source_title: "",
-      source_publication_year: "",
-      source_edition_label: "",
-      source_pages: "",
-      source_url: "",
-      source_citation: "",
-    },
-  });
+  const [exampleDraft, setExampleDraft] = usePageState<ExampleForm>(`example-draft:${currentUser?.id ?? "guest"}`, EMPTY_EXAMPLE_FORM);
+  const exampleForm = useForm<ExampleForm>({ defaultValues: exampleDraft });
   const exampleEditForm = useForm<ExampleForm>({
     defaultValues: {
       sentence_original: "",
@@ -771,9 +769,10 @@ export function EntryDetailPage() {
     },
   });
 
+  const [commentDraft, setCommentDraft] = usePageState<{ body: string; tokens: ReturnType<typeof updateInlineTokenPositions> }>(`comment-draft:${currentUser?.id ?? "guest"}`, { body: "", tokens: [] });
   const commentForm = useForm<CommentForm>({
     defaultValues: {
-      body: "",
+      body: commentDraft.body,
     },
   });
   const [editingCommentId, setEditingCommentId] = useState<string | null>(null);
@@ -800,8 +799,22 @@ export function EntryDetailPage() {
     },
   });
   const commentTextareaRef = useRef<HTMLTextAreaElement | null>(null);
-  const commentInlineTokensRef = useRef<Array<{ start: number; end: number; raw: string; label: string }>>([]);
-  const commentLastValueRef = useRef("");
+  const commentInlineTokensRef = useRef(commentDraft.tokens);
+  const commentLastValueRef = useRef(commentDraft.body);
+
+  useEffect(() => {
+    exampleForm.reset(exampleDraft);
+    const subscription = exampleForm.watch((values) => setExampleDraft(values as ExampleForm));
+    return () => subscription.unsubscribe();
+  }, [slug, currentUser?.id]);
+
+  useEffect(() => {
+    commentInlineTokensRef.current = commentDraft.tokens;
+    commentLastValueRef.current = commentDraft.body;
+    commentForm.reset({ body: commentDraft.body });
+    const subscription = commentForm.watch((values) => setCommentDraft({ body: values.body ?? "", tokens: [...commentInlineTokensRef.current] }));
+    return () => subscription.unsubscribe();
+  }, [slug, currentUser?.id]);
   const [mentionContext, setMentionContext] = useState<MentionContext | null>(null);
   const [mentionSelectionIndex, setMentionSelectionIndex] = useState(0);
   const [inlineContext, setInlineContext] = useState<InlineReferenceContext | null>(null);
@@ -1015,7 +1028,7 @@ export function EntryDetailPage() {
         has_translation_pt: Boolean(payload.translation_pt?.trim()),
         has_source: Boolean(payload.source || payload.source_citation),
       });
-      exampleForm.reset();
+      exampleForm.reset(EMPTY_EXAMPLE_FORM);
       queryClient.invalidateQueries({ queryKey: ["entry", slug] });
     },
     onError: (error) => {
@@ -1044,7 +1057,8 @@ export function EntryDetailPage() {
     mutationFn: (payload: CommentForm) => createComment(String(entry?.id), payload),
     onSuccess: () => {
       trackEvent("comment_submitted");
-      commentForm.reset();
+      commentForm.reset({ body: "" });
+      setCommentDraft({ body: "", tokens: [] });
       setMentionContext(null);
       setMentionSelectionIndex(0);
       commentInlineTokensRef.current = [];
@@ -2846,7 +2860,7 @@ export function EntryDetailPage() {
 
       <Card>
         <h2 className="text-lg font-semibold text-brand-900">{t("entry.versionHistory")}</h2>
-        <details className="mt-2">
+        <details className="mt-2" open={historyOpen} onToggle={(event) => setHistoryOpen(event.currentTarget.open)}>
           <summary className="cursor-pointer text-sm text-brand-700">{t("entry.showVersions")}</summary>
           <ul className="mt-3 space-y-2 text-sm text-slate-700">
             {historyEvents.map((event) => (

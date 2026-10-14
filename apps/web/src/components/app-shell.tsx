@@ -13,6 +13,7 @@ import { initAnalytics, trackEvent, trackPageView } from "@/lib/analytics";
 import { useOrthography } from "@/lib/orthography";
 import { buildAbsoluteUrl, useSeo } from "@/lib/seo";
 import { isTurnstileConfigured, preloadTurnstile } from "@/lib/turnstile";
+import { NavigationRestoration } from "@/components/navigation-restoration";
 
 export function AppShell() {
   const location = useLocation();
@@ -208,6 +209,7 @@ export function AppShell() {
 
   return (
     <div className="min-h-screen">
+      <NavigationRestoration />
       <header className="border-b border-line bg-surface-header/95 backdrop-blur">
         <nav className="mx-auto flex max-w-6xl flex-col gap-3 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
           <Link to="/" className="min-w-0 text-base font-semibold text-brand-800 sm:text-lg">

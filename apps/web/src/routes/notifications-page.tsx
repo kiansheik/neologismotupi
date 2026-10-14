@@ -1,5 +1,4 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
 import { Link } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -15,13 +14,16 @@ import { formatRelativeOrDate } from "@/i18n/formatters";
 import { ApiError } from "@/lib/api";
 import { getLocalizedApiErrorMessage } from "@/lib/localized-api-error";
 import { useOrthography } from "@/lib/orthography";
+import { useBrowseUrl } from "@/lib/browse-url";
 
 export function NotificationsPage() {
   const { t, locale } = useI18n();
   const queryClient = useQueryClient();
   const { data: user, isLoading: userLoading } = useCurrentUser();
   const { apply } = useOrthography();
-  const [showAll, setShowAll] = useState(false);
+  const { params, setParam } = useBrowseUrl();
+  const showAll = params.get("all") === "1";
+  const setShowAll = (value: boolean) => setParam("all", value ? "1" : "");
 
   const notificationsQuery = useQuery({
     queryKey: ["notifications", { showAll }],

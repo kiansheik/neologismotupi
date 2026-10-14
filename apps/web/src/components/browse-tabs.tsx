@@ -1,6 +1,7 @@
 import { Link, useLocation } from "react-router-dom";
 
 import { useI18n } from "@/i18n";
+import { browseTabUrl } from "@/lib/browse-url";
 
 export function BrowseTabs() {
   const location = useLocation();
@@ -16,14 +17,14 @@ export function BrowseTabs() {
   return (
     <div className="flex flex-wrap items-center gap-2">
       <Link
-        to="/entries"
+        to={isEntries ? `${location.pathname}${location.search}${location.hash}` : browseTabUrl("/entries", new URLSearchParams(location.search))}
         aria-current={isEntries ? "page" : undefined}
         className={`${baseClass} ${isEntries ? activeClass : inactiveClass}`}
       >
         {t("term.entriesCap")}
       </Link>
       <Link
-        to="/examples"
+        to={isExamples ? `${location.pathname}${location.search}${location.hash}` : browseTabUrl("/examples", new URLSearchParams(location.search))}
         aria-current={isExamples ? "page" : undefined}
         className={`${baseClass} ${isExamples ? activeClass : inactiveClass}`}
       >

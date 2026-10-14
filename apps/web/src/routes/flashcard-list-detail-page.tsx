@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import { Link, useParams } from "react-router-dom";
 
 import { Button } from "@/components/ui/button";
@@ -18,6 +18,7 @@ import { entryDefinitionPreview } from "@/lib/entry-definition";
 import { useOrthography } from "@/lib/orthography";
 import { buildAbsoluteUrl, useSeo } from "@/lib/seo";
 import { getCachedVote, resolveVote, setCachedVote, useVoteMemoryVersion } from "@/lib/vote-memory";
+import { usePageState } from "@/lib/navigation-state";
 
 export function FlashcardListDetailPage() {
   const { t, locale } = useI18n();
@@ -25,7 +26,7 @@ export function FlashcardListDetailPage() {
   const { data: user } = useCurrentUser();
   const { apply } = useOrthography();
   useVoteMemoryVersion();
-  const [commentBody, setCommentBody] = useState("");
+  const [commentBody, setCommentBody] = usePageState(`list-comment:${user?.id ?? "guest"}`, "");
 
   const listQuery = useFlashcardListDetail(listId ?? null, Boolean(listId));
   const commentsQuery = useFlashcardListComments(listId ?? null, { page: 1, page_size: 50 });

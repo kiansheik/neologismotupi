@@ -10,9 +10,6 @@ export function EntriesPage() {
   const { t, locale } = useI18n();
   const location = useLocation();
   const { data: currentUser } = useCurrentUser();
-  const searchParams = new URLSearchParams(location.search);
-  const initialUnseen =
-    searchParams.get("unseen") === "1" || searchParams.get("unseen") === "true";
 
   const canonicalPath =
     location.pathname === "/entries" ? "/" : location.pathname;
@@ -44,7 +41,6 @@ export function EntriesPage() {
         titleAs="h1"
         title={t("entries.title")}
         description="Base comunitária de Tupi histórico e contemporâneo para quem quer aprender, usar e revitalizar a língua no dia a dia."
-        initialSort={initialUnseen ? "unseen" : "recent"}
         allowUnseenFilter={Boolean(currentUser)}
       />
     </section>

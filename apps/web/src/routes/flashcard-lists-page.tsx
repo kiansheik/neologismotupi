@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import { Link } from "react-router-dom";
 
 import { Button } from "@/components/ui/button";
@@ -15,17 +15,19 @@ import { resolveFlashcardListDescription, resolveFlashcardListTitle } from "@/fe
 import { useI18n } from "@/i18n";
 import { buildAbsoluteUrl, useSeo } from "@/lib/seo";
 import { getCachedVote, resolveVote, setCachedVote, useVoteMemoryVersion } from "@/lib/vote-memory";
+import { useBrowseUrl } from "@/lib/browse-url";
+import { usePageState } from "@/lib/navigation-state";
 
 export function FlashcardListsPage() {
   const { t, locale } = useI18n();
   const { data: user } = useCurrentUser();
   useVoteMemoryVersion();
-  const [search, setSearch] = useState("");
-  const [titlePt, setTitlePt] = useState("");
-  const [titleEn, setTitleEn] = useState("");
-  const [descPt, setDescPt] = useState("");
-  const [descEn, setDescEn] = useState("");
-  const [theme, setTheme] = useState("");
+  const { search, setSearch } = useBrowseUrl();
+  const [titlePt, setTitlePt] = usePageState(`list-title-pt:${user?.id ?? "guest"}`, "");
+  const [titleEn, setTitleEn] = usePageState(`list-title-en:${user?.id ?? "guest"}`, "");
+  const [descPt, setDescPt] = usePageState(`list-description-pt:${user?.id ?? "guest"}`, "");
+  const [descEn, setDescEn] = usePageState(`list-description-en:${user?.id ?? "guest"}`, "");
+  const [theme, setTheme] = usePageState(`list-theme:${user?.id ?? "guest"}`, "");
 
   const listsQuery = useFlashcardLists(
     { q: search.trim() || undefined, page: 1, page_size: 20 },

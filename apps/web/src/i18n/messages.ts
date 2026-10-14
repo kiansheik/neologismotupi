@@ -250,6 +250,7 @@ export const ptBR = {
   "entries.sourceSearchAria": "Filtrar por {term.source}",
   "entries.sourcePlaceholder": "Filtrar por {term.source} (autor, título, edição)",
   "entries.allStatuses": "Todos os status",
+  "browse.sortLabel": "Ordenação",
   "entries.sort.alphabetical": "Alfabética",
   "entries.sort.recent": "Recentes",
   "entries.sort.score": "Pontuação",
@@ -1073,6 +1074,7 @@ export const enUS: Record<TranslationKey, string> = {
   "entries.sourceSearchAria": "Filter by {term.source}",
   "entries.sourcePlaceholder": "Filter by {term.source} (author, title, edition)",
   "entries.allStatuses": "All statuses",
+  "browse.sortLabel": "Sort order",
   "entries.sort.alphabetical": "Alphabetical",
   "entries.sort.recent": "Recent",
   "entries.sort.score": "Score",
@@ -1683,6 +1685,7 @@ const tupiOverrides: Partial<Record<TranslationKey, string>> = {
   "entries.searchPlaceholder": "Tesekar tupinhe'enga pupé konipó perónhe'enga pupé",
 
   "entries.allStatuses": "Opá sekoaba",
+  "browse.sortLabel": "Ordenação",
   "entries.sort.alphabetical": "Nhe'engekomonhangaba",
   "entries.sort.recent": "ipysasueté",
   "entries.sort.score": "Serapûaneté",

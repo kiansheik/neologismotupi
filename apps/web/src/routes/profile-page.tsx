@@ -3,6 +3,7 @@ import { useMemo } from "react";
 import { Link, useParams } from "react-router-dom";
 
 import { EntryBrowser } from "@/components/entry-browser";
+import { useRestoreResultPages } from "@/lib/navigation-state";
 import { Card } from "@/components/ui/card";
 import { UserBadge } from "@/components/user-badge";
 import { Button } from "@/components/ui/button";
@@ -33,6 +34,8 @@ export function ProfilePage() {
 
   const audioQuery = useInfiniteQuery({
     queryKey: ["profile-audio", userId],
+    staleTime: 60_000,
+    gcTime: 30 * 60_000,
     initialPageParam: 1,
     queryFn: ({ pageParam }) =>
       listUserAudioSubmissions(String(userId), { page: Number(pageParam), page_size: 10 }),
@@ -42,6 +45,8 @@ export function ProfilePage() {
     },
     enabled: Boolean(userId),
   });
+  useRestoreResultPages(`profile-audio:${userId}`, audioQuery.data?.pages.length ?? 0, audioQuery.hasNextPage, audioQuery.isFetching, audioQuery.fetchNextPage);
+
   const audioItems = useMemo(
     () => audioQuery.data?.pages.flatMap((page) => page.items) ?? [],
     [audioQuery.data],

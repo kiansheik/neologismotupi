@@ -6,6 +6,10 @@ Inspected areas; this is not an exhaustive inventory.
 | --- | --- |
 | Development, tests and deployment targets | `Makefile`, `CLAUDE.md`, `apps/web/package.json`, `apps/api/pyproject.toml` |
 | Shared text inputs | `apps/web/src/components/ui/input.tsx`, `textarea.tsx`; normalization in `apps/web/src/lib/text.ts` |
+| Shareable browsing filters/history | `apps/web/src/lib/browse-url.ts`; consumers: entry/example browsers, list search, notifications; browse tabs transfer compatible parameters |
+| Tab UI state and result depth | `apps/web/src/lib/navigation-state.ts`; consumers include entry/detail/profile/list pages and entry list picker |
+| Scroll restoration | `apps/web/src/components/navigation-restoration.tsx`, mounted by `app-shell.tsx` |
+| Navigation regression checks | `apps/web/tests/browse-history.test.tsx`, `entry-detail-page.test.tsx`, `tests/e2e/browse-history.spec.ts`; runner configuration in `apps/web/playwright.config.ts` |
 | Dictionary browse/search | `apps/web/src/components/entry-browser.tsx`, `example-browser.tsx`; API in `apps/api/app/api/routes/entries.py` |
 | Etymology dictionary search | `apps/web/src/features/etymology-builder/dictionary-search.ts`, `orthography.ts` |
 | Navarro cache search | `apps/web/src/features/navarro/cache.ts`; backend in `apps/api/app/services/navarro.py`, routes in `api/routes/navarro.py` |

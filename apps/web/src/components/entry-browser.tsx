@@ -21,6 +21,8 @@ import { entryDefinitionPreview } from "@/lib/entry-definition";
 import { useOrthography } from "@/lib/orthography";
 import { getCachedVote, resolveVote, setCachedVote, useVoteMemoryVersion } from "@/lib/vote-memory";
 import { EntryListPicker } from "@/features/flashcard-lists/components/entry-list-picker";
+import { readChoice, useBrowseUrl } from "@/lib/browse-url";
+import { usePageState, useRestoreResultPages } from "@/lib/navigation-state";
 
 type EntrySort = "alphabetical" | "recent" | "score" | "most_examples" | "unseen";
 
@@ -81,8 +83,8 @@ export function EntryBrowser({
   const isModerator = Boolean(currentUser?.is_superuser);
   useVoteMemoryVersion();
   const [voteTargetId, setVoteTargetId] = useState<string | null>(null);
-  const [downvoteDrafts, setDownvoteDrafts] = useState<Record<string, string>>({});
-  const [downvoteOpen, setDownvoteOpen] = useState<Record<string, boolean>>({});
+  const [downvoteDrafts, setDownvoteDrafts] = usePageState<Record<string, string>>(`downvote-drafts:${queryKey}:${currentUser?.id ?? "guest"}`, {});
+  const [downvoteOpen, setDownvoteOpen] = usePageState<Record<string, boolean>>(`downvote-open:${queryKey}:${currentUser?.id ?? "guest"}`, {});
   const [downvoteErrors, setDownvoteErrors] = useState<Record<string, string>>({});
   const canVote = Boolean(currentUser);
 
@@ -91,10 +93,15 @@ export function EntryBrowser({
     queryFn: getEntryConstraints,
   });
 
-  const [search, setSearch] = useState("");
-  const [status, setStatus] = useState("");
-  const [partOfSpeech, setPartOfSpeech] = useState("");
-  const [sort, setSort] = useState<EntrySort>(initialSort);
+  const { params, search, setSearch, setParam } = useBrowseUrl();
+  const requestedStatus = readChoice(params, "status", ["", "pending", "approved", "disputed", "rejected", "archived"], "");
+  const status = !isModerator && (requestedStatus === "rejected" || requestedStatus === "archived") ? "" : requestedStatus;
+  const partOfSpeech = readChoice(params, "part_of_speech", ["", "noun", "verb_tr", "verb_intr", "verb_intr_stative", "adjective", "adverb", "expression", "pronoun", "particle", "postposition", "conjunction", "interjection", "demonstrative", "number", "proper_noun", "other"], "");
+  const requestedSort = readChoice<EntrySort>(params, "sort", ["alphabetical", "recent", "score", "most_examples", "unseen"], params.get("unseen") === "1" || params.get("unseen") === "true" ? "unseen" : initialSort);
+  const sort = requestedSort === "unseen" && !allowUnseenFilter ? "recent" : requestedSort;
+  const setStatus = (value: string) => setParam("status", value);
+  const setPartOfSpeech = (value: string) => setParam("part_of_speech", value);
+  const setSort = (value: EntrySort) => setParam("sort", value, initialSort);
 
   const navarroSearchTerms = useMemo<string[]>(() => {
     const lowered = search.toLowerCase();
@@ -139,18 +146,6 @@ export function EntryBrowser({
     return () => window.clearTimeout(timer);
   }, [analyticsContext, partOfSpeech, search, sort, status]);
 
-  useEffect(() => {
-    if (!allowUnseenFilter && sort === "unseen") {
-      setSort("recent");
-    }
-  }, [allowUnseenFilter, sort]);
-
-  useEffect(() => {
-    if (!isModerator && (status === "rejected" || status === "archived")) {
-      setStatus("");
-    }
-  }, [isModerator, status]);
-
   const filters = useMemo(
     () => ({
       search: navarroSearchTerms[0] ?? search,
@@ -168,6 +163,8 @@ export function EntryBrowser({
   const { data, isPending, isFetchingNextPage, hasNextPage, fetchNextPage } =
     useInfiniteQuery({
       queryKey: ["entry-browser", queryKey, filters],
+      staleTime: 60_000,
+      gcTime: 30 * 60_000,
       initialPageParam: 1,
       queryFn: ({ pageParam }) =>
         listEntries({
@@ -186,6 +183,8 @@ export function EntryBrowser({
         return loadedCount < lastPage.total ? lastPage.page + 1 : undefined;
       },
     });
+
+  useRestoreResultPages(`${queryKey}:${JSON.stringify(filters)}`, data?.pages.length ?? 0, hasNextPage, isFetchingNextPage, fetchNextPage);
 
   const items = useMemo(
     () => data?.pages.flatMap((page) => page.items) ?? [],
@@ -307,6 +306,7 @@ export function EntryBrowser({
           <select
             className="rounded-md border border-brand-300 bg-surface-soft px-3 py-2 text-sm"
             value={status}
+            aria-label={t("entries.allStatuses")}
             onChange={(event) => setStatus(event.target.value)}
           >
             <option value="">{t("entries.allStatuses")}</option>
@@ -323,6 +323,7 @@ export function EntryBrowser({
           <select
             className="rounded-md border border-brand-300 bg-surface-soft px-3 py-2 text-sm"
             value={partOfSpeech}
+            aria-label={t("partOfSpeech.any")}
             onChange={(event) => setPartOfSpeech(event.target.value)}
           >
             <option value="">{t("partOfSpeech.any")}</option>
@@ -352,6 +353,7 @@ export function EntryBrowser({
           <select
             className="rounded-md border border-brand-300 bg-surface-soft px-3 py-2 text-sm"
             value={sort}
+            aria-label={t("browse.sortLabel")}
             onChange={(event) =>
               setSort(
                 event.target.value as

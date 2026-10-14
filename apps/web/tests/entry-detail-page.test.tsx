@@ -1,5 +1,7 @@
 import { screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { useNavigate } from "react-router-dom";
+import { writeNavigationState } from "@/lib/navigation-state";
 
 import { EntryDetailPage } from "@/routes/entry-detail-page";
 import { renderWithRoute } from "./test-utils";
@@ -88,6 +90,38 @@ describe("EntryDetailPage", () => {
     resolveMentionUsersMock.mockResolvedValue([]);
     updateCommentMock.mockResolvedValue({});
     listCommentVersionsMock.mockResolvedValue([]);
+  });
+
+  it("restores comment and example drafts when returning from another entry", async () => {
+    authState.currentUser = { id: "draft-author", is_superuser: false };
+    createCommentMock.mockClear();
+    writeNavigationState("page:/entries/entry-one:comment-draft:draft-author", {
+      body: "abare ",
+      tokens: [{ start: 0, end: 5, label: "abare", raw: "[[neo:reference-id|abare|abare]]" }],
+    });
+    function Navigation() {
+      const navigate = useNavigate();
+      return <><button onClick={() => navigate("/entries/other")}>Other entry</button><button onClick={() => navigate(-1)}>Back</button></>;
+    }
+    renderWithRoute(<><EntryDetailPage /><Navigation /></>, "/entries/:slug", "/entries/entry-one");
+    const user = userEvent.setup();
+    const comment = await screen.findByPlaceholderText(/Escreva seu/);
+    await user.type(comment, "Comentário ainda em elaboração");
+    await user.type(screen.getByLabelText(/Frase/), "a’e tembi’u");
+    await user.click(screen.getByText("Other entry"));
+    await waitFor(() => expect(screen.getByPlaceholderText(/Escreva seu/)).toHaveValue(""));
+    expect(screen.getByLabelText(/Frase/)).toHaveValue("");
+    await user.click(screen.getByText("Back"));
+    await waitFor(() => expect(screen.getByPlaceholderText(/Escreva seu/)).toHaveValue("abare Comentário ainda em elaboração"));
+    expect(screen.getByLabelText(/Frase/)).toHaveValue("a'e tembi'u");
+    await user.click(screen.getByRole("button", { name: "Comentar" }));
+    await waitFor(() => expect(createCommentMock).toHaveBeenCalledWith("entry-1", {
+      body: "[[neo:reference-id|abare|abare]] Comentário ainda em elaboração",
+    }));
+    await waitFor(() => expect(screen.getByPlaceholderText(/Escreva seu/)).toHaveValue(""));
+    await user.click(screen.getByText("Other entry"));
+    await user.click(screen.getByText("Back"));
+    expect(screen.getByPlaceholderText(/Escreva seu/)).toHaveValue("");
   });
 
   it("shows sign-in prompt for logged-out users", async () => {
