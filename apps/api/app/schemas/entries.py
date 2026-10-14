@@ -7,6 +7,7 @@ from pydantic import BaseModel, Field, model_validator
 from app.core.enums import EntryStatus, ExampleStatus, ReportReasonCode, TagType
 from app.schemas.audio import AudioSampleOut
 from app.schemas.badges import UserBadgeKind
+from app.schemas.text import CanonicalText
 
 
 class TagOut(BaseModel):
@@ -26,11 +27,11 @@ class EntryAuthorOut(BaseModel):
 
 
 class SourceInput(BaseModel):
-    authors: str | None = Field(default=None, max_length=255)
-    title: str | None = Field(default=None, max_length=400)
+    authors: CanonicalText | None = Field(default=None, max_length=255)
+    title: CanonicalText | None = Field(default=None, max_length=400)
     publication_year: int | None = Field(default=None, ge=1, le=3000)
-    edition_label: str | None = Field(default=None, max_length=120)
-    pages: str | None = Field(default=None, max_length=120)
+    edition_label: CanonicalText | None = Field(default=None, max_length=120)
+    pages: CanonicalText | None = Field(default=None, max_length=120)
     url: str | None = Field(default=None, max_length=2048)
 
     @model_validator(mode="after")
@@ -272,14 +273,14 @@ class EntrySubmissionGateOut(BaseModel):
 
 
 class EntryCreate(BaseModel):
-    headword: str = Field(min_length=1, max_length=180)
-    gloss_pt: str = Field(min_length=1, max_length=255)
-    gloss_en: str | None = Field(default=None, max_length=255)
-    part_of_speech: str | None = Field(default=None, max_length=64)
-    short_definition: str | None = None
-    source_citation: str | None = Field(default=None, max_length=500)
+    headword: CanonicalText = Field(min_length=1, max_length=180)
+    gloss_pt: CanonicalText = Field(min_length=1, max_length=255)
+    gloss_en: CanonicalText | None = Field(default=None, max_length=255)
+    part_of_speech: CanonicalText | None = Field(default=None, max_length=64)
+    short_definition: CanonicalText | None = None
+    source_citation: CanonicalText | None = Field(default=None, max_length=500)
     source: SourceInput | None = None
-    morphology_notes: str | None = None
+    morphology_notes: CanonicalText | None = None
     pydicate: str | None = Field(default=None, max_length=10000)
     tag_ids: list[uuid.UUID] = Field(default_factory=list)
     force_submit: bool = False
@@ -287,48 +288,48 @@ class EntryCreate(BaseModel):
 
 
 class EntryUpdate(BaseModel):
-    headword: str | None = Field(default=None, min_length=1, max_length=180)
-    gloss_pt: str | None = Field(default=None, max_length=255)
-    gloss_en: str | None = Field(default=None, max_length=255)
-    part_of_speech: str | None = Field(default=None, max_length=64)
-    short_definition: str | None = Field(default=None, min_length=3)
-    source_citation: str | None = Field(default=None, max_length=500)
+    headword: CanonicalText | None = Field(default=None, min_length=1, max_length=180)
+    gloss_pt: CanonicalText | None = Field(default=None, max_length=255)
+    gloss_en: CanonicalText | None = Field(default=None, max_length=255)
+    part_of_speech: CanonicalText | None = Field(default=None, max_length=64)
+    short_definition: CanonicalText | None = Field(default=None, min_length=3)
+    source_citation: CanonicalText | None = Field(default=None, max_length=500)
     source: SourceInput | None = None
-    morphology_notes: str | None = None
+    morphology_notes: CanonicalText | None = None
     tag_ids: list[uuid.UUID] | None = None
-    edit_summary: str | None = Field(default=None, max_length=280)
+    edit_summary: CanonicalText | None = Field(default=None, max_length=280)
 
 
 class ExampleCreate(BaseModel):
-    sentence_original: str = Field(min_length=3)
-    translation_pt: str | None = None
-    translation_en: str | None = None
-    source_citation: str | None = Field(default=None, max_length=500)
+    sentence_original: CanonicalText = Field(min_length=3)
+    translation_pt: CanonicalText | None = None
+    translation_en: CanonicalText | None = None
+    source_citation: CanonicalText | None = Field(default=None, max_length=500)
     source: SourceInput | None = None
-    usage_note: str | None = None
-    context_tag: str | None = Field(default=None, max_length=120)
+    usage_note: CanonicalText | None = None
+    context_tag: CanonicalText | None = Field(default=None, max_length=120)
     turnstile_token: str | None = None
 
 
 class ExampleUpdate(BaseModel):
-    sentence_original: str | None = Field(default=None, min_length=3)
-    translation_pt: str | None = None
-    translation_en: str | None = None
-    source_citation: str | None = Field(default=None, max_length=500)
+    sentence_original: CanonicalText | None = Field(default=None, min_length=3)
+    translation_pt: CanonicalText | None = None
+    translation_en: CanonicalText | None = None
+    source_citation: CanonicalText | None = Field(default=None, max_length=500)
     source: SourceInput | None = None
-    usage_note: str | None = None
-    context_tag: str | None = Field(default=None, max_length=120)
-    edit_summary: str | None = Field(default=None, max_length=280)
+    usage_note: CanonicalText | None = None
+    context_tag: CanonicalText | None = Field(default=None, max_length=120)
+    edit_summary: CanonicalText | None = Field(default=None, max_length=280)
 
 
 class CommentCreate(BaseModel):
-    body: str = Field(min_length=1, max_length=2000)
+    body: CanonicalText = Field(min_length=1, max_length=2000)
     parent_comment_id: uuid.UUID | None = None
     turnstile_token: str | None = None
 
 
 class CommentUpdate(BaseModel):
-    body: str = Field(min_length=1, max_length=2000)
+    body: CanonicalText = Field(min_length=1, max_length=2000)
 
 
 class VoteRequest(BaseModel):
@@ -358,5 +359,5 @@ class CommentVoteOut(BaseModel):
 
 class ReportCreate(BaseModel):
     reason_code: ReportReasonCode
-    free_text: str | None = Field(default=None, min_length=5, max_length=280)
+    free_text: CanonicalText | None = Field(default=None, min_length=5, max_length=280)
     turnstile_token: str | None = None

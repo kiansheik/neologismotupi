@@ -20,7 +20,13 @@ from app.core.permissions import (
     filtered_entry_status_clause,
     is_moderator,
 )
-from app.core.utils import collapse_whitespace, normalize_search_query, slugify
+from app.core.utils import (
+    collapse_whitespace,
+    normalize_apostrophes,
+    normalize_apostrophes_sql,
+    normalize_search_query,
+    slugify,
+)
 from app.models.audio import AudioSample, AudioVote
 from app.models.discussion import CommentVote, EntryComment, EntryCommentVersion
 from app.models.entry import (
@@ -669,20 +675,20 @@ async def list_entries(
 
     all_search_terms = [s for s in ([search] if search else []) + list(search_terms) if s]
     if all_search_terms:
-        normalized_headword = func.replace(Entry.normalized_headword, "-", " ")
+        normalized_headword = func.replace(normalize_apostrophes_sql(Entry.normalized_headword), "-", " ")
         term_clauses = []
         for s in all_search_terms:
-            pattern = f"%{collapse_whitespace(s)}%"
+            pattern = f"%{collapse_whitespace(normalize_apostrophes(s))}%"
             normalized_s = normalize_search_query(s)
             normalized_pattern = f"%{normalized_s}%"
             term_clauses.append(
                 or_(
-                    Entry.headword.ilike(pattern),
-                    Entry.gloss_pt.ilike(pattern),
-                    Entry.gloss_en.ilike(pattern),
+                    normalize_apostrophes_sql(Entry.headword).ilike(pattern),
+                    normalize_apostrophes_sql(Entry.gloss_pt).ilike(pattern),
+                    normalize_apostrophes_sql(Entry.gloss_en).ilike(pattern),
                     normalized_headword.ilike(normalized_pattern),
-                    Entry.normalized_gloss_pt.ilike(normalized_pattern),
-                    Entry.normalized_gloss_en.ilike(normalized_pattern),
+                    normalize_apostrophes_sql(Entry.normalized_gloss_pt).ilike(normalized_pattern),
+                    normalize_apostrophes_sql(Entry.normalized_gloss_en).ilike(normalized_pattern),
                 )
             )
         conditions.append(or_(*term_clauses) if len(all_search_terms) > 1 else term_clauses[0])
@@ -744,17 +750,17 @@ async def list_entries(
 
     if source_query:
         normalized_source = normalize_search_query(source_query)
-        source_pattern = f"%{source_query}%"
+        source_pattern = f"%{normalize_apostrophes(source_query)}%"
         normalized_source_pattern = f"%{normalized_source}%"
 
         conditions.append(
             or_(
-                SourceWork.authors.ilike(source_pattern),
-                SourceWork.title.ilike(source_pattern),
-                SourceEdition.edition_label.ilike(source_pattern),
-                func.replace(SourceWork.normalized_authors, "-", " ").ilike(normalized_source_pattern),
-                func.replace(SourceWork.normalized_title, "-", " ").ilike(normalized_source_pattern),
-                Entry.source_citation.ilike(source_pattern),
+                normalize_apostrophes_sql(SourceWork.authors).ilike(source_pattern),
+                normalize_apostrophes_sql(SourceWork.title).ilike(source_pattern),
+                normalize_apostrophes_sql(SourceEdition.edition_label).ilike(source_pattern),
+                func.replace(normalize_apostrophes_sql(SourceWork.normalized_authors), "-", " ").ilike(normalized_source_pattern),
+                func.replace(normalize_apostrophes_sql(SourceWork.normalized_title), "-", " ").ilike(normalized_source_pattern),
+                normalize_apostrophes_sql(Entry.source_citation).ilike(source_pattern),
             )
         )
 
@@ -1524,7 +1530,7 @@ async def create_example(
     duplicate_stmt = select(Example).where(
         and_(
             Example.entry_id == entry_id,
-            func.lower(Example.sentence_original) == collapse_whitespace(payload.sentence_original).lower(),
+            func.lower(normalize_apostrophes_sql(Example.sentence_original)) == collapse_whitespace(payload.sentence_original).lower(),
         )
     )
     duplicate_example = (await db.execute(duplicate_stmt)).scalar_one_or_none()
@@ -1804,26 +1810,26 @@ async def list_examples(
 
     all_search_terms = [s for s in ([search] if search else []) + list(search_terms) if s]
     if all_search_terms:
-        normalized_headword = func.replace(Entry.normalized_headword, "-", " ")
+        normalized_headword = func.replace(normalize_apostrophes_sql(Entry.normalized_headword), "-", " ")
         term_clauses = []
         for s in all_search_terms:
-            pattern = f"%{collapse_whitespace(s)}%"
+            pattern = f"%{collapse_whitespace(normalize_apostrophes(s))}%"
             normalized_s = normalize_search_query(s)
             normalized_pattern = f"%{normalized_s}%"
             term_clauses.append(
                 or_(
-                    Example.sentence_original.ilike(pattern),
-                    Example.translation_pt.ilike(pattern),
-                    Example.translation_en.ilike(pattern),
-                    Entry.headword.ilike(pattern),
-                    Entry.gloss_pt.ilike(pattern),
-                    Entry.gloss_en.ilike(pattern),
-                    Example.normalized_sentence_original.ilike(normalized_pattern),
-                    Example.normalized_translation_pt.ilike(normalized_pattern),
-                    Example.normalized_translation_en.ilike(normalized_pattern),
+                    normalize_apostrophes_sql(Example.sentence_original).ilike(pattern),
+                    normalize_apostrophes_sql(Example.translation_pt).ilike(pattern),
+                    normalize_apostrophes_sql(Example.translation_en).ilike(pattern),
+                    normalize_apostrophes_sql(Entry.headword).ilike(pattern),
+                    normalize_apostrophes_sql(Entry.gloss_pt).ilike(pattern),
+                    normalize_apostrophes_sql(Entry.gloss_en).ilike(pattern),
+                    normalize_apostrophes_sql(Example.normalized_sentence_original).ilike(normalized_pattern),
+                    normalize_apostrophes_sql(Example.normalized_translation_pt).ilike(normalized_pattern),
+                    normalize_apostrophes_sql(Example.normalized_translation_en).ilike(normalized_pattern),
                     normalized_headword.ilike(normalized_pattern),
-                    Entry.normalized_gloss_pt.ilike(normalized_pattern),
-                    Entry.normalized_gloss_en.ilike(normalized_pattern),
+                    normalize_apostrophes_sql(Entry.normalized_gloss_pt).ilike(normalized_pattern),
+                    normalize_apostrophes_sql(Entry.normalized_gloss_en).ilike(normalized_pattern),
                 )
             )
         conditions.append(or_(*term_clauses) if len(all_search_terms) > 1 else term_clauses[0])

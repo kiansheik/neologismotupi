@@ -1,5 +1,7 @@
-import { screen } from "@testing-library/react";
+import { screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 
+import { listEntries } from "@/features/entries/api";
 import { EntriesPage } from "@/routes/entries-page";
 import { renderWithProviders } from "./test-utils";
 
@@ -54,5 +56,14 @@ describe("EntriesPage", () => {
 
     expect(await screen.findByText("abare")).toBeInTheDocument();
     expect(screen.getByTestId("entry-list")).toBeInTheDocument();
+  });
+
+  it("sends the canonical apostrophe when searching from a mobile keyboard", async () => {
+    renderWithProviders(<EntriesPage />);
+    await screen.findByText("abare");
+    const input = screen.getByRole("textbox");
+    await userEvent.setup().type(input, "a’e");
+    expect(input).toHaveValue("a'e");
+    await waitFor(() => expect(listEntries).toHaveBeenCalledWith(expect.objectContaining({ search: "a'e" })));
   });
 });

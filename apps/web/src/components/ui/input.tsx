@@ -1,7 +1,9 @@
 import clsx from "clsx";
 import type { InputHTMLAttributes } from "react";
 
-export function Input({ className, ...props }: InputHTMLAttributes<HTMLInputElement>) {
+import { normalizeTextInput } from "@/lib/text";
+
+export function Input({ className, onChange, type = "text", ...props }: InputHTMLAttributes<HTMLInputElement>) {
   return (
     <input
       className={clsx(
@@ -10,6 +12,13 @@ export function Input({ className, ...props }: InputHTMLAttributes<HTMLInputElem
         className,
       )}
       {...props}
+      type={type}
+      onChange={(event) => {
+        if (type === "text" || type === "search") {
+          normalizeTextInput(event.currentTarget);
+        }
+        onChange?.(event);
+      }}
     />
   );
 }

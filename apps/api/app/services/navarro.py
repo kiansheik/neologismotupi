@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.utils import normalize_search_query, normalize_text
+from app.core.utils import normalize_apostrophes, normalize_search_query, normalize_text
 from app.models.navarro import NavarroEntry
 
 
@@ -42,9 +42,14 @@ async def load_navarro_cache(db: AsyncSession) -> None:
         payload: list[dict[str, str]] = []
         hasher = hashlib.sha256()
         for index, row in enumerate(rows):
-            normalized_headword = row.normalized_headword or normalize_text(row.first_word)
-            search_text = row.search_text or normalize_search_query(
-                f"{row.first_word} {row.optional_number} {row.definition}"
+            normalized_headword = normalize_apostrophes(
+                row.normalized_headword or normalize_text(row.first_word)
+            )
+            search_text = normalize_apostrophes(
+                row.search_text
+                or normalize_search_query(
+                    f"{row.first_word} {row.optional_number} {row.definition}"
+                )
             )
             entry = NavarroCacheEntry(
                 id=row.id,

@@ -1,5 +1,7 @@
+import { normalizeApostrophes } from "@/lib/text";
+
 export function removePunctuation(value: string): string {
-  return value.replace(/[.,\/#!$%?^&*;:{}=\-_`~()]/g, "").trim();
+  return normalizeApostrophes(value).replace(/[.,\/#!$%?^&*;:{}=\-_`~()]/g, "").trim();
 }
 
 export function removeDiacritics(value: string): string {
@@ -7,7 +9,7 @@ export function removeDiacritics(value: string): string {
 }
 
 export function stripDiacritics(value: string): string {
-  return value.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+  return normalizeApostrophes(value).normalize("NFD").replace(/[\u0300-\u036f]/g, "");
 }
 
 export function normalizeExact(value: string): string {

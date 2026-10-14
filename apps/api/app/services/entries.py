@@ -9,7 +9,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.config import get_settings
 from app.core.enums import EntryStatus, ExampleStatus
 from app.core.permissions import entry_visibility_clause
-from app.core.utils import collapse_whitespace, normalize_text
+from app.core.utils import (
+    collapse_whitespace,
+    normalize_apostrophes,
+    normalize_apostrophes_sql,
+    normalize_text,
+)
 from app.models.discussion import CommentVote, EntryComment
 from app.models.entry import (
     Entry,
@@ -79,15 +84,15 @@ async def find_possible_duplicates(
     normalized_headword: str,
     limit: int = 5,
 ) -> list[Entry]:
-    pattern = f"%{collapse_whitespace(headword)}%"
+    pattern = f"%{collapse_whitespace(normalize_apostrophes(headword))}%"
     stmt = (
         select(Entry)
         .where(
             or_(
-                Entry.normalized_headword == normalized_headword,
-                Entry.headword.ilike(pattern),
-                Entry.gloss_pt.ilike(pattern),
-                Entry.gloss_en.ilike(pattern),
+                normalize_apostrophes_sql(Entry.normalized_headword) == normalized_headword,
+                normalize_apostrophes_sql(Entry.headword).ilike(pattern),
+                normalize_apostrophes_sql(Entry.gloss_pt).ilike(pattern),
+                normalize_apostrophes_sql(Entry.gloss_en).ilike(pattern),
             )
         )
         .where(entry_visibility_clause(None))

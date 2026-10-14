@@ -4,23 +4,24 @@ from datetime import datetime
 from pydantic import BaseModel, Field
 
 from app.schemas.entries import EntryAuthorOut, EntrySummaryOut
+from app.schemas.text import CanonicalText
 
 
 class FlashcardListCreate(BaseModel):
-    title_pt: str = Field(min_length=2, max_length=140)
-    title_en: str | None = Field(default=None, max_length=140)
-    description_pt: str | None = Field(default=None, max_length=1000)
-    description_en: str | None = Field(default=None, max_length=1000)
-    theme_label: str | None = Field(default=None, max_length=120)
+    title_pt: CanonicalText = Field(min_length=2, max_length=140)
+    title_en: CanonicalText | None = Field(default=None, max_length=140)
+    description_pt: CanonicalText | None = Field(default=None, max_length=1000)
+    description_en: CanonicalText | None = Field(default=None, max_length=1000)
+    theme_label: CanonicalText | None = Field(default=None, max_length=120)
     is_public: bool = True
 
 
 class FlashcardListUpdate(BaseModel):
-    title_pt: str | None = Field(default=None, min_length=2, max_length=140)
-    title_en: str | None = Field(default=None, max_length=140)
-    description_pt: str | None = Field(default=None, max_length=1000)
-    description_en: str | None = Field(default=None, max_length=1000)
-    theme_label: str | None = Field(default=None, max_length=120)
+    title_pt: CanonicalText | None = Field(default=None, min_length=2, max_length=140)
+    title_en: CanonicalText | None = Field(default=None, max_length=140)
+    description_pt: CanonicalText | None = Field(default=None, max_length=1000)
+    description_en: CanonicalText | None = Field(default=None, max_length=1000)
+    theme_label: CanonicalText | None = Field(default=None, max_length=120)
     is_public: bool | None = None
 
 
@@ -70,7 +71,7 @@ class FlashcardListVoteOut(BaseModel):
 
 
 class FlashcardListCommentCreate(BaseModel):
-    body: str = Field(min_length=1, max_length=2000)
+    body: CanonicalText = Field(min_length=1, max_length=2000)
 
 
 class FlashcardListCommentOut(BaseModel):

@@ -1,3 +1,4 @@
+import { normalizeApostrophes } from "@/lib/text";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
@@ -47,7 +48,7 @@ function normalizeComparableText(value: string | null | undefined): string {
   if (!value) {
     return "";
   }
-  return value
+  return normalizeApostrophes(value)
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
     .replace(/[.?!,:;]+$/g, "")

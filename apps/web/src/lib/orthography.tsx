@@ -9,6 +9,7 @@ import {
 } from "react";
 
 import type { OrthographyMapItem } from "@/lib/types";
+import { normalizeApostrophes } from "@/lib/text";
 
 const STORAGE_KEY = "nheenga.orthography.map";
 const STORAGE_KEY_MODE = "nheenga.orthography.mode";
@@ -28,8 +29,8 @@ const OrthographyContext = createContext<OrthographyContextValue | null>(null);
 function normalizeMapping(mapping: OrthographyMapItem[]): OrthographyMapItem[] {
   return mapping
     .map((item) => ({
-      from: item.from.trim().toLowerCase(),
-      to: (item.to ?? "").trim().toLowerCase(),
+      from: normalizeApostrophes(item.from).trim().toLowerCase(),
+      to: normalizeApostrophes(item.to ?? "").trim().toLowerCase(),
     }))
     .filter((item) => item.from.length > 0);
 }
@@ -105,6 +106,7 @@ function writeStoredMode(mode: OrthoMode) {
 }
 
 export function applyOrthography(value: string, mapping: OrthographyMapItem[]): string {
+  value = normalizeApostrophes(value);
   if (!mapping.length) {
     return value;
   }
@@ -113,7 +115,7 @@ export function applyOrthography(value: string, mapping: OrthographyMapItem[]): 
     if (!item.from) {
       continue;
     }
-    next = next.split(item.from).join(item.to ?? "");
+    next = next.split(normalizeApostrophes(item.from)).join(normalizeApostrophes(item.to ?? ""));
   }
   return next;
 }

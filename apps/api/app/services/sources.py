@@ -4,7 +4,12 @@ from urllib.parse import urlsplit, urlunsplit
 from sqlalchemy import String, cast, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.utils import collapse_whitespace, normalize_text
+from app.core.utils import (
+    collapse_whitespace,
+    normalize_apostrophes,
+    normalize_apostrophes_sql,
+    normalize_text,
+)
 from app.models.entry import Entry, Example
 from app.models.source import SourceEdition, SourceLink, SourceWork
 from app.schemas.entries import SourceInput
@@ -93,6 +98,8 @@ def build_source_citation(
 def _null_safe_equals(column, value):
     if value is None:
         return column.is_(None)
+    if isinstance(value, str):
+        return normalize_apostrophes_sql(column) == normalize_apostrophes(value)
     return column == value
 
 
@@ -217,7 +224,7 @@ async def search_sources(
     query: str,
     limit: int = 10,
 ) -> list[SourceSuggestionRow]:
-    cleaned_query = collapse_whitespace(query)
+    cleaned_query = collapse_whitespace(normalize_apostrophes(query))
     if cleaned_query == "":
         return []
 
@@ -246,12 +253,12 @@ async def search_sources(
         .outerjoin(SourceLink, SourceLink.edition_id == SourceEdition.id)
         .where(
             or_(
-                SourceWork.authors.ilike(like_query),
-                SourceWork.title.ilike(like_query),
-                SourceEdition.edition_label.ilike(like_query),
+                normalize_apostrophes_sql(SourceWork.authors).ilike(like_query),
+                normalize_apostrophes_sql(SourceWork.title).ilike(like_query),
+                normalize_apostrophes_sql(SourceEdition.edition_label).ilike(like_query),
                 cast(SourceEdition.publication_year, String).ilike(like_query),
-                SourceWork.normalized_authors.ilike(normalized_like_query),
-                SourceWork.normalized_title.ilike(normalized_like_query),
+                normalize_apostrophes_sql(SourceWork.normalized_authors).ilike(normalized_like_query),
+                normalize_apostrophes_sql(SourceWork.normalized_title).ilike(normalized_like_query),
             )
         )
         .having(

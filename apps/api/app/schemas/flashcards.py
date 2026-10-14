@@ -4,6 +4,7 @@ from datetime import date, datetime
 from pydantic import BaseModel, Field
 
 from app.core.enums import FlashcardDirection, FlashcardGrade, FlashcardQueue
+from app.schemas.text import CanonicalText
 
 
 class FlashcardSettingsOut(BaseModel):
@@ -59,7 +60,7 @@ class FlashcardReviewRequest(BaseModel):
     direction: FlashcardDirection
     grade: FlashcardGrade
     response_ms: int | None = Field(default=None, ge=0, le=600_000)
-    user_response: str | None = Field(default=None, max_length=1000)
+    user_response: CanonicalText | None = Field(default=None, max_length=1000)
     list_id: uuid.UUID | None = None
 
 

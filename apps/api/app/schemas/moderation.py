@@ -10,6 +10,7 @@ from app.core.enums import (
     ReportStatus,
     ReportTargetType,
 )
+from app.schemas.text import CanonicalText
 
 
 class ModerationEntryOut(BaseModel):
@@ -69,8 +70,8 @@ class ModerationDashboardOut(BaseModel):
 
 
 class ModerationActionRequest(BaseModel):
-    notes: str | None = Field(default=None, max_length=1000)
-    reason: str | None = Field(default=None, max_length=120)
+    notes: CanonicalText | None = Field(default=None, max_length=1000)
+    reason: CanonicalText | None = Field(default=None, max_length=120)
 
 
 class ReportOut(BaseModel):
@@ -94,7 +95,7 @@ class ReportOut(BaseModel):
 
 class ReportReviewRequest(BaseModel):
     status: ReportStatus = ReportStatus.resolved
-    notes: str | None = Field(default=None, max_length=1000)
+    notes: CanonicalText | None = Field(default=None, max_length=1000)
 
 
 class UserParticipationRow(BaseModel):

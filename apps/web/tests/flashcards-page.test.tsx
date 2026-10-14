@@ -146,6 +146,47 @@ describe("FlashcardsPage", () => {
     expect(payload.user_response).toBe("padre");
   });
 
+  it("grades a mobile apostrophe as the expected glottal letter", async () => {
+    authState.currentUser = {
+      id: "u-apostrophe",
+      email: "apostrophe@example.com",
+      is_active: true,
+      is_verified: true,
+      is_superuser: false,
+      created_at: "2026-01-01T00:00:00Z",
+      updated_at: "2026-01-01T00:00:00Z",
+      profile: null,
+    };
+    getFlashcardSessionMock.mockResolvedValueOnce({
+      settings: { new_cards_per_day: 3, advanced_grading_enabled: false },
+      summary: { new_remaining: 1, review_remaining: 0, completed_today: 0, due_now: 1, due_later_today: 0 },
+      current_card: {
+        entry_id: "entry-apostrophe",
+        direction: "gloss_to_headword",
+        queue: "new",
+        slug: "eoar",
+        headword: "e‘õ’ar",
+        gloss_pt: "significado",
+        short_definition: "definição",
+        part_of_speech: "verb",
+      },
+      active_session: null,
+    });
+    const user = userEvent.setup();
+    renderWithProviders(<FlashcardsPage />);
+    const input = await screen.findByPlaceholderText("Sua resposta...");
+    await user.type(input, "e’õʼar");
+    expect(input).toHaveValue("e'õ'ar");
+    await user.click(screen.getByRole("button", { name: "Enviar" }));
+    await user.click(await screen.findByRole("button", { name: "Parabéns!" }));
+    await waitFor(() => expect(submitFlashcardReviewMock).toHaveBeenCalled());
+    expect(submitFlashcardReviewMock.mock.calls[0][0]).toMatchObject({
+      entry_id: "entry-apostrophe",
+      grade: "good",
+      user_response: "e'õ'ar",
+    });
+  });
+
   it("types an incorrect answer and gets study-more grade", async () => {
     authState.currentUser = {
       id: "u4",

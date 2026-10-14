@@ -10,14 +10,15 @@ import { useOrthography } from "@/lib/orthography";
 import { trackEvent } from "@/lib/analytics";
 import { playSfx } from "@/lib/sfx";
 import type { FlashcardCard, FlashcardGrade } from "@/lib/types";
+import { normalizeApostrophes, normalizeTextInput } from "@/lib/text";
 
 function normalizeAnswer(s: string): string {
-  return s.toLowerCase().replace(/\s+/g, " ").trim();
+  return normalizeApostrophes(s).toLowerCase().replace(/\s+/g, " ").trim();
 }
 
 // Strips whitespace and hyphens — used for the exact-match "good" check
 function normalizeStrict(s: string): string {
-  return s.toLowerCase().replace(/[\s\-]+/g, "");
+  return normalizeApostrophes(s).toLowerCase().replace(/[\s\-]+/g, "");
 }
 
 // ─── Diff engine ─────────────────────────────────────────────────────────────
@@ -460,7 +461,10 @@ export function FlashcardSession({
               ref={inputRef}
               type="text"
               value={userInput}
-              onChange={(e) => setUserInput(e.target.value)}
+              onChange={(event) => {
+                normalizeTextInput(event.currentTarget);
+                setUserInput(event.target.value);
+              }}
               onKeyDown={(e) => {
                 if (e.key === "Enter") handleSubmit();
               }}

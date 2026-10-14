@@ -1,3 +1,5 @@
+import { normalizeApostrophes } from "@/lib/text";
+
 import { normalizeExact, normalizeNoAccent } from "./orthography";
 
 const DICT_PATH = "/etymology/dict-conjugated.json";
@@ -81,13 +83,13 @@ export function buildSearchIndex(entries: DictionaryEntry[]): SearchIndexEntry[]
     item,
     firstWordExact: normalizeExact(item.first_word || ""),
     firstWordNoAccent: normalizeNoAccent(item.first_word || ""),
-    definitionLower: (item.definition || "").toLowerCase(),
+    definitionLower: normalizeApostrophes(item.definition || "").toLowerCase(),
     definitionNoAccent: normalizeNoAccent(item.definition || ""),
   }));
 }
 
 export function searchDictionary(entries: SearchIndexEntry[], query: string): SearchResult[] {
-  const trimmed = query.trim();
+  const trimmed = normalizeApostrophes(query).trim();
   if (!trimmed) return [];
 
   const queryLower = trimmed.toLowerCase();
@@ -149,7 +151,7 @@ function searchAllDefinitions(entries: SearchIndexEntry[], queryLower: string): 
   const escapedQuery = escapeRegExp(queryLower);
   const regex = new RegExp(`(^|[\\s.,;:!?()\"])${escapedQuery}($|[\\s.,;:!?()\"])`, "i");
   const filtered = entries.filter(
-    (entry) => entry.item.first_word.toLowerCase() !== queryLower && regex.test(entry.definitionLower),
+    (entry) => normalizeApostrophes(entry.item.first_word).toLowerCase() !== queryLower && regex.test(entry.definitionLower),
   );
   filtered.sort((a, b) => a.definitionLower.indexOf(queryLower) - b.definitionLower.indexOf(queryLower));
   return filtered;

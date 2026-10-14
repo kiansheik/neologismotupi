@@ -4,6 +4,7 @@ from datetime import datetime
 from pydantic import BaseModel, Field
 
 from app.schemas.badges import UserBadgeKind
+from app.schemas.text import CanonicalText
 
 
 class PublicProfileStatsOut(BaseModel):
@@ -58,10 +59,10 @@ class MentionResolveRequest(BaseModel):
 
 
 class ProfileUpdateRequest(BaseModel):
-    display_name: str | None = Field(default=None, min_length=2, max_length=120)
-    bio: str | None = Field(default=None, max_length=500)
-    affiliation_label: str | None = Field(default=None, max_length=120)
-    role_label: str | None = Field(default=None, max_length=120)
+    display_name: CanonicalText | None = Field(default=None, min_length=2, max_length=120)
+    bio: CanonicalText | None = Field(default=None, max_length=500)
+    affiliation_label: CanonicalText | None = Field(default=None, max_length=120)
+    role_label: CanonicalText | None = Field(default=None, max_length=120)
     website_url: str | None = Field(default=None, max_length=500)
     instagram_handle: str | None = Field(default=None, max_length=120)
     tiktok_handle: str | None = Field(default=None, max_length=120)
@@ -70,8 +71,8 @@ class ProfileUpdateRequest(BaseModel):
 
 
 class OrthographyMapItem(BaseModel):
-    from_value: str = Field(default="", alias="from", max_length=40)
-    to_value: str = Field(default="", alias="to", max_length=40)
+    from_value: CanonicalText = Field(default="", alias="from", max_length=40)
+    to_value: CanonicalText = Field(default="", alias="to", max_length=40)
 
     model_config = {"populate_by_name": True}
 

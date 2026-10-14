@@ -7,6 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.deps import SessionDep, get_current_user, get_current_user_optional
 from app.core.errors import raise_api_error
+from app.core.utils import normalize_apostrophes, normalize_apostrophes_sql
 from app.models.entry import Entry
 from app.models.flashcards import (
     FlashcardList,
@@ -125,14 +126,14 @@ async def list_flashcard_lists(
     else:
         filters.append(FlashcardList.is_public.is_(True))
     if q and q.strip():
-        pattern = f"%{q.strip()}%"
+        pattern = f"%{normalize_apostrophes(q).strip()}%"
         filters.append(
             or_(
-                FlashcardList.title_pt.ilike(pattern),
-                FlashcardList.title_en.ilike(pattern),
-                FlashcardList.description_pt.ilike(pattern),
-                FlashcardList.description_en.ilike(pattern),
-                FlashcardList.theme_label.ilike(pattern),
+                normalize_apostrophes_sql(FlashcardList.title_pt).ilike(pattern),
+                normalize_apostrophes_sql(FlashcardList.title_en).ilike(pattern),
+                normalize_apostrophes_sql(FlashcardList.description_pt).ilike(pattern),
+                normalize_apostrophes_sql(FlashcardList.description_en).ilike(pattern),
+                normalize_apostrophes_sql(FlashcardList.theme_label).ilike(pattern),
             )
         )
 

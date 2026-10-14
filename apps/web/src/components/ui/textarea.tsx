@@ -2,8 +2,10 @@ import clsx from "clsx";
 import { forwardRef } from "react";
 import type { TextareaHTMLAttributes } from "react";
 
+import { normalizeTextInput } from "@/lib/text";
+
 export const Textarea = forwardRef<HTMLTextAreaElement, TextareaHTMLAttributes<HTMLTextAreaElement>>(
-  ({ className, ...props }, ref) => (
+  ({ className, onChange, ...props }, ref) => (
     <textarea
       ref={ref}
       className={clsx(
@@ -12,6 +14,10 @@ export const Textarea = forwardRef<HTMLTextAreaElement, TextareaHTMLAttributes<H
         className,
       )}
       {...props}
+      onChange={(event) => {
+        normalizeTextInput(event.currentTarget);
+        onChange?.(event);
+      }}
     />
   ),
 );
